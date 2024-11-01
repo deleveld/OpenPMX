@@ -1,6 +1,6 @@
 # The `OpenPMX` project
 
-This is `OpenPMX`, a collection of numerical routines for estimation and simulation of mixed-effect pharmacokinetic and pharmacodynamic models.
+This repository contains a copy of the latest stable version of `OpenPMX`, collection of numerical routines for estimation and simulation of mixed-effect pharmacokinetic and pharmacodynamic models.
 
 - First-order conditional estimation results similar to industry standard [NONMEM](https://www.iconplc.com/solutions/technologies/nonmem)
 - Code and simulate/estimate models using text files allows scripting and integration with other tools
@@ -14,9 +14,6 @@ Unlike the licenses of proprietary pharmacometric software the license of `OpenP
 The GNU General Public License does not permit this software to be redistributed in proprietary programs.
 
 This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-
-# About this repository
-This repository contains a copy of the latest stable version of `OpenPMX`.
 
 # Philosophy
 - Do one thing and do it well.
@@ -38,8 +35,10 @@ In directory `schnider` the Schnider PK data reported in Schnider TW, Minto CF, 
 Andresen C, Goodale DB, Shafer SL, Youngs EJ. The influence of method of
 administration and covariates on the pharmacokinetics of propofol in adult
 volunteers. Anesthesiology 1998;88:1170-82. 
+
 In this example a 3-compartment allometric model is estimated.
 - `../../openpmx schnider.gp`
+
 The same example, but using a differential equation solver.
 - `../../openpmx schnider_diffeqn.gp`
 
