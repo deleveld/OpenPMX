@@ -38,8 +38,10 @@ In directory `schnider` the Schnider PK data reported in Schnider TW, Minto CF, 
 Andresen C, Goodale DB, Shafer SL, Youngs EJ. The influence of method of
 administration and covariates on the pharmacokinetics of propofol in adult
 volunteers. Anesthesiology 1998;88:1170-82. 
+
 In this example a 3-compartment allometric model is estimated.
 - `../../openpmx schnider.gp`
+
 The same example, but using a differential equation solver.
 - `../../openpmx schnider_diffeqn.gp`
 
