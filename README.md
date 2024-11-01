@@ -50,5 +50,5 @@ In directory `theo` these are the Theophylline data from the NONMEM distribution
 ### Warfarin
 In directory `warfarin` data obtained from [here](http://clinpharmacol.fmhs.auckland.ac.nz/docs/warfarin.csv) and [here](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://holford.fmhs.auckland.ac.nz/docs/pkpd-workshop-nonmem7.pdf).
 The PK analysis example is:
-`../../openpmx warfarin.gp`
+- `../../openpmx warfarin.gp`
 
