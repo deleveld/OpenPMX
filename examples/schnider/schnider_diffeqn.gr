@@ -1,0 +1,47 @@
+//
+//	Schnider T, Minto C, Gambus P, Andresen C, Goodale D, Shafer S, Youngs E:
+//	The influence of method of administration and covariates on the pharmacokinetics
+//	of propofol in adult volunteers. Anesthesiology 1998; 88:1170–82 PMID: 9605675
+//
+//	Data obtained from http://opentci.org/data/propofol/schnider-1998-study (Nov 6 2020)
+//	Only changed CP name to DV
+//
+$DATA("data.csv")
+$ADVAN(diffeqn_libgsl)
+	.firstonly = 1,
+	.nstate = 3,
+	.args.diffeqn.reltol = 1e-6,
+	.args.diffeqn.abstol = 1e-6,
+$IMODEL(V1, V2, V3, CL, Q2, Q3, SIZE)
+	SIZE = WT/70.;
+	V1 = THETA(1) * SIZE * exp(ETA(1));
+	V2 = THETA(2) * SIZE * exp(ETA(2));
+	V3 = THETA(3) * SIZE * exp(ETA(3));
+	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4));
+	Q2 = THETA(5) * pow(SIZE, 0.75) * exp(ETA(5));
+	Q3 = THETA(6) * pow(SIZE, 0.75) * exp(ETA(6));
+$DIFFEQN
+	const double K10 = CL/V1;
+	const double K12 = Q2/V1;
+	const double K21 = Q2/V2;
+	const double K13 = Q3/V1;
+	const double K31 = Q3/V3;
+	const double K1023 = K10 + K12 + K13;
+	DADT(1) = A(2)*K21 + A(3)*K31 - A(1)*K1023;
+	DADT(2) = A(1)*K12 - A(2)*K21;
+	DADT(3) = A(1)*K13 - A(3)*K31;
+$PREDICT(IPRED)
+	IPRED = A(1)/V1;
+	Y = IPRED*(1 + ERR(1));
+$THETA
+	{   1,   4,   10,  ESTIMATE     },
+	{   5,   20,   50,  ESTIMATE     },
+	{   20,   100,   1000,  ESTIMATE     },
+	{   0.1,   2,   5,  ESTIMATE     },
+	{   0.1,   2,   5,  ESTIMATE     },
+	{   0.1,   1,   5,  ESTIMATE     },
+$OMEGA(0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+$SIGMA(0.1)
+$MAIN
+	estimate();
+	table("ID, TIME, DV, EVID, PRED, Y", 0);

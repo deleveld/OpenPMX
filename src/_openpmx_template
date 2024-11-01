@@ -1,0 +1,61 @@
+########################################################################
+#
+# This file is part of OpenPMX (https://github.com/deleveld/openpmx).
+# Copyright (c) 2022 Douglas Eleveld.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+set -eu
+
+# control, object, and executable
+FILE="${1}"
+TEMP=$(mktemp -d)
+OBJFILE="${TEMP}/${FILE}.o"
+EXECFILE="${TEMP}/a.out"
+
+# cleanup at exit
+CLEANUP_MESSAGE="error: \"${0}\" failed"
+cleanup() {
+	echo "${CLEANUP_MESSAGE}"
+	rm -rf "${TEMP}"
+}
+trap cleanup EXIT
+
+# accept C code directly
+if [ "${FILE##*.}" = "c" ]; then
+	echo "compile: \"${FILE}\""
+	${CC} ${CFLAGS} -c "${FILE}" -I"${OPENPMXDIR}/include" -o "${OBJFILE}"
+
+# accept C++ code directly
+elif [ "${FILE##*.}" = "cpp" ]; then
+	echo "compile: \"${FILE}\""
+	g++ ${CPPFLAGS} -c "${FILE}" -I"${OPENPMXDIR}/include" -o  "${OBJFILE}"
+	CC=${CPP} # override for linking
+
+# translate control file to C code
+else
+	"${OPENPMXDIR}/bin/openpmxtran" "${FILE}"
+	echo "compile: \"${FILE}.c\""
+	${CC} ${CFLAGS} -c "${FILE}.c" -I"${OPENPMXDIR}/include" -o "${OBJFILE}"
+fi
+
+# we have object files, so link now
+echo "link: \"${OBJFILE}\""
+${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXDIR}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm
+
+echo "execute: \"${FILE}\""
+if [ -f "${EXECFILE}" ]; then
+	env LD_LIBRARY_PATH=${OPENPMXDIR}/lib:${LD_LIBRARY_PATH:-} "${EXECFILE}"
+	CLEANUP_MESSAGE=""
+fi
+

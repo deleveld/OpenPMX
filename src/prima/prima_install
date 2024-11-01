@@ -1,0 +1,9 @@
+### git clone --depth 1 https://github.com/libprima/prima.git
+### cd prima
+cmake -S . -B build -DCMAKE_INSTALL_PREFIX=install
+cmake --build build --target install
+
+cd c/examples/bobyqa
+cmake -S . -B build -DCMAKE_INSTALL_PREFIX=install -DPRIMA_DIR=$PWD/../../../install/lib/cmake/prima/
+cmake --build build --target install
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$PWD/../../../install/lib ./install/bin/bobyqa_example
