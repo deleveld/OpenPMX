@@ -20,6 +20,6 @@ $OMEGA(1, 1, 1, 1)
 $SIGMA(1, 1)
 $MAIN
 	estimate();
-	table("ID,wt,age,sex", .name="covariates", firstonly=true);
-	table("ID,time,dv,dvid,dv,mdv,evid,yhat,yhatvar", .name="pred);
+	table("ID,wt,age,sex", .name="covariates", .firstonly=true);
+	table("ID,time,dv,dvid,dv,mdv,EVID,yhat,yhatvar", .name="pred");
 

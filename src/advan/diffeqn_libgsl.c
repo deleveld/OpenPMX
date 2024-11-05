@@ -146,7 +146,7 @@ static void advancer_diffeqn_libgsl_advance_interval(ADVAN* advan,
 	advandes->args.rates = rates;
 	/* advandes->args.nstate = nstate; already set in constructor */
 
-	assert(advan->init_count > 0);
+	assert(advan->initcount > 0);
 
 	while (advan->time < endtime) {
 		let status = gsl_odeiv2_driver_apply(advandes->d, &advan->time, endtime, state);

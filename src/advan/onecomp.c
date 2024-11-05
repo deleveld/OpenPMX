@@ -66,7 +66,7 @@ static void advancer_onecomp_advance_interval(ADVAN* advan,
 	(void)record;
 	(void)popparam;
 
-	assert(advan->init_count > 0);
+	assert(advan->initcount > 0);
 
 	const double time = advan->time;
 

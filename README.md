@@ -1,6 +1,7 @@
 # The `OpenPMX` project
 
-This repository contains a copy of the latest stable version of `OpenPMX`, collection of numerical routines for estimation and simulation of mixed-effect pharmacokinetic and pharmacodynamic models.
+`OpenPMX` is a collection of numerical routines for estimation and simulation of mixed-effect pharmacokinetic and pharmacodynamic models.
+This repository contains a copy of the latest stable version.
 
 - First-order conditional estimation results similar to industry standard [NONMEM](https://www.iconplc.com/solutions/technologies/nonmem)
 - Code and simulate/estimate models using text files allows scripting and integration with other tools
@@ -15,17 +16,13 @@ The GNU General Public License does not permit this software to be redistributed
 
 This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
-# Philosophy
-- Do one thing and do it well.
-- Fewer dependencies are better.
-- Reproducability is good.
-
 # Install
-In the source directory run either:
-- `./install` default build (using PThreads)
-- `./install openmp` builds using OpenMP
-- `./install singlethread` use only a single threads
-This will build the library and a script `openpmx` with the installed paths.
+1. Install GNU Scientific Library [GSL](https://www.gnu.org/software/gsl/).
+2. Open a shell in the source directory and run either:
+	- `./install` default build using [pthreads](https://man7.org/linux/man-pages/man7/pthreads.7.html))
+	- `./install openmp` builds using [OpenMP](https://www.openmp.org/)
+	- `./install singlethread` use only a single threads
+3. After install a script `openpmx` will be built with the installed paths.
 
 # Examples
 Some examples are available. Open a shell in the particular example directory and run:
@@ -50,4 +47,9 @@ In directory `theo` these are the Theophylline data from the NONMEM distribution
 In directory `warfarin` data obtained from [here](http://clinpharmacol.fmhs.auckland.ac.nz/docs/warfarin.csv) and [here](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://holford.fmhs.auckland.ac.nz/docs/pkpd-workshop-nonmem7.pdf).
 The PK analysis example is:
 - `../../openpmx warfarin.gp`
+
+# Philosophy
+- Do one thing and do it well.
+- Fewer dependencies are better.
+- Reproducability is good.
 

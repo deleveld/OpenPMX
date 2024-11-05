@@ -21,7 +21,6 @@ $OMEGABLOCK(
 $SIGMA(1, 1)
 $MAIN
 	estimate();
-	simulate();
-	estimate();
 	table("ID BWT", .name="covariates", .firstonly=true);
 	table("ID TIME yhat yhatvar");
+

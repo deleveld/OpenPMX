@@ -144,15 +144,15 @@ static void advancer_threecomp_advance_interval(ADVAN* advan,
 	(void)popparam;
 
 	/* this advancer can only allow doses to first compartment */
-	assert(advan->init_count > 0);
+	assert(advan->initcount > 0);
 	assert(rates[0] >= 0.);
 	assert(rates[1] == 0.);
 	assert(rates[2] == 0.);
 
 	/* reset the internal imodel IMODEL if necessary */
-	if (advan->init_count != advanthreecomp->last_reset_count) {
+	if (advan->initcount != advanthreecomp->last_reset_count) {
 		imodel_threecomp_reset_macro_constants(advanthreecomp, imodel);
-		advanthreecomp->last_reset_count = advan->init_count;
+		advanthreecomp->last_reset_count = advan->initcount;
 	}
 
 	const double time = advan->time;

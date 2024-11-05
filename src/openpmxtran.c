@@ -223,7 +223,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 	var line = buffer;
 	var linebreak = strchr(line, '\n');
 	if (!linebreak)
-		fatal("could not fine line in data");
+		fatal("could not any lines in data");
 	*linebreak = 0;
 	while (line) {
 		const char delim[] = " \t,";
@@ -746,6 +746,13 @@ extern char openpmxtran_template[];
 			}
 			string_append(&res.output, begin + i);
 
+		} else if (match_recordname(begin, "${OPENPMXTRAN_IMODEL_FIELDS_DECLARE_AND_SET}\n", &i, false)) {
+			forvector(i, res.imodel_field_names) {
+				let s = res.imodel_field_names.data[i];
+				string_appendf(&res.output, "\tdouble %s = _imodel->%s;\n", s, s);
+			}
+			string_append(&res.output, begin + i);
+
 		} else if (match_recordname(begin, "${OPENPMXTRAN_RECORD_FIELDS_DEFINE}\n", &i, false)) {
 			forvector(i, res.record_field_names) {
 				let s = res.record_field_names.data[i];
@@ -939,14 +946,14 @@ char openpmxtran_template[] =
 "	const double* _theta = _popparam->theta;\n"
 "	const double* _eta = _popparam->eta;\n"
 "	const RECORD* const _record = _advanstate->record;\n"
-"	const int init_count = _advanstate->init_count;\n"
-"	(void) init_count;\n"
+"	const int initcount = _advanstate->initcount;\n"
+"	(void) initcount;\n"
 "\n"
 "	/* allow access to RECORD fields */\n"
 "${OPENPMXTRAN_RECORD_FIELDS_DEFINE}\n"
 "\n"
-"	/* declare IMODEL fields */\n"
-"${OPENPMXTRAN_IMODEL_FIELDS_DECLARE}\n"
+"	/* declare and set IMODEL fields */\n"
+"${OPENPMXTRAN_IMODEL_FIELDS_DECLARE_AND_SET}\n"
 "\n"
 "#define THETA(i) ((const double)_theta[i-1])\n"
 "#define ETA(i) ((const double)_eta[i-1])\n"
@@ -954,7 +961,7 @@ char openpmxtran_template[] =
 "#define ALAG(i) (_advanstate->amtlag[i-1])\n"
 "#define F(i) (_advanstate->bioavail[i-1])\n"
 "#define STATETIME (_advanstate->statetime)\n"
-"#define INITTIME(a) do { _advanstate->init_time = (a); } while (0)\n"
+"#define INITTIME(t) pmx_advan_inittime(_advanstate, (t))\n"
 "\n"
 "/* begin user code to init the IMODEL */\n"
 "${OPENPMXTRAN_IMODEL_FIELDS_CODE}\n"

@@ -69,7 +69,7 @@ typedef struct ADVAN {
 	ADVANINFUSION _infusions_buffer[OPENPMX_SIMULINFUSION_MAX];
 	VECTOR(ADVANINFUSION) infusions;
 
-	int init_count;
+	int initcount;
 } ADVAN;
 
 void advan_base_construct(ADVAN* advanbase, const ADVANFUNCS* advanfuncs);

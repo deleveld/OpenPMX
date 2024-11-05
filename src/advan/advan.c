@@ -29,7 +29,7 @@ void advan_base_construct(ADVAN* advan, const ADVANFUNCS* advanfuncs)
 
 	advan->advanfuncs = advanfuncs;
 	advan->time = NAN;
-	advan->init_count = 0;
+	advan->initcount = 0;
 
 	for (int i=0; i<OPENPMX_STATE_MAX; i++)
 		advan->bioavail[i] = 1.;
@@ -67,35 +67,37 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	var state = advan->state;
 
 	/* reset the state on first start or on EVID==3 or EVID==4 events */
-	let reset_state = (advan->init_count == 0 ||
+	let reset_state = (advan->initcount == 0 ||
 					   RECORDINFO_EVID(recordinfo, record) == 3 ||
 					   RECORDINFO_EVID(recordinfo, record) == 4);
 
-	var advan_init_time = DBL_MAX;
+	var advan_inittime = DBL_MAX;
 	if (advanconfig->firstonly == false || reset_state) {
 		if (reset_state) {
-			memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size);
+//			memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size);
 			memset(state, 0, OPENPMX_STATE_MAX * sizeof(double));
 			advan->time = RECORDINFO_TIME(recordinfo, record);
 			vector_resize(advan->infusions, 0);
 
 			/* for reset and reset-and-dose we should treat it like a discontinuitiy
 			 * This helps the ODE solver a lot I expect */
-			if (advan->init_count != 0 && advanfuncs->reset)
+			if (advan->initcount != 0 && advanfuncs->reset)
 				advanfuncs->reset(advan, 1);
 		}
 		var advanstate = (ADVANSTATE) {
+			.initcount = advan->initcount,
 			.statetime = advan->time,
+			.recordtime = RECORDINFO_TIME(recordinfo, record),
 			.record = record,
-			.init_count = advan->init_count,
 			.state = state,
 			.amtlag = advan->amtlag,
 			.bioavail = advan->bioavail,
-			.init_time = DBL_MAX,
+			._inittime = DBL_MAX,
 		};
 		advanconfig->init(imodel, &advanstate, popparam);
-		advan_init_time = advanstate.init_time;
-		++advan->init_count;
+		if (advanstate._inittime != DBL_MAX)
+			advan_inittime = advanstate._inittime;
+		++advan->initcount;
 	}
 
 	/* now handle any doses, if this is a dose add it to the list */
@@ -143,8 +145,8 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 				intervalstop = v->start;
 		}
 		/* call init when the user asks, but not in the past */
-		if (advan_init_time < intervalstop && advan_init_time > currenttime)
-			intervalstop = advan_init_time;
+		if (advan_inittime < intervalstop && advan_inittime > currenttime)
+			intervalstop = advan_inittime;
 
 		/* do we advance time at all */
 		if (intervalstop > currenttime) {
@@ -184,19 +186,21 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			advanfuncs->reset(advan, 0);
 
 		/* extra call to init if we are asked
-		 * setting init_time to the one asked is the sign that it is the extra call */
-		if (advan->time == advan_init_time) {
+		 * setting _inittime to the one asked is the sign that it is the extra call */
+		if (advan->time == advan_inittime) {
 			var advanstate = (ADVANSTATE) {
+				.initcount = advan->initcount,
 				.statetime = advan->time,
+				.recordtime = RECORDINFO_TIME(recordinfo, record),
 				.record = record,
-				.init_count = advan->init_count,
 				.state = state,
 				.amtlag = advan->amtlag,
 				.bioavail = advan->bioavail,
-				.init_time = advan_init_time,
+				._inittime = DBL_MAX,
 			};
 			advanconfig->init(imodel, &advanstate, popparam);
-			advan_init_time = advanstate.init_time;
+			if (advanstate._inittime != DBL_MAX)
+				advan_inittime = advanstate._inittime;
 		}
 
 	/* keep going till we have the state equal to the required record time */
@@ -207,6 +211,14 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		.state = state,
 		.record = record,
 	};
+}
+
+void pmx_advan_inittime(ADVANSTATE* const advanstate, const double t)
+{
+	if (t < advanstate->recordtime && t > advanstate->statetime) {
+		if (t < advanstate->_inittime)
+			advanstate->_inittime = t;
+	}
 }
 
 /*

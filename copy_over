@@ -1,0 +1,22 @@
+set -eu
+TEMP=`mktemp -d`
+trap "rmdir --ignore-fail-on-non-empty $TEMP" EXIT
+export LC_ALL=C
+
+# inform user if we fail prematurely
+COMPLETION_MESSAGE="WARNING: The script ${0} failed somewhere! The results may not be reliable!!!"
+function inform_error_state {
+	echo $COMPLETION_MESSAGE
+}
+trap inform_error_state EXIT
+
+SRC=~/openpmx-0.0.1
+DEST=~/Documents/GitHub/OpenPMX
+
+(cd ${DEST}; find * >"${TEMP}/list.txt")
+cat "${TEMP}/list.txt"
+(cd ${SRC};  zip -q ${TEMP}/files -@ <"${TEMP}/list.txt")
+(cd ${DEST}; unzip -qo ${TEMP}/files)
+
+COMPLETION_MESSAGE=""
+exit 0

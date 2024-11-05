@@ -68,16 +68,19 @@ typedef struct {
 /*---------------------------------------------------------------------*/
 typedef struct {
 	/* info about the record being processed */
+	const int initcount;
 	const double statetime;
+	const double recordtime;
 	const RECORD* const record;
-	const int init_count;
 
 	/* may be initialized in IMODEL_INIT */
 	double* const state;
 	double* const amtlag;
 	double* const bioavail;
-	double init_time;
+	double _inittime;
 } ADVANSTATE;
+
+void pmx_advan_inittime(ADVANSTATE* const advanstate, const double t);
 
 typedef	struct {
 	const double* const theta;

@@ -110,7 +110,7 @@ static void advancer_diffeqn_advance_interval(ADVAN* advan,
 	advandes->args.rates = rates;
 	/* advandes->args.nstate = nstate; already set in constructor */
 
-	assert(advan->init_count > 0);
+	assert(advan->initcount > 0);
 
 	let nstate = advandes->args.nstate;
 	double k1[nstate];

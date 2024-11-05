@@ -43,5 +43,7 @@ $THETA
 $OMEGA(0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
 $SIGMA(0.1)
 $MAIN
+//	openpmx.verbose=true;
 	estimate();
+
 	table("ID, TIME, DV, EVID, PRED, Y", 0);

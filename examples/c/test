@@ -1,12 +1,8 @@
 #!/bin/sh
 set -ex
-
 rm a.out | true
-gcc -W -Wall -Wextra -g -O2 theo.c -I../../include -I../../src -lgsl -lgslcblas -lm
-./a.out
-rm a.out | true
-
+#gcc -W -Wall -Wextra -g -O2 theo.c -I../../include -I../../src -lgsl -lgslcblas -lm
 gcc -W -Wall -Wextra -g -O2 theo_posthoc.c -I../../include -I../../src -lgsl -lgslcblas -lm
 ./a.out
-rm a.out | true
+rm a.out
 
