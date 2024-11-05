@@ -378,7 +378,7 @@ void print_iteration(FILE* f1,
 	openpmx_printf(f1, f2, 0, "\n");
 }
 
-void iterfile_popmodel_information(FILE* f2, const POPMODEL* const popmodel)
+void iterfile_popmodel_information(FILE* f2, const POPMODEL* const popmodel, const bool appendcode)
 {
 	if (popmodel->result.type == OBJFN_EVALUATE ||
 		popmodel->result.type == OBJFN_CURRENT ||
@@ -401,47 +401,110 @@ void iterfile_popmodel_information(FILE* f2, const POPMODEL* const popmodel)
 
 	/* info about theta */
 	let ntheta = popmodel->ntheta;
-	info(f2, "$THETA\n");
+	info(f2, "THETA(%i):\n", ntheta);
 	forcount(i, ntheta) {
 		let l = popmodel->lower[i];
 		let v = popmodel->theta[i];
 		let u = popmodel->upper[i];
-		let s = (popmodel->thetaestim[i] == ESTIMATE) ? "ESTIMATE" : "FIXED";
-		info(f2, "\t{" OPENPMX_FFORMAT ",\t" OPENPMX_FFORMAT ",\t" OPENPMX_FFORMAT ",\t %s },\n", l, v, u, s);
+		char ratiomessage[1024] = "";
+		if (popmodel->thetaestim[i] == ESTIMATE)
+			sprintf(ratiomessage, "%.1f", (v - l) / (u - l) * 100.);
+		info(f2, OPENPMX_FFORMAT " (%s)\n", v, ratiomessage);
 	}
 
-	/* TODO: This has to be done correctly, in the same blocks the user made
-	 * otherwise SAME blocks are screwed up. FIXME!!! */
 	/* info about omega matrix */
 	let nomega = popmodel->nomega;
-	info(f2, "$OMEGABLOCK( ");
+	info(f2, "OMEGA(%i):\n", nomega);
 	forcount(i, nomega) {
-		forcount(j, i+1) {
-			let v = popmodel->omega[i][j];
-			let s = (i == j && popmodel->omegafixed[i][j]) ? -1. : 1.;
-			if (i != 0)
-				info(f2, "\t");
-			info(f2, "%g", v * s);
-			if (i != j || i != nomega - 1)
-				info(f2, ",");
-			info(f2, "%s", s < 0. ? "/*FIX*/" :  "");
-		}
-		if (i == nomega - 1)
-			info(f2, ")");
+		forcount(j, i+1) 
+			info(f2, OPENPMX_FFORMAT " ", popmodel->omega[i][j]);
 		info(f2, "\n");
 	}
 
 	/* info about sigma */
 	let nsigma = popmodel->nsigma;
-	info(f2, "$SIGMA(");
-	forcount(i, nsigma) {
-		let v = popmodel->sigma[i];
-		let s = (popmodel->sigmafixed[i]) ? -1. : 1.;
-		info(f2, "\t%g", s * v);
-		if (i != nsigma - 1)
-			info(f2, ",");
-		info(f2, "%s", s < 0. ? "/*FIX*/" :  "");
+	info(f2, "SIGMA(%i):\n", nsigma);
+	forcount(i, nsigma) 
+		info(f2, OPENPMX_FFORMAT " ", popmodel->sigma[i]);
+	info(f2, "\n");
+
+	if (appendcode) {
+		/* info about theta */
+		info(f2, "$THETA\n");
+		forcount(i, ntheta) {
+			let l = popmodel->lower[i];
+			let v = popmodel->theta[i];
+			let u = popmodel->upper[i];
+			let s = (popmodel->thetaestim[i] == ESTIMATE) ? "ESTIMATE" : "FIXED";
+			info(f2, "\t{" OPENPMX_FFORMAT ",\t" OPENPMX_FFORMAT ",\t" OPENPMX_FFORMAT ",\t %s },\n", l, v, u, s);
+		}
+
+		var offset = 0;
+		let nblock = popmodel->nblock;
+		forcount(k, nblock) {
+			let ndim = popmodel->blockdim[k];
+			let type = popmodel->blocktype[k];
+			switch (type) {
+
+				case OMEGA_DIAG:
+					info(f2, "$OMEGA( ");
+					forcount(i, ndim) {
+						let v = popmodel->omega[offset + i][offset + i];
+						let s = popmodel->omegafixed[offset + i][offset + i] ? -1. : 1.;
+						info(f2, " %g", v * s);
+						if (i != ndim - 1)
+							info(f2, ",");
+						info(f2, "%s", s < 0. ? "/*FIX*/" :  "");
+					}
+					info(f2, ")\n");
+					break;
+
+				case OMEGA_BLOCK:
+					info(f2, "$OMEGABLOCK( ");
+					forcount(i, ndim) {
+						forcount(j, i+1) {
+							let v = popmodel->omega[offset + i][offset + j];
+							let s = (i == j && popmodel->omegafixed[offset + i][offset + j]) ? -1. : 1.;
+							if (i != 0)
+								info(f2, "\t");
+							info(f2, "%g", v * s);
+							if (i != j || i != ndim - 1)
+								info(f2, ",");
+							info(f2, "%s", s < 0. ? "/*FIX*/" :  "");
+						}
+						if (i == ndim - 1)
+							info(f2, ")");
+						else
+							info(f2, "\n");
+					}
+					break;
+
+				case OMEGA_SAME:
+					info(f2, "$OMEGASAME(%i)", ndim);
+					break;
+
+				default:
+					fatal(f2, "Invalid block type (%i) if size %i\n", type, ndim);
+					break;
+			}
+			offset += ndim;
+
+			if (k != nblock - 1)
+				info(f2, "\n");
+		}
+
+		/* info about sigma */
+
+		info(f2, "$SIGMA(");
+		forcount(i, nsigma) {
+			let v = popmodel->sigma[i];
+			let s = (popmodel->sigmafixed[i]) ? -1. : 1.;
+			info(f2, "\t%g", s * v);
+			if (i != nsigma - 1)
+				info(f2, ",");
+			info(f2, "%s", s < 0. ? "/*FIX*/" :  "");
+		}
+		info(f2, ")\n");
 	}
-	info(f2, ")\n");
 }
 

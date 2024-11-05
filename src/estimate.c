@@ -53,38 +53,47 @@ static void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const p
 			pmx->theta[i].value = theta[i];
 	}
 
-	let nblock = popmodel->nblock;
-	let blocktype = popmodel->blocktype;
-	let blockdim = popmodel->blockdim;
 	let omega = popmodel->omega;
 	let omegafixed = popmodel->omegafixed;
-	var n = 0;
-	forcount(k, nblock) {
-		let ndim = blockdim[k];
-		if (blocktype[k] == OMEGA_DIAG) {
-			forcount(i, ndim) {
-				double v = omega[n + i][n + i];
-				let f = omegafixed[n + i][n + i];
-				if (f != 0 && v != 0.)
-					v = -fabs(v);
-				pmx->omega[k].values[i] = v;
-			}
-		} else if (blocktype[k] == OMEGA_BLOCK) {
-			int blocki = 0;
-			forcount(i, ndim) {
-				forcount(j, i + 1) {
-					double v = omega[n + i][n + j];
-					let f = omegafixed[n + i][n + j];
+	var offset = 0;
+	forcount(k, popmodel->nblock) {
+		let ndim = popmodel->blockdim[k];
+		let type = popmodel->blocktype[k];
+		switch (type) {
+			
+			case OMEGA_DIAG:
+				forcount(i, ndim) {
+					double v = omega[offset + i][offset + i];
+					let f = omegafixed[offset + i][offset + i];
 					if (f != 0 && v != 0.)
 						v = -fabs(v);
-					pmx->omega[k].values[blocki] = v;
-					blocki++;
+					pmx->omega[k].values[i] = v;
 				}
-			}
-		} else {
-			assert(0);
+				break;
+				
+			case OMEGA_BLOCK:
+				int blocki = 0;
+				forcount(i, ndim) {
+					forcount(j, i + 1) {
+						double v = omega[offset + i][offset + j];
+						let f = omegafixed[offset + i][offset + j];
+						if (f != 0 && v != 0.)
+							v = -fabs(v);
+						pmx->omega[k].values[blocki] = v;
+						blocki++;
+					}
+				}
+				break;
+
+			case OMEGA_SAME:
+				/* we dont need to do anything here */
+				break;
+
+			default:
+				fatal(0, "Invalid block type (%i) if size %i\n", type, ndim);
+				break;
 		}
-		n += ndim;
+		offset += ndim;
 	}
 
 	let sigma = popmodel->sigma;
@@ -213,7 +222,7 @@ static void update_best_imodel(const int xlength,
 			let maxd = calculate_maxd(xlength, x);
 
 			if (options->verbose)
-				iterfile_popmodel_information(params->logstream, improved_model);
+				iterfile_popmodel_information(params->logstream, improved_model, false);
 			if (!options->brief) {
 				info_iteration(params->logstream, runtime_s, maxd, improved_model);
 				FILE* f = (options->verbose) ? stdout : 0;
@@ -660,7 +669,7 @@ static void estimate_popmodel(const char* filename,
 		}
 	}
 	if (!options->silent)
-		iterfile_popmodel_information(logstream, popmodel);
+		iterfile_popmodel_information(logstream, popmodel, false);
 	if (logstream)
 		fclose(logstream);
 	free(params.besteta);
@@ -723,7 +732,8 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 		options.estimate = estimconfig_default(estimate);
 		*estimate = options.estimate;
 	}
-	options.estimate.optim.step_final = options.estimate.optim.step_refine;
+	options.estimate.optim.step_refine = 1e-1;
+	options.estimate.optim.step_final = 1e-2;
 
 	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
 	popmodel.result.type = OBJFN_INITIAL;

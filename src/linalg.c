@@ -39,6 +39,12 @@ int cholesky_decomposition(gsl_matrix* matrix, const char* matrixname)
 	var mat = gsl_matrix_alloc(n, n);
 	gsl_matrix_memcpy(mat, matrix);
 
+//	forcount(i, n) {
+//		forcount(j, n) 
+//			printf("%f ", gsl_matrix_get(mat, i, j));
+//		printf("\n");
+//	}
+
 	/* try to do cholesky decomposition */
 	let oldhandler = gsl_set_error_handler_off();
 	let err = gsl_linalg_cholesky_decomp1(matrix);

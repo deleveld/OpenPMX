@@ -23,7 +23,7 @@ set -eu
 
 # general build flags
 CC="gcc"
-CFLAGS="-g -O2 -W -Wall -Wextra -Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init"
+CFLAGS="-g -O2 -W -Wall -Wextra -Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -march=native"
 CPP="g++"
 CPPFLAGS="-g -O2 -W -Wall -Wextra -Wfloat-conversion -Wformat -Werror=format-security -Wno-missing-field-initializers"
 LFLAGS="-flto"
