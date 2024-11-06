@@ -319,10 +319,10 @@ void extfile_trailer(const char* filename, const POPMODEL* const popmodel)
 	fclose(f);
 }
 
-void info_iteration(FILE* f1,
-					const double runtime_s,
-					const double d1,
-					const POPMODEL* popmodel)
+static void info_iteration(FILE* f1,
+						   const double runtime_s,
+						   const double d1,
+						   const POPMODEL* popmodel)
 {
 	let _objfn = popmodel->result.objfn;
 	let nfunc = popmodel->result.nfunc;
@@ -332,11 +332,11 @@ void info_iteration(FILE* f1,
 	info(f1, "\n");
 }
 
-void print_iteration(FILE* f1,
-					 FILE* f2,
-					 const POPMODEL* popmodel,
-					 const int xlength,
-					 const double* const x)
+static void print_iteration(FILE* f1,
+							FILE* f2,
+							const POPMODEL* popmodel,
+							const int xlength,
+							const double* const x)
 {
 	openpmx_printf(f1, f2, 0, "param:");
 
@@ -378,7 +378,7 @@ void print_iteration(FILE* f1,
 	openpmx_printf(f1, f2, 0, "\n");
 }
 
-void iterfile_popmodel_information(FILE* f2, const POPMODEL* const popmodel)
+void popmodel_information(FILE* f2, const POPMODEL* const popmodel)
 {
 	if (popmodel->result.type == OBJFN_EVALUATE ||
 		popmodel->result.type == OBJFN_CURRENT ||
@@ -429,7 +429,7 @@ void iterfile_popmodel_information(FILE* f2, const POPMODEL* const popmodel)
 	info(f2, "\n");
 }
 
-void iterfile_popmodel_initcode(FILE* f2, const POPMODEL* const popmodel)
+void popmodel_initcode(FILE* f2, const POPMODEL* const popmodel)
 {
 	/* info about theta */
 	openpmx_printf(f2, 0, 0, "$THETA\n");
@@ -507,4 +507,28 @@ void iterfile_popmodel_initcode(FILE* f2, const POPMODEL* const popmodel)
 	}
 	openpmx_printf(f2, 0, 0, ")\n");
 }
+
+void popmodel_eval_information(const POPMODEL* const popmodel,
+						   const double runtime_s,
+						   const char* filename,
+						   const bool verbose,
+						   const bool brief,
+						   FILE* outstream,
+						   const int xlength,
+						   const double* const x,
+						   const double maxd)
+{
+	if (verbose)
+		popmodel_information(outstream, popmodel);
+	if (!brief) {
+		info_iteration(outstream, runtime_s, 0, popmodel);
+		FILE* f = (verbose) ? stdout : 0;
+		print_iteration(f, outstream, popmodel, xlength, x);
+	}
+	if (filename) {
+		if (verbose || !brief)
+			extfile_append(filename, popmodel, maxd);
+	}
+}
+
 

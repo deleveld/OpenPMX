@@ -58,8 +58,12 @@ static void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const p
 	forcount(k, popmodel->nblock) {
 		let ndim = popmodel->blockdim[k];
 		let type = popmodel->blocktype[k];
+
+		assert((int)pmx->omega[k].type == type);
+		assert(pmx->omega[k].ndim == ndim);
+
 		switch (type) {
-			
+
 			case OMEGA_DIAG: {
 				forcount(i, ndim) {
 					double v = omega[offset + i][offset + i];
@@ -85,7 +89,7 @@ static void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const p
 				break;
 			}
 			case OMEGA_SAME: {
-				/* we dont need to do anything here */
+				/* we dont need to do anything here since the block is already */
 				break;
 			}
 			default:
@@ -183,7 +187,7 @@ typedef struct {
 	double* besteta;
 
 	struct timespec begin;
-	FILE* logstream;
+	FILE* outstream;
 	const char* filename;
 } STAGE2_PARAMS;
 
@@ -213,23 +217,19 @@ static void update_best_imodel(const int xlength,
 	if (options->verbose)
 		improved_model = popmodel;
 	if (improved_model) {
+		let maxd = calculate_maxd(xlength, x);
+
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
 		let runtime_s = timespec_time_difference(&params->begin, &now) / 1000.;
-
-		let maxd = calculate_maxd(xlength, x);
-
-		if (options->verbose)
-			iterfile_popmodel_information(params->logstream, improved_model);
-		if (!options->brief) {
-			info_iteration(params->logstream, runtime_s, maxd, improved_model);
-			FILE* f = (options->verbose) ? stdout : 0;
-			print_iteration(f, params->logstream, improved_model, xlength, x);
-		}
-		if (params->filename) {
-			if (options->verbose || !options->brief)
-				extfile_append(params->filename, improved_model, maxd);
-		}
+		popmodel_eval_information(improved_model,
+								  runtime_s,
+								  params->filename,
+								  options->verbose,
+								  options->brief,
+								  params->outstream,
+								  xlength, x,
+								  maxd);
 	}
 }
 
@@ -244,7 +244,7 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 	let popmodel = &params->test.popmodel;
 	let omegainfo = &params->test.omegainfo;
 	assert(_xlength == params->test.nparam);
-	encode_update_popmodel(&params->test, _x);
+	encode_update(&params->test, _x);
 
 	/* do the internal stage 1, start with eta from best run */
 	if (params->besteta) {
@@ -317,7 +317,6 @@ static const char* focei(STAGE2_PARAMS* const params)
 	var s = gsl_multimin_fminimizer_alloc(gsl_multimin_fminimizer_nmsimplex2, n);
 
 	/* Starting point */
-	encode_popmodel(&params->best, &params->test);
 	forcount(i, n)
 		initial[i] = 0.;
 	gsl_vector_set_all(ss, step_initial);
@@ -353,7 +352,6 @@ static const char* focei(STAGE2_PARAMS* const params)
 	let wsize = (npt+5)*(npt+n)+3*n*(n+5)/2 + 10; /* a little bit extra room to be sure */
 	let w = mallocvar(double, wsize);
 
-	encode_popmodel(&params->best, &params->test);
 	forcount(i, n)
 		initial[i] = 0.;
 
@@ -374,7 +372,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 		var lastobjfn = best->result.objfn;
 		var dobjfn = DBL_MAX - lastobjfn;
 		do {
-			encode_popmodel(&params->best, &params->test);
+			encode_reset(&params->test, &params->best);
 			forcount(i, n)
 				initial[i] = 0.;
 
@@ -412,8 +410,7 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 	let idata = params->idata;
 	let advanfuncs = params->advanfuncs;
 	let options = params->options;
-	let logstream = params->logstream;
-	let best = &params->best;
+	let outstream = params->outstream;
 
 	/* cleanup previous runs */
 	/* at each estimate or evaluate, the pred and state gets reset to zero */
@@ -431,10 +428,11 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 	/* first run so we can set objective function and yhat. */
 	/* this is the first evaluation */
 	/* we may have to evaluate several times for a stable objfn */
-	params->nfunc = 1; 
+	params->nfunc = 0; 
 	var done = false;
+	let popmodel = &params->test.popmodel;
 	while (!done) {
-		let popmodel = &params->test.popmodel;
+		let prev_objfn = popmodel->result.objfn;
 		let omegainfo = &params->test.omegainfo;
 		let nonzero = &omegainfo->nonzero;
 		SCATTEROPTIONS scatteroptions = { 0 };
@@ -445,50 +443,62 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 										 .type = OBJFN_CURRENT,
 										 .nfunc = params->nfunc };
 		/* are we stable? */
-		if (popmodel->result.objfn + 0.01 > best->result.objfn) 
+		/* besteta we update later, individual eta values keep getting updated */
+		if (fabs(popmodel->result.objfn - prev_objfn) < 0.01) 
 			done = true;
-										 
-		/* save as best result so far,
-		 * this will update best and besteta */
-		const double dummy[1] = { 0. };
-		update_best_imodel(1, dummy , params, best);
+
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		let runtime_s = timespec_time_difference(&params->begin, &now) / 1000.;
+		popmodel_eval_information(popmodel,
+								  runtime_s,
+								  params->filename,
+								  options->verbose,
+								  options->brief,
+								  params->outstream,
+								  0, 0, 0);
 
 		/* warn if we are not stable after 10 iterations */
 		if (!done && params->nfunc >= 10) {
-			warning(logstream, "initial evaluation not stable after %i iterations\n", params->nfunc);
+			warning(outstream, "initial evaluation not stable after %i iterations\n", params->nfunc);
 			done = true;
 		}
 	}
+	/* after the iterations, we save the besteta which we use to start with later */
+	memcpy(params->besteta, firstindivid->eta, idata->nindivid * idata->nomega * sizeof(double));
+	/* we dont really need this since we dont change popmodel or best since starting
+	 * best = *popmodel;
+	 * encode_reset(&params->test, best); */
 
 	/* call the underlying advan to optimize and find the best imodel */
 	let maxeval = options->estimate.optim.maxeval;
-	best->result.type = OBJFN_EVALUATE;
+	params->best.result.type = OBJFN_EVALUATE;
 	if (maxeval > 1) {
 		focei(params); /* TODO: this should be renamed I think */
-		best->result.type = OBJFN_FINAL;
-		best->result.nfunc = params->nfunc;
+		params->best.result.type = OBJFN_FINAL;
+		params->best.result.nfunc = params->nfunc;
 
 		/* TODO: we can add a posthoc test to make sure the result is stable */
 	}
 }
 
 typedef enum {
-	ITERFILE_HEADER_EVALUATE,
-	ITERFILE_HEADER_ESTIMATE,
-	ITERFILE_HEADER_RESAMPLE
-} ITERFILE_TYPE;
+	OUTFILE_HEADER_EVALUATE,
+	OUTFILE_HEADER_ESTIMATE,
+	OUTFILE_HEADER_RESAMPLE
+} OUTFILE_TYPE;
 
-static void iterfile_header(FILE* f2,
-							const ADVANFUNCS* const advanfuncs,
-							const IDATA* const idata,
-							const OPTIONS* const options,
-							const ITERFILE_TYPE iterfile_type)
+static void outfile_header(FILE* f2,
+						   const ADVANFUNCS* const advanfuncs,
+						   const IDATA* const idata,
+						   const OPTIONS* const options,
+						   const OUTFILE_TYPE outfile_type)
 {
 	assert(advanfuncs);
 	assert(idata);
 	assert(options);
 	
-	info(f2, "$LOGFILE\nOpenPMX %i.%i.%i\n", OPENPMX_VERSION_MAJOR, OPENPMX_VERSION_MINOR, OPENPMX_VERSION_RELEASE);
+	info(f2, "$OUTFILE\nOpenPMX %i.%i.%i\n", OPENPMX_VERSION_MAJOR, OPENPMX_VERSION_MINOR, OPENPMX_VERSION_RELEASE);
 
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 	char message[] = "pthread";
@@ -510,12 +520,12 @@ static void iterfile_header(FILE* f2,
 	if (f2)
 		advanfuncs->info(advanfuncs, f2);
 
-	if (iterfile_type == ITERFILE_HEADER_RESAMPLE)
+	if (outfile_type == OUTFILE_HEADER_RESAMPLE)
 		info(f2, "resample seed: %i\n", options->simulate.seed);
 
 /*
-	if (iterfile_type == ITERFILE_HEADER_EVALUATE ||
-		iterfile_type == ITERFILE_HEADER_ESTIMATE) {
+	if (outfile_type == OUTFILE_HEADER_EVALUATE ||
+		outfile_type == OUTFILE_HEADER_ESTIMATE) {
 		let stage1 = &options->estimate.stage1;
 		info(f2, "stage1 gradient step: %g\n", stage1->gradient_step);
 		info(f2, "stage1 step initial: %g\n", stage1->step_initial);
@@ -524,7 +534,7 @@ static void iterfile_header(FILE* f2,
 		info(f2, "stage1 omit icov resample: %s\n", stage1->omit_icov_resample ? "true" : "false");
 		info(f2, "stage1 max evaluations: %i\n", stage1->maxeval);
 	}
-	if (iterfile_type == ITERFILE_HEADER_ESTIMATE) {
+	if (outfile_type == OUTFILE_HEADER_ESTIMATE) {
 		let optim = &options->estimate.optim;
 		info(f2, "optim step initial: %g\n", optim->step_initial);
 		info(f2, "optim step refine: %g\n", optim->step_refine);
@@ -534,30 +544,20 @@ static void iterfile_header(FILE* f2,
 */
 }
 
-static void estimate_popmodel(const char* filename,
-							  IDATA* const idata,
-							  const ADVANFUNCS* const advanfuncs,
-							  POPMODEL* const popmodel,
-							  const OPTIONS* const options)
+static STAGE2_PARAMS stage2_params(const char* filename,
+								   IDATA* const idata,
+								   const ADVANFUNCS* const advanfuncs,
+								   POPMODEL* const popmodel,
+								   const OPTIONS* const options)
 {
 	/* setup output logging */
-	FILE* logstream = 0;
+	FILE* outstream = 0;
 	if (filename) {
-		logstream = results_fopen(filename, OPENPMX_LOGFILE, "w");
-		if (!logstream)
-			fatal(logstream, "%s: could not open file \"%s%s\"\n", __func__, filename, OPENPMX_LOGFILE);
+		outstream = results_fopen(filename, OPENPMX_OUTFILE, "w");
+		if (!outstream)
+			fatal(outstream, "%s: could not open file \"%s%s\"\n", __func__, filename, OPENPMX_OUTFILE);
 	}
 
-	const char* message = "Evaluate only";
-	var iterfile_type = ITERFILE_HEADER_EVALUATE;
-	let maxeval = options->estimate.optim.maxeval;
-	popmodel->result.type = OBJFN_INITIAL;
-	if (maxeval > 1) {
-		message = focei(0);
-		iterfile_type = ITERFILE_HEADER_ESTIMATE;
-	}
-
-	/* setup the minimizer */
 	var params = (STAGE2_PARAMS) {
 		.idata = idata,
 		.advanfuncs = advanfuncs,
@@ -567,28 +567,58 @@ static void estimate_popmodel(const char* filename,
 		.best = *popmodel,
 		.besteta = 0,
 		.begin = { 0 }, 							/* set after initialization */
-		.logstream = logstream,
+		.outstream = outstream,
 		.filename = filename,
 	};
 	clock_gettime(CLOCK_REALTIME, &params.begin);
 	assert(idata->nindivid > 0);
 	assert(idata->nomega > 0);
 
-	params.best.result = (PMXRESULT) { .objfn = DBL_MAX,
-									   .type = OBJFN_INVALID,
-									   .nfunc = 0 };	
+	params.best = params.test.popmodel; /* will set objfn to invalid */
 	params.besteta = callocvar(double, idata->nindivid * idata->nomega);
 
-	iterfile_header(logstream, advanfuncs, idata, options, iterfile_type);
-	if (maxeval > 1)
-		info(logstream, "optim %s\n", message);
+	/* make sure everything is consistent */
+	encode_reset(&params.test, &params.best);
 
-	idata_checkout(idata, advanfuncs, popmodel, options, logstream);
+	return params;
+}
 
+static void stage2_params_cleanup(STAGE2_PARAMS *params)
+{
+	if (params->outstream)
+		fclose(params->outstream);
+	free(params->besteta);
+}
+
+static void estimate_popmodel(const char* filename,
+							  IDATA* const idata,
+							  const ADVANFUNCS* const advanfuncs,
+							  POPMODEL* const popmodel,
+							  const OPTIONS* const options)
+{
+	const char* message = "Evaluate only";
+	var outfile_type = OUTFILE_HEADER_EVALUATE;
+	let maxeval = options->estimate.optim.maxeval;
+	popmodel->result.type = OBJFN_INITIAL;
+	if (maxeval > 1) {
+		message = focei(0);
+		outfile_type = OUTFILE_HEADER_ESTIMATE;
+	}
+
+	/* setup the minimizer */
+	var params = stage2_params(filename, idata, advanfuncs, popmodel, options);
+
+	/* do some logging */
 	/* start extfile and other headers, rest will be saved during iterations */
+	outfile_header(params.outstream, advanfuncs, idata, options, outfile_type);
 	var offset_1 = options->offset_1;
 	if (filename)
 		extfile_header(filename, &params.best, offset_1);
+	if (maxeval > 1)
+		info(params.outstream, "optim %s\n", message);
+
+	/* do the checkout */
+	idata_checkout(idata, advanfuncs, popmodel, options, params.outstream);
 
 	/* actually do the stage 2 estimation */
 	focei_popmodel_stage2(&params);
@@ -598,14 +628,15 @@ static void estimate_popmodel(const char* filename,
 	if (filename) {
 		table_phi_idata(filename, idata, offset_1);
 		extfile_trailer(filename, &params.best);
-		table_icov_resample_idata(filename, idata, offset_1);
+		if (!options->estimate.stage1.omit_icov_resample)
+			table_icov_resample_idata(filename, idata, offset_1);
 	}
-	iterfile_popmodel_information(logstream, popmodel);
-	if (logstream) {
-		iterfile_popmodel_initcode(logstream, popmodel);
-		fclose(logstream);
-	}
-	free(params.besteta);
+	popmodel_information(params.outstream, popmodel); /* writes to stdout too */
+	if (params.outstream) 
+		popmodel_initcode(params.outstream, popmodel);
+
+	/* cleanup */
+	stage2_params_cleanup(&params);
 }
 
 void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)

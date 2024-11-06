@@ -62,19 +62,20 @@ void extfile_append(const char* filename,
 					const double maxd);
 void extfile_trailer(const char* filename, const POPMODEL* const popmodel);
 
-void info_iteration(FILE* f1,
-					const double runtime_s,
-					const double d1,
-					const POPMODEL* popmodel);
-void print_iteration(FILE* f1,
-					 FILE* f2,
-					 const POPMODEL* popmodel,
-					 const int xlength,
-					 const double* const x);
-void iterfile_popmodel_information(FILE* f2,
-								   const POPMODEL* const popmodel);
-void iterfile_popmodel_initcode(FILE* f2,
-								const POPMODEL* const popmodel);
+void popmodel_eval_information(const POPMODEL* const popmodel,
+							   const double runtime_s,
+							   const char* filename,
+							   const bool verbose,
+							   const bool brief,
+							   FILE* outstream,
+							   const int xlength,
+							   const double* const x,
+							   const double maxd);
+
+void popmodel_information(FILE* f2,
+						  const POPMODEL* const popmodel);
+void popmodel_initcode(FILE* f2,
+					   const POPMODEL* const popmodel);
 
 #ifdef __cplusplus
 }

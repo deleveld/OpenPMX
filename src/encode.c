@@ -78,6 +78,7 @@ ENCODE encode_init(const POPMODEL* const popmodel)
 		.omegainfo = temp_omegainfo,
 		.nparam = encode_nparam(popmodel, &temp_omegainfo),
 		.offset = { 0 },
+		.has_been_reset = false,
 	};
 }
 
@@ -144,21 +145,21 @@ static void scale_to_match_diagonal(gsl_matrix* matrix, const gsl_matrix* ref)
 	gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1., &temp.matrix, &scale.matrix, 0., matrix);
 }
 
-void encode_popmodel(const POPMODEL* popmodel, ENCODE* const encode)
+/* encode the popmodel, setting the offsets */
+void encode_reset(ENCODE* const encode, const POPMODEL* const popmodel)
 {
-	var x = mallocvar(double, encode->nparam);
-	
-	let omegainfo = &encode->omegainfo;
 	encode->popmodel = *popmodel;
 
-	let etheta = popmodel->theta;
-	let sigma = popmodel->sigma;
-	let thetaestim = popmodel->thetaestim;
-	let sigmafixed = popmodel->sigmafixed;
-	let ntheta = popmodel->ntheta;
-	let nsigma = popmodel->nsigma;
+	/* update the lndet, but this may not be necessary */
+	var omegainfo = &encode->omegainfo;
 
+	/* we write directly into the offset */
+	var x = encode->offset;
+	
 	var n = 0;
+	let etheta = popmodel->theta;
+	let ntheta = popmodel->ntheta;
+	let thetaestim = popmodel->thetaestim;
 	forcount(i, ntheta) {
 		if (thetaestim[i] != FIXED) {
 			let l = popmodel->lower[i];
@@ -168,6 +169,9 @@ void encode_popmodel(const POPMODEL* popmodel, ENCODE* const encode)
 			++n;
 		}
 	}
+	let sigma = popmodel->sigma;
+	let nsigma = popmodel->nsigma;
+	let sigmafixed = popmodel->sigmafixed;
 	forcount(i, nsigma) {
 		if (sigmafixed[i] == 0) {
 			let s = sigma[i];
@@ -234,9 +238,9 @@ void encode_popmodel(const POPMODEL* popmodel, ENCODE* const encode)
 	}
 	assert(n == encode->nparam);
 
-	forcount(i, n) 
-		encode->offset[i] = x[i];
-	free(x);
+	omegainfo_update_inverse_lndet(omegainfo, popmodel->omega);
+
+	encode->has_been_reset = true;
 }
 
 static void fill_in_OMEGA_SAME_blocks(POPMODEL* const popmodel)
@@ -281,11 +285,12 @@ static void popmodel_omega_update(POPMODEL* const popmodel,
 	fill_in_OMEGA_SAME_blocks(popmodel);
 }
 
-void encode_update_popmodel(ENCODE* encode, const double* x)
+void encode_update(ENCODE* encode, const double* x)
 {
+	assert(encode->has_been_reset == true);
+
 	var popmodel = &encode->popmodel;
 	var omegainfo = &encode->omegainfo;
-	
 	let offset = encode->offset;
 	
 	var n = 0;

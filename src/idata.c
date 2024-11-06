@@ -214,6 +214,7 @@ void table_phi_idata(const char* filename,
 					 const IDATA* const idata,
 					 const bool offset_1)
 {
+	assert(filename);
 	var f = results_fopen(filename, OPENPMX_PHIFILE, "w");
 	assert(f);
 
@@ -280,9 +281,8 @@ void table_icov_resample_idata(const char* filename,
 							   const IDATA* const idata,
 							   const bool offset_1)
 {
-	let baseindivid = &idata->individ[0];
-	if (baseindivid->icovweight == 0)
-		return;
+	assert(filename);
+	assert(idata->individ[0].icovweight != 0);
 
 	var f = results_fopen(filename, OPENPMX_ICOVRESAMPLEFILE, "w");
 	assert(f);

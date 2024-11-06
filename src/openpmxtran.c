@@ -254,11 +254,14 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 			char* rest = line;
 			string_appendf(data, "\t{\t");
 			while ((token = strtok_r(rest, delim, &rest))) {
-				var s = token;
+				var s = strdup(token);
 				strip_firstlast_space(s);
-				if (strcmp(token, ".") == 0)
-					s = "NAN";
+				if (strcmp(token, ".") == 0) {
+					free(s);
+					s = strdup("NAN");
+				}
 				string_append(data, s);
+				free(s);
 				if (n < vector_size(*fieldnames) - 1)
 					string_append(data, ",");
 				++n;

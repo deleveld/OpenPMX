@@ -377,7 +377,7 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
  * via the Akaike weights. Maybe we could also use the cholesky
  * points, but then the specific points used will depend on the ordering
  * of the etas and that is not desirable for an optimization method */
-static double stage1_icov_resample(gsl_matrix * const reducedicov,
+static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 								   double* icovweight,
 								   double* icovsample,
 								   const int nreta,
@@ -395,7 +395,8 @@ static double stage1_icov_resample(gsl_matrix * const reducedicov,
 	gsl_eigen_symmv(ework, eval, evec, w);
 
 	/* There will be 2*nreta samples and weights and the allocated memory
-	 * will allow 2*nomega. The unused ones will be denoted by zero weights */
+	 * will allow 2*nomega. The unused ones will be denoted by zero weights
+	 * and zero sample etas */
 	let nomega = stage1_params->ievaluate_args.popparam.nomega;
 	memset(icovweight, 0, 2 * nomega * sizeof(double));
 	memset(icovsample, 0, 2 * nomega * nomega * sizeof(double));
@@ -405,10 +406,9 @@ static double stage1_icov_resample(gsl_matrix * const reducedicov,
 	double testreta[OPENPMX_OMEGA_MAX] = { 0 };
 
 	/* for each eigenvector */
-	let sample_scale = 1.1;
 	forcount(i, nreta) {
 		/* magnitude of step is the square root of eigenvalue */
-		var stepsize = sqrt(gsl_vector_get(eval, i)) * sample_scale;
+		var stepsize = sqrt(gsl_vector_get(eval, i));
 		if (stepsize < stage1_params->stage1->gradient_step)
 			stepsize = stage1_params->stage1->gradient_step;
 
@@ -421,8 +421,7 @@ static double stage1_icov_resample(gsl_matrix * const reducedicov,
 		var etaval_iobjfn = stage1_evaluate_individual_iobjfn(nreta, testreta, (void*)stage1_params);
 		var delta = etaval_iobjfn - base_iobjfn;
 		var lik = exp(-0.5*delta);
-		let w1 = lik / exp(-0.5*pow(sample_scale, 2));
-//		printf("weight %f\n", w1);
+		let w1 = lik / exp(-0.5*1.);
 
 		/* save the eta used in the individual */
 		icovweight[i * 2] = w1;
@@ -438,8 +437,7 @@ static double stage1_icov_resample(gsl_matrix * const reducedicov,
 		etaval_iobjfn = stage1_evaluate_individual_iobjfn(nreta, testreta, (void*)stage1_params);
 		delta = etaval_iobjfn - base_iobjfn;
 		lik = exp(-0.5*delta);
-		let w2 = lik / exp(-0.5*pow(sample_scale, 2));
-//		printf("weight %f\n", w2);
+		let w2 = lik / exp(-0.5*1.);
 
 		/* save the eta used in the individual */
 		icovweight[i * 2 + 1] = w2;
@@ -447,18 +445,12 @@ static double stage1_icov_resample(gsl_matrix * const reducedicov,
 			icovsample[(i * 2 + 1) * nomega + k] = stage1_params->testeta[k];
 	}
 
-	/* do weighted covariance calculation of the sampled points.
-	 * We weight by 0.5 because we sample twice (forward and backward)
-	 * for each eigenvector. We dont find the mean because otherwise
-	 * our covariance estimate would require bessel correction (I think)
-	 * this way we are measuring the covariance around the MAP minimum
-	 * This matrix is not used for anything really, we only need icov_lndet
-	 * maybe we should not really keep it. On the other hand it is in
-	 * the PHI file so users might expect it. It should be in the documentation
-	 * that this is the symmetric matrix used for sampling and not the
-	 * one that determined log(det) */
-	/* TODO: the weights are on SD, does that mean different weights on variance ??? */
-	forcount(j, nreta) {
+	/* should we do weighted covariance calculation of the sampled points?
+	 * NO because the lndet_icov does not match the sampling matrix!
+	 * It should be in the documentation that this is the symmetric matrix
+	 * used for sampling and not the one that determined log(det) */
+	/* For now we just keep the sampling icov in the same place */
+/*	forcount(j, nreta) {
 		forcount(k, j + 1) {
 			var s = 0.;
 			forcount(i, nreta * 2) {
@@ -472,7 +464,8 @@ static double stage1_icov_resample(gsl_matrix * const reducedicov,
 			gsl_matrix_set(reducedicov, j, k, s);
 			gsl_matrix_set(reducedicov, k, j, s);
 		}
-	}
+	} */
+	
 	/* we have to average the weights on the eigenvectors
 	 * and take advantage of the fact that determinant of a matrix is
 	 * the product of its eigenvectors, in this case, scaled eigenvectors,
@@ -488,9 +481,11 @@ static double stage1_icov_resample(gsl_matrix * const reducedicov,
 		let w1 = icovweight[i * 2];
 		let w2 = icovweight[i * 2 + 1];
 		let eivar = gsl_vector_get(eval, i);
-		let eisd = sqrt(eivar) * (w1 + w2) / 2.; /* average the weights, i.e, two of them weighted by 0.5 */
-//		sumlogeval += log(eisd*eisd);
-		sumlogeval += 2.*log(eisd);
+		let eisd1 = sqrt(eivar); 						/* distance in positive direction */
+		let eisd2 = sqrt(eivar); 						/* distance in negative direction */
+		let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
+//		sumlogeval += log(eiwgtsd*eiwgtsd);
+		sumlogeval += 2.*log(eiwgtsd);
 	}
 	let icov_lndet = -1. * sumlogeval; /* we get lndet from inverse, so we have -1 here */
 

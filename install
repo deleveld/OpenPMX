@@ -21,12 +21,14 @@ TARGET="${1:-pthread}"
 
 set -eu
 
-# general build flags
+# compiler
 CC="gcc"
-## CC="clang"
-CFLAGS="-g -O2 -W -Wall -Wextra -Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -march=native"
+### CC="clang"
+
+# general build flags
+CFLAGS="-g -O2 -W -Wall -Wextra -Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -march=native -Wwrite-strings"
 CPP="g++"
-CPPFLAGS="-g -O2 -W -Wall -Wextra -Wfloat-conversion -Wformat -Werror=format-security -Wno-missing-field-initializers"
+CPPFLAGS="-g -O2 -W -Wall -Wextra -Wfloat-conversion -Wformat -Werror=format-security -Wno-missing-field-initializers -Wwrite-strings"
 LFLAGS="-flto"
 RM="rm -f"
 AR="ar r"
