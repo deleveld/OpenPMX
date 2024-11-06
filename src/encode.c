@@ -20,6 +20,7 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
+#include <values.h>
 
 #include "encode.h"
 #include "linalg.h"
@@ -66,21 +67,19 @@ static int encode_nparam(const POPMODEL* const popmodel,
 
 ENCODE encode_init(const POPMODEL* const popmodel)
 {
-	var temp = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed);
-	
+	var temp_popmodel = *popmodel;
+	temp_popmodel.result = (PMXRESULT) { .objfn = DBL_MAX,
+										 .type = OBJFN_INVALID,
+										 .nfunc = 0 };	
+	var temp_omegainfo = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed);
+
 	return (ENCODE) {
-		.popmodel = *popmodel,
-		.omegainfo = temp,
-		.nparam = encode_nparam(popmodel, &temp),
+		.popmodel = temp_popmodel,
+		.omegainfo = temp_omegainfo,
+		.nparam = encode_nparam(popmodel, &temp_omegainfo),
 		.offset = { 0 },
 	};
 }
-
-/* TODO: this value seems arbitrary but seems to work well in most cases */
-#define THETA_TRANSFORM_SCALE 		1. //	4. // 10
-#define SIGMA_TRANSFORM_SCALE 		1. //	4.
-#define OMEGA_TRANSFORM_SCALE 		1. //	1.
-#define OFFDIAG_TRANSFORM_SCALE 	1. //	4.
 
 #define ENCODE_ATANH
 //#define ENCODE_LINEAR
@@ -165,14 +164,14 @@ void encode_popmodel(const POPMODEL* popmodel, ENCODE* const encode)
 			let l = popmodel->lower[i];
 			let v = etheta[i];
 			let u = popmodel->upper[i];
-			x[n] = theta_transform(v, l, u) * THETA_TRANSFORM_SCALE;
+			x[n] = theta_transform(v, l, u);
 			++n;
 		}
 	}
 	forcount(i, nsigma) {
 		if (sigmafixed[i] == 0) {
 			let s = sigma[i];
-			x[n] = log(s) * SIGMA_TRANSFORM_SCALE;
+			x[n] = log(s);
 			++n;
 		}
 	}
@@ -218,13 +217,13 @@ void encode_popmodel(const POPMODEL* popmodel, ENCODE* const encode)
 				if (fixed == 0) {
 					if (i == j) {
 						let s = popmodel->omega[r][c];
-						x[n] = log(s) * OMEGA_TRANSFORM_SCALE;
+						x[n] = log(s);
 					} else {
 						let s = gsl_matrix_get(z, j, i);
 						/* see above webpage close to the text
 						 * "The final stage of the transform reverses the
 						 * hyperbolic tangent transform, which is defined by" */
-						x[n] = atanh(s) * OFFDIAG_TRANSFORM_SCALE;
+						x[n] = atanh(s);
 					}
 					++n;
 				}
@@ -296,7 +295,7 @@ void encode_update_popmodel(ENCODE* encode, const double* x)
 	forcount(i, ntheta) {
 		if (thetaestim[i] != FIXED) {
 			var l = popmodel->lower[i];
-			var v = (x[n] + offset[n]) / THETA_TRANSFORM_SCALE;
+			var v = (x[n] + offset[n]);
 			var u = popmodel->upper[i];
 			var estvalue = theta_untransform(v, l, u);
 			etheta[i] = estvalue;
@@ -308,7 +307,7 @@ void encode_update_popmodel(ENCODE* encode, const double* x)
 	let sigmafixed = popmodel->sigmafixed;
 	forcount(i, nsigma) {
 		if (sigmafixed[i] == 0) {
-			let s = (x[n] + offset[n]) / SIGMA_TRANSFORM_SCALE;
+			let s = (x[n] + offset[n]);
 			sigma[i] = exp(s);
 			++n;
 		}
@@ -339,9 +338,9 @@ void encode_update_popmodel(ENCODE* encode, const double* x)
 				if (fixed == 0) {
 					let s = (x[n] + offset[n]);
 					if (i == j)
-						gsl_matrix_set(S, i, i, exp(s / OMEGA_TRANSFORM_SCALE));
+						gsl_matrix_set(S, i, i, exp(s));
 					else
-						gsl_matrix_set(z, j, i, tanh(s / OFFDIAG_TRANSFORM_SCALE));
+						gsl_matrix_set(z, j, i, tanh(s));
 					++n;
 				}
 			}
@@ -397,5 +396,10 @@ void encode_update_popmodel(ENCODE* encode, const double* x)
 	/* foce advan need to see updated omega cholesky and lndet */
 	/* we assume the empty rows and cols dont change */
 	omegainfo_update_inverse_lndet(omegainfo, popmodel->omega);
+
+	/* invalidate the objfn because we dont know it anymore */
+	popmodel->result = (PMXRESULT) { .objfn = DBL_MAX,
+									 .type = OBJFN_INVALID,
+									 .nfunc = 0 };
 }
 

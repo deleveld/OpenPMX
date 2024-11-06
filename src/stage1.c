@@ -38,7 +38,6 @@
 
 /*--------------------------------------------------------------------*/
 /* different optimizers */
-//#define OPTIMIZER_INNER_PRIMA
 #define OPTIMIZER_INNER_BOBYQA
 
 /* different ways to calculate sample min2ll */
@@ -199,16 +198,6 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 #include "bobyqa/bobyqa.h"
 #endif
 
-#ifdef OPTIMIZER_INNER_PRIMA
-#include "prima/c/include/prima/prima.h"
-static void prima_inner_fun(const double x[], double *const f, const void *data)
-{
-	let stage1_params = (const STAGE1_PARAMS * const) data;
-
-	*f = stage1_evaluate_individual_iobjfn(stage1_params->nonzero->n, x, data);
-}
-#endif
-
 /* NOTE: this function must be thread safe and only touch individual data */
 static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX],
 											const STAGE1_PARAMS* const stage1_params)
@@ -238,42 +227,6 @@ static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 	let n = nreta;
 	assert(n < OPENPMX_OMEGA_MAX);
 	let neval = stage1->maxeval;
-
-#ifdef OPTIMIZER_INNER_PRIMA
-    prima_problem_t pproblem;
-    prima_init_problem(&pproblem, n);
-    pproblem.x0 = reta;
-    pproblem.xl = lower;
-    pproblem.xu = upper;
-    pproblem.calfun = prima_inner_fun;
-
-    prima_options_t poptions;
-    prima_init_options(&poptions);
-    poptions.iprint = PRIMA_MSG_NONE;
-    poptions.maxfun = neval;
-    poptions.callback = 0;
-    poptions.data = stage1_params;
-
-	if (all_eta_zero) {
-		poptions.rhobeg = stage1->step_initial;
-		poptions.rhoend = stage1->step_refine;
-		prima_result_t result;
-		const prima_rc_t rc = prima_minimize(PRIMA_BOBYQA, pproblem, poptions, &result);
-		(void) rc;
-		forcount(i, nreta)
-			reta[i] = result.x[i];
-		prima_free_result(&result);
-	}
-	
-	poptions.rhobeg = stage1->step_refine;
-	poptions.rhoend = stage1->step_final;
-	prima_result_t result;
-	const prima_rc_t rc = prima_minimize(PRIMA_BOBYQA, pproblem, poptions, &result);
-	(void) rc;
-	forcount(i, nreta)
-		reta[i] = result.x[i];
-	prima_free_result(&result);
-#endif
 
 #ifdef OPTIMIZER_INNER_BOBYQA
 	int retcode;

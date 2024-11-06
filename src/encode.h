@@ -29,7 +29,8 @@ typedef struct {
 	POPMODEL popmodel;
 	OMEGAINFO omegainfo;
 	const int nparam;
-	double offset[OPENPMX_THETA_MAX];
+	/* this is more than enough room because we only need lower triangular omega */
+	double offset[OPENPMX_THETA_MAX + OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX + OPENPMX_SIGMA_MAX]; 
 } ENCODE;
 
 ENCODE encode_init(const POPMODEL* const popmodel);

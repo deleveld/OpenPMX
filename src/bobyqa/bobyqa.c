@@ -1,3 +1,7 @@
+/*-----------------------------------------------------------------------
+  small changes made to bobyqa.c by Douglas Eleveld deleveld@dds.nl
+  to avoid compiler warnings about possibly unused unitialized values
+ -----------------------------------------------------------------------*/
 /*
  * bobyqa.c -
  *
@@ -221,6 +225,10 @@ objfun_test(const INTEGER n, const REAL* x, void* data)
 {
   INTEGER i;
   REAL f, temp, tempa, tempb;
+
+  /* Douglas Eleveld deleveld@dds.nl
+   * avoid unused warning */
+  (void) data;
 
   f = 0.0;
   for (i = 4; i <= n; i += 2) {
@@ -1903,6 +1911,12 @@ rescue(const INTEGER n, const INTEGER npt,
     sfrac, sum, sumpq, temp, vlmxsq, vquad, winc, xp, xq;
   INTEGER i, ih, ihp, ihq, ip, iq, iw, j, jp, jpn, k, knew, kold, kpt,
     np, nptm, nrem;
+
+  /* Douglas Eleveld deleveld@dds.nl
+   * avoid unitialized warning */
+  ihp = 0;
+  xq = 0;
+  xp = 0;
 
   /* Parameter adjustments to comply with FORTRAN indexing. */
   zmat   -= 1 + npt;

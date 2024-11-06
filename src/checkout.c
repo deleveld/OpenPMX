@@ -61,16 +61,14 @@ void idata_checkout(const IDATA* const idata,
 					const OPTIONS* const options,
 					FILE* logstream)
 {
-	if (!options->silent)
-		info(logstream, "check: begin\n");
+	info(logstream, "check: begin\n");
 
 	SCATTEROPTIONS scatteroptions = { 0 };
 	scatteroptions.checkout_errors = true;
 	scatteroptions.logstream = logstream;
 	scatter_threads(idata, advanfuncs, popmodel, 0, options, &scatteroptions, idata_checkout_thread);
 
-	if (!options->silent)
-		info(logstream, "check: end\n");
+	info(logstream, "check: end\n");
 
 /* checkout is only called just before a run to we dont have to stop the
  * threads as they will be used shortly anyway. */

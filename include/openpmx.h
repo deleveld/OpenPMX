@@ -208,7 +208,6 @@ typedef struct {
 	bool offset_1;
 	bool verbose;
 	bool brief;
-	bool silent;
 
 	/* the problem structure to analyse */
 	const DATACONFIG data;

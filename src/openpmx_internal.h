@@ -36,7 +36,6 @@ typedef struct {
 	SIMCONFIG simulate;
 	bool verbose;
 	bool brief;
-	bool silent;
 } OPTIONS;
 
 OPTIONS options_default(const OPTIONS* const opt1);

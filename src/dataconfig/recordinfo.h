@@ -81,7 +81,7 @@ inline double RECORDINFO_MDV(const RECORDINFO* const recordinfo, const RECORD* p
 inline double RECORDINFO_EVID(const RECORDINFO* const recordinfo, const RECORD* p)
 {
 	if (recordinfo->offsetEVID == -1)
-		return (RECORDINFO_MDV(recordinfo, p) ? 1. : 0.);
+		return (RECORDINFO_MDV(recordinfo, p) != 0 ? 1. : 0.);
 	else
 		return *(const double*)((const char*)p + recordinfo->offsetEVID);
 }

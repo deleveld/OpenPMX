@@ -1,3 +1,8 @@
+#-----------------------------------------------------------------------
+# small changes made to bobyqa.c by Douglas Eleveld deleveld@dds.nl
+# to avoid compiler warnings about possibly unused unitialized values
+#-----------------------------------------------------------------------
+
 # C version of BOBYQA
 
 This provides a C implementation of Mike Powell's BOBYQA algorithm for

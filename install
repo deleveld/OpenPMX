@@ -23,6 +23,7 @@ set -eu
 
 # general build flags
 CC="gcc"
+## CC="clang"
 CFLAGS="-g -O2 -W -Wall -Wextra -Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -march=native"
 CPP="g++"
 CPPFLAGS="-g -O2 -W -Wall -Wextra -Wfloat-conversion -Wformat -Werror=format-security -Wno-missing-field-initializers"
@@ -30,8 +31,6 @@ LFLAGS="-flto"
 RM="rm -f"
 AR="ar r"
 LIBNAME="libopenpmx.so"
-
-# CFLAGS="-g -O2"
 
 # openpmx source files
 SOURCEFILES="openpmx.c
@@ -73,6 +72,11 @@ if [ "${TARGET}" = "clean" ]; then
 	exit 0
 fi
 
+# cleaner compiles on clang
+if [ "${CC}" = "clang" ]; then
+	CFLAGS="${CFLAGS} -Wno-gnu-auto-type"
+fi
+
 # install flag for OpenMP target
 if [ "${TARGET}" = "openmp" ]; then
 	echo "OpenPMX build: OpenMP"
@@ -90,8 +94,8 @@ elif [ "${TARGET}" = "pthread" ]; then
 # install flag for sanitize target
 elif [ "${TARGET}" = "sanitize" ]; then
 	echo "OpenPMX build: pthread/sanitize"
-	CFLAGS="${CFLAGS} -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
-	LFLAGS="${LFLAGS} -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
+	CFLAGS="${CFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
+	LFLAGS="${LFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
 	echo '#define OPENPMX_PARALLEL_PTHREADS' >src/openpmx_compile_options.h
 	echo '#define OPENPMX_SANATIZE' >>src/openpmx_compile_options.h
 

@@ -127,7 +127,6 @@ OPTIONS options_init_from_pmx(const OPENPMX* const pmx)
 
 		.verbose = pmx->verbose,
 		.brief = pmx->brief,
-		.silent = pmx->silent,
 	};
 	return options_default(&ret);
 }

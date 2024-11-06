@@ -72,8 +72,9 @@ void print_iteration(FILE* f1,
 					 const int xlength,
 					 const double* const x);
 void iterfile_popmodel_information(FILE* f2,
-								   const POPMODEL* const popmodel,
-								   const bool appendcode);
+								   const POPMODEL* const popmodel);
+void iterfile_popmodel_initcode(FILE* f2,
+								const POPMODEL* const popmodel);
 
 #ifdef __cplusplus
 }
