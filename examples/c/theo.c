@@ -89,6 +89,7 @@ int main(void)
 		.advan = {
 			.init = imodel_init,
 			.predict = imodel_predict,
+			.diffeqn = 0,
 			.imodelfields = {
 				.size = sizeof(IMODEL),
 				.field = {
