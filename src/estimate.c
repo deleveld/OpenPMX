@@ -374,7 +374,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 						 rhobeg, rhoend,
 						 iprint, neval, w);
 	if (retcode != BOBYQA_SUCCESS)
-		info(0, "initial BOBYQA error code %i\n", retcode);
+		info(params->outstream, "initial BOBYQA error code %i\n", retcode);
 
 	if (options->estimate.optim.fast == false && step_final < step_refine) {
 		let best = &params->best;
@@ -388,17 +388,17 @@ static const char* focei(STAGE2_PARAMS* const params)
 			neval = maxeval - params->nfunc;
 			rhobeg = step_refine;
 			rhoend = step_final;
-			info(0, "refine: rho %f to %f\n", rhobeg, rhoend);
+			info(params->outstream, "refine: rho %f to %f\n", rhobeg, rhoend);
 			retcode = bobyqa(n, npt,
 							 focei_stage2_evaluate_population_objfn, (void*)params,
 							 initial, lower, upper,
 							 rhobeg, rhoend,
 							 iprint, neval, w);
 			if (retcode != BOBYQA_SUCCESS)
-				info(0, "refine BOBYQA error code %i\n", retcode);
+				info(params->outstream, "refine BOBYQA error code %i\n", retcode);
 
 			dobjfn = best->result.objfn - lastobjfn;
-			info(0, "dobjfn %f\n", dobjfn);
+			info(params->outstream, "dobjfn %f\n", dobjfn);
 			lastobjfn = best->result.objfn;
 		}
 		while (dobjfn < -0.01);
