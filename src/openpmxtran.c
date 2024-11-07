@@ -223,7 +223,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 	var line = buffer;
 	var linebreak = strchr(line, '\n');
 	if (!linebreak)
-		fatal("could not any lines in data");
+		fatal("no lines in data");
 	*linebreak = 0;
 	while (line) {
 		const char delim[] = " \t,";
@@ -254,11 +254,14 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 			char* rest = line;
 			string_appendf(data, "\t{\t");
 			while ((token = strtok_r(rest, delim, &rest))) {
-				var s = token;
+				var s = strdup(token);
 				strip_firstlast_space(s);
-				if (strcmp(token, ".") == 0)
-					s = "NAN";
+				if (strcmp(token, ".") == 0) {
+					free(s);
+					s = strdup("NAN");
+				}
 				string_append(data, s);
+				free(s);
 				if (n < vector_size(*fieldnames) - 1)
 					string_append(data, ",");
 				++n;
@@ -287,7 +290,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 	string_append(config, "\t\t.writeable = OPENPMXTRAN_DATA_NAME,\n");
 	string_append(config, "\t\t.records = OPENPMXTRAN_DATA_NAME,\n");
 	string_appendf(config, "\t\t.nrecords = %i,\n", nrows);
-	string_appendf(config, "\t\t.offset_1 = true,\n");
+	string_appendf(config, "\t\t._offset1 = true,\n");
 	string_append(config, "\t\t.recordfields = {\n");
 	string_append(config, "\t\t\t.size = sizeof(RECORD),\n");
 	string_append(config, "\t\t\t.field = {\n");
@@ -731,7 +734,7 @@ extern char openpmxtran_template[];
 			string_appendf(&res.output, "\"%s\"\n", res.filename.data);
 			string_append(&res.output, begin + i);
 
-		} else if (match_recordname(begin, "${OPENPMXTRAN_INCLUDE_FILE}\n", &i, false)) {
+		} else if (match_recordname(begin, "${OPENPMXTRAN_DATA_ARRAY}\n", &i, false)) {
 			string_appendf(&res.output, "%s\n", res.data.data);
 			string_append(&res.output, begin + i);
 
@@ -929,9 +932,9 @@ char openpmxtran_template[] =
 "#define OPENPMXTRAN_DEFAULT_FILENAME \\\n"
 "${OPENPMXTRAN_DEFAULT_FILENAME}\n"
 "\n"
-"/* begin OPENPMXTRAN_INCLUDE_FILE */\n"
-"${OPENPMXTRAN_INCLUDE_FILE}\n"
-"/* end OPENPMXTRAN_INCLUDE_FILE */\n"
+"/* begin OPENPMXTRAN_DATA_ARRAY */\n"
+"${OPENPMXTRAN_DATA_ARRAY}\n"
+"/* end OPENPMXTRAN_DATA_ARRAY */\n"
 "\n"
 "typedef struct IMODEL {\n"
 "/* begin OPENPMXTRAN_IMODEL_FIELDS_DECLARE */\n"
@@ -955,13 +958,13 @@ char openpmxtran_template[] =
 "	/* declare and set IMODEL fields */\n"
 "${OPENPMXTRAN_IMODEL_FIELDS_DECLARE_AND_SET}\n"
 "\n"
-"#define THETA(i) ((const double)_theta[i-1])\n"
-"#define ETA(i) ((const double)_eta[i-1])\n"
-"#define A(i) (_advanstate->state[i-1])\n"
-"#define ALAG(i) (_advanstate->amtlag[i-1])\n"
-"#define F(i) (_advanstate->bioavail[i-1])\n"
-"#define STATETIME (_advanstate->statetime)\n"
-"#define INITTIME(t) pmx_advan_inittime(_advanstate, (t))\n"
+"#define THETA(i) 		((const double)_theta[i-1])\n"
+"#define ETA(i) 		((const double)_eta[i-1])\n"
+"#define A(i) 			(_advanstate->state[i-1])\n"
+"#define ALAG(i) 		(_advanstate->amtlag[i-1])\n"
+"#define F(i) 			(_advanstate->bioavail[i-1])\n"
+"#define STATETIME 		(_advanstate->statetime)\n"
+"#define INITTIME(t) 	pmx_advan_inittime(_advanstate, (t))\n"
 "\n"
 "/* begin user code to init the IMODEL */\n"
 "${OPENPMXTRAN_IMODEL_FIELDS_CODE}\n"
@@ -1005,11 +1008,11 @@ char openpmxtran_template[] =
 "	/* declare IMODEL fields */\n"
 "${OPENPMXTRAN_IMODEL_FIELDS_DEFINE}\n"
 "\n"
-"#define THETA(i) ((const double)_theta[i-1])\n"
-"#define ETA(i) ((const double)_eta[i-1])\n"
-"#define STATE(i) ((const double)_state[i-1])\n"
-"#define A(i) ((const double)_state[i-1])\n"
-"#define DADT(i) (_dadt[i-1])\n"
+"#define THETA(i) 	((const double)_theta[i-1])\n"
+"#define ETA(i) 	((const double)_eta[i-1])\n"
+"#define STATE(i) 	((const double)_state[i-1])\n"
+"#define A(i) 		((const double)_state[i-1])\n"
+"#define DADT(i) 	(_dadt[i-1])\n"
 "\n"
 "/* begin user code to do the differential equations */\n"
 "${OPENPMXTRAN_IMODEL_DIFFEQN_CODE}\n"
@@ -1044,11 +1047,11 @@ char openpmxtran_template[] =
 "	/* declare PREDICTVARS fields */\n"
 "${OPENPMXTRAN_PREDPARAMS_FIELDS_DECLARE}\n"
 "\n"
-"#define THETA(i) ((const double)_theta[i-1])\n"
-"#define ETA(i) ((const double)_popparam->eta[i-1])\n"
-"#define A(i) ((const double)_state[i-1])\n"
-"#define ERR(i) ((const double)_err[i-1])\n"
-"#define EPS(i) ((const double)_err[i-1])\n"
+"#define THETA(i) 	((const double)_theta[i-1])\n"
+"#define ETA(i) 	((const double)_popparam->eta[i-1])\n"
+"#define A(i) 		((const double)_state[i-1])\n"
+"#define ERR(i) 	((const double)_err[i-1])\n"
+"#define EPS(i) 	((const double)_err[i-1])\n"
 "\n"
 "/* begin user code to do prediction, set Y and PREDICTVARS */\n"
 "${OPENPMXTRAN_PREDICT_CODE}\n"
@@ -1086,7 +1089,7 @@ char openpmxtran_template[] =
 "static OPENPMX openpmx = (OPENPMX) {\n"
 "	.filename = OPENPMXTRAN_DEFAULT_FILENAME,\n"
 "	.nthread = 0,\n"
-"	.offset_1 = true,\n"
+"	._offset1 = true,\n"
 "	.data = \n"
 "/* begin OPENPMXTRAN_DATA_CONFIG */\n"
 "${OPENPMXTRAN_DATA_CONFIG}\n"

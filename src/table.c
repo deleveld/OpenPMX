@@ -247,7 +247,7 @@ int table_row(TABLE* const table)
 	return 1;
 }
 
-double table_value(const TABLE* const table, const char* const name, const bool offset_1)
+double table_value(const TABLE* const table, const char* const name, const bool _offset1)
 {
 	let idata = table->idata;
 	let advanfuncs = table->advanfuncs;
@@ -293,7 +293,7 @@ double table_value(const TABLE* const table, const char* const name, const bool 
 	var i = -1;
 
 	/* normal C access */
-	if (offset_1 == false) {
+	if (_offset1 == false) {
 		if (sscanf(name, "theta[%i]", &i)) {
 			assert(i >= 0 && i < idata->ntheta);
 			return table->theta[i].value;
@@ -359,7 +359,7 @@ void pmx_table(OPENPMX* pmx,
 	while (table_row(&table)) {
 		forvector(i, table.fieldnames) {
 			let name = table.fieldnames.data[i];
-			let val = table_value(&table, name, pmx->offset_1);
+			let val = table_value(&table, name, pmx->_offset1);
 			fprintf(f, OPENPMX_TABLE_FORMAT, val);
 		}
 		fputc('\n', f);

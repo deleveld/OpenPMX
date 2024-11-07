@@ -23,17 +23,17 @@ $PREDICT(IPRED)
 	IPRED = A(1)/V1;
 	Y = IPRED*(1 + ERR(1));
 $THETA
-	{   2,   5,  15,	ESTIMATE     },
-	{   5,   20,   50,  ESTIMATE     },
-	{   20,   100,   1000,  ESTIMATE     },
-	{   0.1,   2,   5,  ESTIMATE     },
-	{   0.1,   2,   5,  ESTIMATE     },
-	{   0.1,   1,   5,  ESTIMATE     },
-	{ 0, 0, 0, FIXED } , // {   -2,   1,   2,  ESTIMATE     },
-	{ 0, 0, 0, FIXED } , // {   -100,   1,   100,  ESTIMATE     },
-	{ 1, 1, 1, FIXED } , // {   -1,   1,   2,  ESTIMATE     },
-$OMEGA(.1, .1, .1, .1, .1, .1)
-$SIGMA(.1)
+	{            2,	      5,		           15,	 ESTIMATE },
+	{            5,	      20,		           50,	 ESTIMATE },
+	{           20,	      100,		         1000,	 ESTIMATE },
+	{          0.1,	      1,		            5,	 ESTIMATE },
+	{          0.1,	      1,		            5,	 ESTIMATE },
+	{          0.1,	     0.5,		            5,	 ESTIMATE },
+	{            0,	            0,	            0,	 FIXED },
+	{            0,	            0,	            0,	 FIXED },
+	{            1,	            1,	            1,	 FIXED },
+$OMEGA(0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+$SIGMA(	0.0513934)
 $MAIN
 	estimate();
 	table("ID,AGE,WT,HT,M1F2", .name="covariates");

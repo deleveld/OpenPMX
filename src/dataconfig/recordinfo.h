@@ -37,7 +37,7 @@ typedef struct {
 	const int offsetAMT;
 	const int offsetRATE;
 	const int offsetCMT;
-	const bool offset_1;
+	const bool _offset1;
 	const int ndata;
 	const int nindivid;
 	const int nobs;
@@ -81,7 +81,7 @@ inline double RECORDINFO_MDV(const RECORDINFO* const recordinfo, const RECORD* p
 inline double RECORDINFO_EVID(const RECORDINFO* const recordinfo, const RECORD* p)
 {
 	if (recordinfo->offsetEVID == -1)
-		return (RECORDINFO_MDV(recordinfo, p) ? 1. : 0.);
+		return (RECORDINFO_MDV(recordinfo, p) != 0 ? 1. : 0.);
 	else
 		return *(const double*)((const char*)p + recordinfo->offsetEVID);
 }
@@ -108,7 +108,7 @@ static inline double RECORDINFO_CMT(const RECORDINFO* const recordinfo, const RE
 		return 0.;
 
 	const double ret = *(const double*)((const char*)p + recordinfo->offsetCMT);
-	if (recordinfo->offset_1)
+	if (recordinfo->_offset1)
 		return ret - 1;
 	return ret;
 }

@@ -31,12 +31,11 @@ extern "C" {
 
 typedef struct {
 	int nthread;
-	const bool offset_1;
+	const bool _offset1;
 	ESTIMCONFIG estimate;
 	SIMCONFIG simulate;
 	bool verbose;
 	bool brief;
-	bool silent;
 } OPTIONS;
 
 OPTIONS options_default(const OPTIONS* const opt1);

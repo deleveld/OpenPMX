@@ -212,13 +212,14 @@ void idata_free_icovresample(const IDATA* const idata)
 
 void table_phi_idata(const char* filename,
 					 const IDATA* const idata,
-					 const bool offset_1)
+					 const bool _offset1)
 {
+	assert(filename);
 	var f = results_fopen(filename, OPENPMX_PHIFILE, "w");
 	assert(f);
 
 	let nomega = idata->nomega;
-	let indexoffset = offset_1 ? 1 : 0;
+	let indexoffset = _offset1 ? 1 : 0;
 
 	fprintf(f, OPENPMX_SFORMAT, "SUBJECT_NO");
 	fprintf(f, OPENPMX_HEADER_FORMAT, "ID");
@@ -278,17 +279,16 @@ void table_phi_idata(const char* filename,
 
 void table_icov_resample_idata(const char* filename,
 							   const IDATA* const idata,
-							   const bool offset_1)
+							   const bool _offset1)
 {
-	let baseindivid = &idata->individ[0];
-	if (baseindivid->icovweight == 0)
-		return;
+	assert(filename);
+	assert(idata->individ[0].icovweight != 0);
 
 	var f = results_fopen(filename, OPENPMX_ICOVRESAMPLEFILE, "w");
 	assert(f);
 
 	let nomega = idata->nomega;
-	let indexoffset = offset_1 ? 1 : 0;
+	let indexoffset = _offset1 ? 1 : 0;
 
 	fprintf(f, OPENPMX_SFORMAT, "SUBJECT_NO");
 	fprintf(f, OPENPMX_HEADER_FORMAT, "ID");

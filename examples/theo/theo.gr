@@ -12,7 +12,7 @@ $PREDICT(IPRED)
     Y = IPRED * (1 + ERR(1)) + ERR(2);
 $THETA
 	{ 0.1, 15, 50, ESTIMATE },
-	{ 0.0001, 0.1, 1, ESTIMATE },
+	{ 0.0001, 0.1, 0.3, ESTIMATE },
 	{ 0.0001, 0.5, 5, ESTIMATE },
 $OMEGABLOCK(
 	.1,

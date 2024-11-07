@@ -99,10 +99,10 @@ void idata_free_icovresample(const IDATA* const idata);
 
 void table_phi_idata(const char* filename,
 					 const IDATA* const idata,
-					 const bool offset_1);
+					 const bool _offset1);
 void table_icov_resample_idata(const char* filename,
 							   const IDATA* const idata,
-							   const bool offset_1);
+							   const bool _offset1);
 
 #ifdef __cplusplus
 }

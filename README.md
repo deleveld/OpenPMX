@@ -17,18 +17,19 @@ The GNU General Public License does not permit this software to be redistributed
 This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 # Install
-1. Install GNU Scientific Library [GSL](https://www.gnu.org/software/gsl/).
+1. Install the GNU Scientific Library [GSL](https://www.gnu.org/software/gsl/).
+	- Ubuntu: `sudo apt install libgsl-dev`
 2. Open a shell in the source directory and run either:
 	- `./install` default build using [pthreads](https://man7.org/linux/man-pages/man7/pthreads.7.html))
 	- `./install openmp` builds using [OpenMP](https://www.openmp.org/)
 	- `./install singlethread` use only a single threads
-3. After install a script `openpmx` will be built with the installed paths.
+3. Install builds a script `openpmx` with the installed paths.
 
 # Examples
 Some examples are available. Open a shell in the particular example directory and run:
 
 ### Propofol
-In directory `schnider` the Schnider PK data reported in Schnider TW, Minto CF, Gambus PL,
+In the directory `schnider` are the Schnider PK data reported in Schnider TW, Minto CF, Gambus PL,
 Andresen C, Goodale DB, Shafer SL, Youngs EJ. The influence of method of
 administration and covariates on the pharmacokinetics of propofol in adult
 volunteers. Anesthesiology 1998;88:1170-82. 
@@ -44,7 +45,7 @@ In directory `theo` these are the Theophylline data from the NONMEM distribution
 - `../../openpmx theo.gp`
 
 ### Warfarin
-In directory `warfarin` data obtained from [here](http://clinpharmacol.fmhs.auckland.ac.nz/docs/warfarin.csv) and [here](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://holford.fmhs.auckland.ac.nz/docs/pkpd-workshop-nonmem7.pdf).
+In directory `warfarin` contains data obtained from [here](http://clinpharmacol.fmhs.auckland.ac.nz/docs/warfarin.csv) and [here](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://holford.fmhs.auckland.ac.nz/docs/pkpd-workshop-nonmem7.pdf).
 The PK analysis example is:
 - `../../openpmx warfarin.gp`
 

@@ -71,8 +71,6 @@ int main(void)
 {
 	OPENPMX openpmx = (OPENPMX) {
 		.filename = "theo.c",
-		.nthread = 0,
-		.offset_1 = false,
 		.data = {
 			.writeable = data,
 			.records = data,
@@ -91,7 +89,6 @@ int main(void)
 		.advan = {
 			.init = imodel_init,
 			.predict = imodel_predict,
-			.diffeqn = 0,
 			.imodelfields = {
 				.size = sizeof(IMODEL),
 				.field = {

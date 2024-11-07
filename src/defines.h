@@ -22,7 +22,7 @@
 extern "C" {
 #endif
 
-#define OPENPMX_LOGFILE 				".out"
+#define OPENPMX_OUTFILE 				".out"
 #define OPENPMX_EXTFILE 				".ext"
 #define OPENPMX_PHIFILE 				".phi"
 #define OPENPMX_ICOVRESAMPLEFILE 		".icov"

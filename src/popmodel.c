@@ -184,13 +184,13 @@ POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
 
 void extfile_header(const char* filename,
 					const POPMODEL* const popmodel,
-					const bool offset_1)
+					const bool _offset1)
 {
 	var f = results_fopen(filename, OPENPMX_EXTFILE, "w");
 	assert(f);
 
 	char temp[1024];
-	let indexoffset = offset_1 ? 1 : 0;
+	let indexoffset = _offset1 ? 1 : 0;
 
 	fprintf(f, OPENPMX_SFORMAT, "ITERATION");
 	let ntheta = popmodel->ntheta;
@@ -319,10 +319,10 @@ void extfile_trailer(const char* filename, const POPMODEL* const popmodel)
 	fclose(f);
 }
 
-void info_iteration(FILE* f1,
-					const double runtime_s,
-					const double d1,
-					const POPMODEL* popmodel)
+static void info_iteration(FILE* f1,
+						   const double runtime_s,
+						   const double d1,
+						   const POPMODEL* popmodel)
 {
 	let _objfn = popmodel->result.objfn;
 	let nfunc = popmodel->result.nfunc;
@@ -332,11 +332,11 @@ void info_iteration(FILE* f1,
 	info(f1, "\n");
 }
 
-void print_iteration(FILE* f1,
-					 FILE* f2,
-					 const POPMODEL* popmodel,
-					 const int xlength,
-					 const double* const x)
+static void print_iteration(FILE* f1,
+							FILE* f2,
+							const POPMODEL* popmodel,
+							const int xlength,
+							const double* const x)
 {
 	openpmx_printf(f1, f2, 0, "param:");
 
@@ -378,7 +378,7 @@ void print_iteration(FILE* f1,
 	openpmx_printf(f1, f2, 0, "\n");
 }
 
-void iterfile_popmodel_information(FILE* f2, const POPMODEL* const popmodel)
+void popmodel_information(FILE* f2, const POPMODEL* const popmodel)
 {
 	if (popmodel->result.type == OBJFN_EVALUATE ||
 		popmodel->result.type == OBJFN_CURRENT ||
@@ -401,47 +401,134 @@ void iterfile_popmodel_information(FILE* f2, const POPMODEL* const popmodel)
 
 	/* info about theta */
 	let ntheta = popmodel->ntheta;
-	info(f2, "$THETA\n");
+	info(f2, "THETA(%i):\n", ntheta);
 	forcount(i, ntheta) {
 		let l = popmodel->lower[i];
 		let v = popmodel->theta[i];
 		let u = popmodel->upper[i];
-		let s = (popmodel->thetaestim[i] == ESTIMATE) ? "ESTIMATE" : "FIXED";
-		info(f2, "\t{" OPENPMX_FFORMAT ",\t" OPENPMX_FFORMAT ",\t" OPENPMX_FFORMAT ",\t %s },\n", l, v, u, s);
+		char ratiomessage[1024] = "";
+		if (popmodel->thetaestim[i] == ESTIMATE)
+			sprintf(ratiomessage, "%.1f", (v - l) / (u - l) * 100.);
+		info(f2, OPENPMX_FFORMAT " (%s)\n", v, ratiomessage);
 	}
 
-	/* TODO: This has to be done correctly, in the same blocks the user made
-	 * otherwise SAME blocks are screwed up. FIXME!!! */
 	/* info about omega matrix */
 	let nomega = popmodel->nomega;
-	info(f2, "$OMEGABLOCK( ");
+	info(f2, "OMEGA(%i):\n", nomega);
 	forcount(i, nomega) {
-		forcount(j, i+1) {
-			let v = popmodel->omega[i][j];
-			let s = (i == j && popmodel->omegafixed[i][j]) ? -1. : 1.;
-			if (i != 0)
-				info(f2, "\t");
-			info(f2, "%g", v * s);
-			if (i != j || i != nomega - 1)
-				info(f2, ",");
-			info(f2, "%s", s < 0. ? "/*FIX*/" :  "");
-		}
-		if (i == nomega - 1)
-			info(f2, ")");
+		forcount(j, i+1) 
+			info(f2, OPENPMX_FFORMAT " ", popmodel->omega[i][j]);
 		info(f2, "\n");
 	}
 
 	/* info about sigma */
 	let nsigma = popmodel->nsigma;
-	info(f2, "$SIGMA(");
+	info(f2, "SIGMA(%i):\n", nsigma);
+	forcount(i, nsigma) 
+		info(f2, OPENPMX_FFORMAT " ", popmodel->sigma[i]);
+	info(f2, "\n");
+}
+
+void popmodel_initcode(FILE* f2, const POPMODEL* const popmodel)
+{
+	/* info about theta */
+	openpmx_printf(f2, 0, 0, "$THETA\n");
+	forcount(i, popmodel->ntheta) {
+		let l = popmodel->lower[i];
+		let v = popmodel->theta[i];
+		let u = popmodel->upper[i];
+		let s = (popmodel->thetaestim[i] == ESTIMATE) ? "ESTIMATE" : "FIXED";
+		openpmx_printf(f2, 0, 0, "\t{" OPENPMX_FFORMAT ",\t" OPENPMX_FFORMAT ",\t" OPENPMX_FFORMAT ",\t %s },\n", l, v, u, s);
+	}
+
+	var offset = 0;
+	let nblock = popmodel->nblock;
+	forcount(k, nblock) {
+		let ndim = popmodel->blockdim[k];
+		let type = popmodel->blocktype[k];
+		switch (type) {
+
+			case OMEGA_DIAG:
+				openpmx_printf(f2, 0, 0, "$OMEGA( ");
+				forcount(i, ndim) {
+					let v = popmodel->omega[offset + i][offset + i];
+					let s = popmodel->omegafixed[offset + i][offset + i] ? -1. : 1.;
+					openpmx_printf(f2, 0, 0, " %g", v * s);
+					if (i != ndim - 1)
+						openpmx_printf(f2, 0, 0, ",");
+					openpmx_printf(f2, 0, 0, "%s", s < 0. ? "/*FIX*/" :  "");
+				}
+				openpmx_printf(f2, 0, 0, ")\n");
+				break;
+
+			case OMEGA_BLOCK:
+				openpmx_printf(f2, 0, 0, "$OMEGABLOCK( ");
+				forcount(i, ndim) {
+					forcount(j, i+1) {
+						let v = popmodel->omega[offset + i][offset + j];
+						let s = (i == j && popmodel->omegafixed[offset + i][offset + j]) ? -1. : 1.;
+						if (i != 0)
+							openpmx_printf(f2, 0, 0, "\t");
+						openpmx_printf(f2, 0, 0, "%g", v * s);
+						if (i != j || i != ndim - 1)
+							openpmx_printf(f2, 0, 0, ",");
+						openpmx_printf(f2, 0, 0, "%s", s < 0. ? "/*FIX*/" :  "");
+					}
+					if (i == ndim - 1)
+						openpmx_printf(f2, 0, 0, ")");
+				}
+				openpmx_printf(f2, 0, 0, "\n");
+				break;
+
+			case OMEGA_SAME:
+				openpmx_printf(f2, 0, 0, "$OMEGASAME(%i)", ndim);
+				break;
+
+			default:
+				fatal(f2, "Invalid block type (%i) if size %i\n", type, ndim);
+				break;
+		}
+		offset += ndim;
+
+		if (k != nblock - 1)
+			openpmx_printf(f2, 0, 0, "\n");
+	}
+
+	/* info about sigma */
+	openpmx_printf(f2, 0, 0, "$SIGMA(");
+	let nsigma = popmodel->nsigma;
 	forcount(i, nsigma) {
 		let v = popmodel->sigma[i];
 		let s = (popmodel->sigmafixed[i]) ? -1. : 1.;
-		info(f2, "\t%g", s * v);
+		openpmx_printf(f2, 0, 0, "\t%g", s * v);
 		if (i != nsigma - 1)
-			info(f2, ",");
-		info(f2, "%s", s < 0. ? "/*FIX*/" :  "");
+			openpmx_printf(f2, 0, 0, ",");
+		openpmx_printf(f2, 0, 0, "%s", s < 0. ? "/*FIX*/" :  "");
 	}
-	info(f2, ")\n");
+	openpmx_printf(f2, 0, 0, ")\n");
 }
+
+void popmodel_eval_information(const POPMODEL* const popmodel,
+						   const double runtime_s,
+						   const char* filename,
+						   const bool verbose,
+						   const bool brief,
+						   FILE* outstream,
+						   const int xlength,
+						   const double* const x,
+						   const double maxd)
+{
+	if (verbose)
+		popmodel_information(outstream, popmodel);
+	if (!brief) {
+		info_iteration(outstream, runtime_s, 0, popmodel);
+		FILE* f = (verbose) ? stdout : 0;
+		print_iteration(f, outstream, popmodel, xlength, x);
+	}
+	if (filename) {
+		if (verbose || !brief)
+			extfile_append(filename, popmodel, maxd);
+	}
+}
+
 

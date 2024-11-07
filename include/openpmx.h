@@ -59,7 +59,7 @@ typedef struct {
 	RECORD* writeable;
 	const RECORD* records;
 	const int nrecords;
-	const bool offset_1;
+	const bool _offset1;
 	const STRUCTINFO recordfields;
 } DATACONFIG;
 
@@ -205,10 +205,9 @@ typedef struct {
 	/* options and config */
 	const char* filename;
 	int nthread;
-	bool offset_1;
+	bool _offset1;
 	bool verbose;
 	bool brief;
-	bool silent;
 
 	/* the problem structure to analyse */
 	const DATACONFIG data;

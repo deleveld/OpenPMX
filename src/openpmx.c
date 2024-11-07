@@ -123,11 +123,10 @@ OPTIONS options_init_from_pmx(const OPENPMX* const pmx)
 {
 	var ret = (OPTIONS) {
 		.nthread = pmx->nthread,
-		.offset_1 = pmx->offset_1,
+		._offset1 = pmx->_offset1,
 
 		.verbose = pmx->verbose,
 		.brief = pmx->brief,
-		.silent = pmx->silent,
 	};
 	return options_default(&ret);
 }

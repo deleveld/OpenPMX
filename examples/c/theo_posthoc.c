@@ -94,9 +94,6 @@ extern RECORD data[11]; /* forward declaration */
 int main(void)
 {
 	OPENPMX openpmx = (OPENPMX) {
-		.filename = "theo.c",
-		.nthread = 0,
-		.offset_1 = false,
 		.data = {
 			.writeable = data,
 			.records = data,
