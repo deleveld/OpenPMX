@@ -117,11 +117,13 @@ static double objfn(const IDATA* const idata,
 {
 	let nindivid = idata->nindivid;
 
-	KAHAN objfn1 = { 0 };
-	KAHAN objfn2 = { 0 };
-	KAHAN objfn3 = { 0 };
-	KAHAN objfn4 = { 0 };
-	KAHAN objfn5 = { 0 };
+	/* doing the sum by type makes sure we are adding numbers of comparable
+	 * magnitude which helps with accuracy */
+	double objfn1 = 0.;
+	double objfn2 = 0.;
+	double objfn3 = 0.;
+	double objfn4 = 0.;
+	double objfn5 = 0.;
 	forcount(k, nindivid) {
 		let individ = &idata->individ[k];
 
@@ -147,17 +149,13 @@ static double objfn(const IDATA* const idata,
 		let iobjfn = term1 + term2 + term3 + term4 + term5;
 		individ->iobjfn = iobjfn;
 
-		KAHAN_ADD(term1, &objfn1);
-		KAHAN_ADD(term2, &objfn2);
-		KAHAN_ADD(term3, &objfn3);
-		KAHAN_ADD(term4, &objfn4);
-		KAHAN_ADD(term5, &objfn5);
+		objfn1 += term1;
+		objfn2 += term2;
+		objfn3 += term3;
+		objfn4 += term4;
+		objfn5 += term5;
 	}
-	let objfn = KAHAN_SUM(&objfn1) +
-				KAHAN_SUM(&objfn2) +
-				KAHAN_SUM(&objfn3) +
-				KAHAN_SUM(&objfn4) +
-				KAHAN_SUM(&objfn5);
+	let objfn = objfn1 + objfn2 + objfn3 + objfn4 + objfn5;
 	assert(isfinite(objfn) == 1);
 	return objfn;
 }

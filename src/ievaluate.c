@@ -101,8 +101,11 @@ typedef struct {
 } ADVAN_MODEL_MEMORY;
 
 /* This is the core function evaluating an individual by advancing over
- * the records and evaluating an individual. Speeding up this function is
- * quite important */
+ * the records and evaluating the imodel, predictions and objective function.
+ * Speeding up this function is quite important.
+ * I dont think making arguments restrict would help because the only pointer
+ * read from has a different type than all of the other pointers, and these
+ * are all only written to. */
  __attribute__ ((hot))
 void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 						 IMODEL* const imodel_saved,
@@ -110,8 +113,8 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 						 double* const istate,
 						 double* const YHAT,
 						 double* const YHATVAR,
-						 KAHAN* const obs_lndet,
-						 KAHAN* const obs_min2ll)
+						 double* const obs_lndet,
+						 double* const obs_min2ll)
 {
 	let advanfuncs = ievaluate_args->advanfuncs;
 	let record = ievaluate_args->record;
@@ -135,7 +138,10 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	let predictall = advanconfig->predictall;
 	let nstate = advanfuncs->nstate;
 	let recordinfo = &advanfuncs->recordinfo;
+	let imodel_size = advanconfig->imodelfields.size;
 	let predictvars_size = advanconfig->predictfields.size;
+	var local_obs_min2ll = 0.;
+	var local_obs_lndet = 0.;
 	const RECORD* ptr = record;
 	forcount(i, nrecord) {
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
@@ -150,7 +156,6 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 
 		/* save imodel, predictvars and state */
 		if (imodel_saved) {
-			let imodel_size = advanconfig->imodelfields.size;
 			let imodelptr = (IMODEL*)((char*)imodel_saved + i * imodel_size);
 			memcpy(imodelptr, imodel, imodel_size);
 
@@ -166,14 +171,15 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 			if (YHATVAR)
 				YHATVAR[i] = yhatvar;
 
+			/* we dont really need to have the if here but its probably faster if its in */
 			if (obs_min2ll) {
 				let err = dv - yhat;
 				let min2ll_term = (err * err) / yhatvar;
-				KAHAN_ADD(min2ll_term, obs_min2ll);
+				local_obs_min2ll += min2ll_term;
 			}
 			if (obs_lndet) {
 				let lndet_term = log(yhatvar);
-				KAHAN_ADD(lndet_term, obs_lndet);
+				local_obs_lndet += lndet_term;
 			}
 		} else {
 			/* yhatvar must be set to zero for non-observations since these will be used to calculate the
@@ -183,8 +189,12 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 		}
 		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
 	}
+	if (obs_min2ll)
+		*obs_min2ll = local_obs_min2ll;
+	if (obs_lndet) 
+		*obs_lndet = local_obs_lndet;
+		
 	advanfuncs->destruct(advan);
-
 }
 
 void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)

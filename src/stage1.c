@@ -82,18 +82,12 @@ static double sample_min2ll_from_cholesky(const double* const data,
 	gsl_vector_memcpy(&r.vector, &x.vector);
 	gsl_blas_dtrsv(CblasLower, CblasNoTrans, CblasNonUnit, chol, &r.vector);
 
-//	var lik2 = 0.;
-//	forcount(i, chol->size1) {
-//		let v = gsl_vector_get(r, i);
-//		lik2 += v*v;
-//	}
-//	return lik2;
-	KAHAN sum = { 0 };
+	double sum = 0.;
 	forcount(i, n) {
 		let v = gsl_vector_get(&r.vector, i);
-		KAHAN_ADD(v * v, &sum);
+		sum += v * v;
 	}
-	return KAHAN_SUM(&sum);
+	return sum;
 }
 #endif
 
@@ -112,13 +106,13 @@ static double sample_min2ll_from_inverse(const double* const data,
 //	var lik = 0.;
 //	gsl_blas_ddot(&x.vector, &y.vector, &lik);
 //	return lik;
-	KAHAN sum = { 0 };
+	double sum = { 0 };
 	forcount(i, n) {
 		let x = gsl_vector_get(&x.vector, i);
 		let y = gsl_vector_get(&y.vector, i);
-		KAHAN_ADD(x * y, &sum);
+		double_ADD(x * y, &sum);
 	}
-	return KAHAN_SUM(&sum);
+	return double_SUM(&sum);
 }
 #endif
 
@@ -175,8 +169,8 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 	/* functions for Bae and Yim objective function Term 1 and Term 2 */
 	struct timespec t3;
 	clock_gettime(CLOCK_REALTIME, &t3);
-	KAHAN objfn_term1 = { 0 };
-	KAHAN objfn_term2 = { 0 };
+	double objfn_term1 = 0.;
+	double objfn_term2 = 0.;
 	individual_evaluate(ievaluate_args,
 						0, /* imodel_saved */
 						0, /* predictvars_saved */
@@ -191,7 +185,7 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 	/* functions for Bae and Yim objective function Term 3 */
 	var term3 = sample_min2ll(nreta, reta, stage1_params->nonzero);
 
-	return KAHAN_SUM(&objfn_term1) + KAHAN_SUM(&objfn_term2) + term3;
+	return objfn_term1 + objfn_term2 + term3;
 }
 
 #ifdef OPTIMIZER_INNER_BOBYQA
@@ -577,8 +571,8 @@ void stage1_thread(INDIVID* const individ,
 	   but we do need yhatvar for the calculation of the covariance second term */
 	struct timespec t3;
 	clock_gettime(CLOCK_REALTIME, &t3);
-	KAHAN obs_min2ll = { 0 };
-	KAHAN obs_lndet = { 0 };
+	double obs_min2ll = 0.;
+	double obs_lndet = 0.;
 	individual_evaluate(&stage1_params.ievaluate_args,
 						individ->imodel,
 						individ->predictvars,
@@ -587,8 +581,8 @@ void stage1_thread(INDIVID* const individ,
 						individ->yhatvar,
 						&obs_lndet, &obs_min2ll);
 	timespec_duration(&t3, &individ->eval_msec);
-	individ->obs_min2ll = KAHAN_SUM(&obs_min2ll);
-	individ->obs_lndet = KAHAN_SUM(&obs_lndet);
+	individ->obs_min2ll = obs_min2ll;
+	individ->obs_lndet = obs_lndet;
 	++nfunc;
 
 	/* we cant do covariance matrix if we have no etas or observations */
@@ -625,7 +619,7 @@ void stage1_thread(INDIVID* const individ,
 	 * inflection points (1 SD from center) and doing a weighted covariance
 	 * matrix estimation. */
 	if (!options->estimate.stage1.omit_icov_resample) {
-		let base_iobjfn = KAHAN_SUM(&obs_min2ll) + KAHAN_SUM(&obs_lndet) + individ->eta_min2ll;
+		let base_iobjfn = obs_min2ll + obs_lndet + individ->eta_min2ll;
 		let icov_resample_lndet = stage1_icov_resample(reducedicov,
 													   individ->icovweight,
 													   individ->icovsample,

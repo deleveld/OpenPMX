@@ -107,9 +107,9 @@ static void idata_predict_pred_thread(INDIVID* const individ,
 }
 
 static void idata_predict_yhat(const IDATA* const idata,
-						const ADVANFUNCS* const advanfuncs,
-						const POPMODEL* const popmodel,
-						const OPTIONS* const options)
+							   const ADVANFUNCS* const advanfuncs,
+							   const POPMODEL* const popmodel,
+							   const OPTIONS* const options)
 {
 	/* fill in yhat, imodel, and  predictvars */
 	SCATTEROPTIONS scatteroptions = { 0 };
@@ -117,9 +117,9 @@ static void idata_predict_yhat(const IDATA* const idata,
 }
 
 static void idata_predict_pred(const IDATA* const idata,
-						const ADVANFUNCS* const advanfuncs,
-						const POPMODEL* const popmodel,
-						const OPTIONS* const options)
+							   const ADVANFUNCS* const advanfuncs,
+							   const POPMODEL* const popmodel,
+							   const OPTIONS* const options)
 {
 	/* fill in pred */
 	SCATTEROPTIONS scatteroptions = { 0 };
