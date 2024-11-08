@@ -42,7 +42,7 @@ typedef struct {
 	double _c;
 	double _sum;
 #else
-	float _sum;
+	double _sum;
 #endif
 } KAHAN;
 
