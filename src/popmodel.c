@@ -521,7 +521,7 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 	if (verbose)
 		popmodel_information(outstream, popmodel);
 	if (!brief) {
-		info_iteration(outstream, runtime_s, 0, popmodel);
+		info_iteration(outstream, runtime_s, maxd, popmodel);
 		FILE* f = (verbose) ? stdout : 0;
 		print_iteration(f, outstream, popmodel, xlength, x);
 	}
