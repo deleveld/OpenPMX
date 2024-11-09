@@ -412,30 +412,12 @@ static const char* focei(STAGE2_PARAMS* const params)
 	return 0;
 }
 
-static void focei_popmodel_stage2(STAGE2_PARAMS* params)
+static bool stabilize_model(STAGE2_PARAMS* params)
 {
 	let idata = params->idata;
 	let advanfuncs = params->advanfuncs;
 	let options = params->options;
-	let outstream = params->outstream;
-
-	/* cleanup previous runs */
-	/* at each estimate or evaluate, the pred and state gets reset to zero */
-	let ndata = idata->ndata;
-	var firstindivid = &idata->individ[0];
-	memset(firstindivid->pred, 0, ndata * sizeof(double));
-	memset(firstindivid->istate, 0, ndata * idata->nstate * sizeof(double));
-
-	idata_free_simerr(idata);
-	if (!params->options->estimate.stage1.omit_icov_resample)
-		idata_alloc_icovresample(idata);
-	else
-		idata_free_icovresample(idata);
-
-	/* first run so we can set objective function and yhat. */
-	/* this is the first evaluation */
-	/* we may have to evaluate several times for a stable objfn */
-	params->nfunc = 0; 
+	
 	var done = false;
 	while (!done) {
 		let popmodel = &params->test.popmodel;
@@ -461,11 +443,38 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 			done = true;
 
 		/* warn if we are not stable after 10 iterations */
-		if (!done && params->nfunc >= 10) {
-			warning(outstream, "initial evaluation not stable after %i iterations\n", params->nfunc);
-			done = true;
-		}
+		if (!done && params->nfunc >= 10)
+			break;
 	}
+	return done;
+}
+
+static void focei_popmodel_stage2(STAGE2_PARAMS* params)
+{
+	let idata = params->idata;
+	let options = params->options;
+	let outstream = params->outstream;
+
+	/* cleanup previous runs */
+	/* at each estimate or evaluate, the pred and state gets reset to zero */
+	let ndata = idata->ndata;
+	var firstindivid = &idata->individ[0];
+	memset(firstindivid->pred, 0, ndata * sizeof(double));
+	memset(firstindivid->istate, 0, ndata * idata->nstate * sizeof(double));
+
+	idata_free_simerr(idata);
+	if (!params->options->estimate.stage1.omit_icov_resample)
+		idata_alloc_icovresample(idata);
+	else
+		idata_free_icovresample(idata);
+
+	/* first run so we can set objective function and yhat. */
+	/* this is the first evaluation, the encode_offset at the best model is
+	 * already done. We may have to evaluate several times for a stable objfn */
+	params->nfunc = 0; 
+	if (!stabilize_model(params))
+		warning(outstream, "initial evaluation not stable\n");
+
 	/* after the iterations, we save the besteta which we use to start with later */
 	memcpy(params->besteta, firstindivid->eta, idata->nindivid * idata->nomega * sizeof(double));
 	/* we dont really need this since we dont change popmodel or best since starting
@@ -481,6 +490,9 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 		params->best.result.nfunc = params->nfunc;
 
 		/* TODO: we can add a posthoc test to make sure the result is stable */
+		encode_offset(&params->test, &params->best);
+		if (!stabilize_model(params))
+			warning(outstream, "final evaluation not stable\n");
 	}
 }
 

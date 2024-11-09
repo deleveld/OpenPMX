@@ -30,7 +30,7 @@
 
 #include "openpmx_compile_options.h"
 
-/* TODO: why does this give a com piler error */
+/* TODO: why does this give a compiler error */
 POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
 					   const OMEGA* omegablocks, // not sure why static here causes warning [static OPENPMX_OMEGABLOCK_MAX],
 					   const double sigma[static OPENPMX_SIGMA_MAX])
@@ -371,9 +371,9 @@ static void print_iteration(FILE* f1,
 		openpmx_printf(f1, f2, 0, "\ntpara:");
 		forcount(j, xlength)
 			openpmx_printf(f1, f2, 0, " % -11.4e", x[j]);
-		openpmx_printf(f1, f2, 0, "\nd    :");
-		forcount(j, xlength)
-			openpmx_printf(f1, f2, 0, " % -11.4e", fabs(x[j]));
+//		openpmx_printf(f1, f2, 0, "\nd    :");
+//		forcount(j, xlength)
+//			openpmx_printf(f1, f2, 0, " % -11.4e", fabs(x[j]));
 	}
 	openpmx_printf(f1, f2, 0, "\n");
 }
@@ -509,14 +509,14 @@ void popmodel_initcode(FILE* f2, const POPMODEL* const popmodel)
 }
 
 void popmodel_eval_information(const POPMODEL* const popmodel,
-						   const double runtime_s,
-						   const char* filename,
-						   const bool verbose,
-						   const bool brief,
-						   FILE* outstream,
-						   const int xlength,
-						   const double* const x,
-						   const double maxd)
+							   const double runtime_s,
+							   const char* filename,
+							   const bool verbose,
+							   const bool brief,
+							   FILE* outstream,
+							   const int xlength,
+							   const double* const x,
+							   const double maxd)
 {
 	if (verbose)
 		popmodel_information(outstream, popmodel);
