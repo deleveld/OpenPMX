@@ -71,10 +71,12 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 					   RECORDINFO_EVID(recordinfo, record) == 3 ||
 					   RECORDINFO_EVID(recordinfo, record) == 4);
 
-	var advan_inittime = DBL_MAX;
 	if (advanconfig->firstonly == false || reset_state) {
 		if (reset_state) {
-//			memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size);
+			/*	If we dont zero the model it keeps the values from the previous
+			 * time we called. This seems to be somewhat elegant in the user code.
+			 * memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size); */
+ 
 			memset(state, 0, OPENPMX_STATE_MAX * sizeof(double));
 			advan->time = RECORDINFO_TIME(recordinfo, record);
 			vector_resize(advan->infusions, 0);
@@ -84,19 +86,17 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			if (advan->initcount != 0 && advanfuncs->reset)
 				advanfuncs->reset(advan, 1);
 		}
-		var advanstate = (ADVANSTATE) {
-			.initcount = advan->initcount,
-			.statetime = advan->time,
-			.recordtime = RECORDINFO_TIME(recordinfo, record),
-			.record = record,
-			.state = state,
-			.amtlag = advan->amtlag,
-			.bioavail = advan->bioavail,
-			._inittime = DBL_MAX,
-		};
-		advanconfig->init(imodel, &advanstate, popparam);
-		if (advanstate._inittime != DBL_MAX)
-			advan_inittime = advanstate._inittime;
+		advanconfig->init(imodel,
+						  &(ADVANSTATE) {
+							.advan = advan,
+							.initcount = advan->initcount,
+							.statetime = advan->time,
+							.recordtime = RECORDINFO_TIME(recordinfo, record),
+							.record = record,
+							.state = state,
+							.amtlag = advan->amtlag,
+							.bioavail = advan->bioavail },
+						  popparam);
 		++advan->initcount;
 	}
 
@@ -110,14 +110,13 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		let duration = (rate != 0.) ? (amt / rate) : (0.);
 		let end = start + duration;
 
-		var dose = (ADVANINFUSION) {
-			.cmt = cmt,
-			.amt = amt,
-			.rate = rate,
-			.start = start,
-			.end = end,
-		};
-		vector_append(advan->infusions, dose);
+		vector_append(advan->infusions,
+					  (ADVANINFUSION) {
+						.cmt = cmt,
+						.amt = amt,
+						.rate = rate,
+						.start = start,
+						.end = end } );
 	}
 
 	/* walk through infusions and doses up until the time of the current record */
@@ -144,9 +143,6 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			if (v->start > currenttime && v->start < intervalstop)
 				intervalstop = v->start;
 		}
-		/* call init when the user asks, but not in the past */
-		if (advan_inittime < intervalstop && advan_inittime > currenttime)
-			intervalstop = advan_inittime;
 
 		/* do we advance time at all */
 		if (intervalstop > currenttime) {
@@ -168,39 +164,42 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 
 		/* are any bolus needed to be given right now */
 		/* we take them off the infusion list so they wont be seen again */
-		bool needreset = false;
+		bool need_reset_now = false;
+		bool need_init_now = false;
 		forvector(i, advan->infusions) {
 			let v = &advan->infusions.data[i];
 			if (v->start == currenttime && v->rate == 0.) {
 				assert(v->start == v->end);
 				let record_cmt = v->cmt;
-				let record_amt = v->amt;
-				var bioavail = advan->bioavail[record_cmt];
-				state[record_cmt] += record_amt * bioavail;
+				if (v->cmt == -1.) {		/* This means call init again */
+					need_init_now = true;
+				} else {
+					let record_amt = v->amt;
+					var bioavail = advan->bioavail[record_cmt];
+					state[record_cmt] += record_amt * bioavail;
+				}
 				vector_remove(advan->infusions, i, 1);
 				--i;
-				needreset = true;
+				need_reset_now = true;
 			}
 		}
-		if (needreset && advanfuncs->reset)
+		if (need_reset_now && advanfuncs->reset)
 			advanfuncs->reset(advan, 0);
 
-		/* extra call to init if we are asked
-		 * setting _inittime to the one asked is the sign that it is the extra call */
-		if (advan->time == advan_inittime) {
-			var advanstate = (ADVANSTATE) {
-				.initcount = advan->initcount,
-				.statetime = advan->time,
-				.recordtime = RECORDINFO_TIME(recordinfo, record),
-				.record = record,
-				.state = state,
-				.amtlag = advan->amtlag,
-				.bioavail = advan->bioavail,
-				._inittime = DBL_MAX,
-			};
-			advanconfig->init(imodel, &advanstate, popparam);
-			if (advanstate._inittime != DBL_MAX)
-				advan_inittime = advanstate._inittime;
+		/* extra call to init */
+		if (need_init_now) {
+			advanconfig->init(imodel,
+							  &(ADVANSTATE) {
+								.advan = advan,
+								.initcount = advan->initcount,
+								.statetime = advan->time,
+								.recordtime = RECORDINFO_TIME(recordinfo, record),
+								.record = record,
+								.state = state,
+								.amtlag = advan->amtlag,
+								.bioavail = advan->bioavail,
+							  },
+							  popparam);
 		}
 
 	/* keep going till we have the state equal to the required record time */
@@ -215,9 +214,28 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 
 void pmx_advan_inittime(ADVANSTATE* const advanstate, const double t)
 {
-	if (t < advanstate->recordtime && t > advanstate->statetime) {
-		if (t < advanstate->_inittime)
-			advanstate->_inittime = t;
+	ADVAN* advan = advanstate->advan;
+
+	/* ignores setting in the past */
+	if (t <= advan->time)
+		return;
+
+	/* if its already on the list then ignore */
+	bool found_already = false;
+	forvector(i, advan->infusions) {
+		let v = &advan->infusions.data[i];
+		if (v->cmt == -1. && v->start == t && v->end == t)
+			found_already = true;
+	}
+
+	if (!found_already) {
+		vector_append(advan->infusions,
+					  (ADVANINFUSION) {
+						.cmt = -1,
+						.amt = 0.,
+						.rate = 0.,
+						.start = t,
+						.end = t });
 	}
 }
 

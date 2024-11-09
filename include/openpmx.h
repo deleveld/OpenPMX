@@ -66,7 +66,10 @@ typedef struct {
 /*---------------------------------------------------------------------*/
 /* advan */
 /*---------------------------------------------------------------------*/
+typedef struct ADVAN ADVAN;
 typedef struct {
+	ADVAN* advan;
+	
 	/* info about the record being processed */
 	const int initcount;
 	const double statetime;
@@ -77,7 +80,6 @@ typedef struct {
 	double* const state;
 	double* const amtlag;
 	double* const bioavail;
-	double _inittime;
 } ADVANSTATE;
 
 void pmx_advan_inittime(ADVANSTATE* const advanstate, const double t);
