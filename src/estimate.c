@@ -419,11 +419,13 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 	let options = params->options;
 	
 	var done = false;
+	var niter = 0;
 	while (!done) {
 		let popmodel = &params->test.popmodel;
 		let prev_objfn = popmodel->result.objfn;
 		encode_evaluate(&params->test, idata, advanfuncs, options);
 		params->nfunc += 1;
+		++niter;
 		popmodel->result.nfunc = params->nfunc;
 
 		struct timespec now;
@@ -443,7 +445,7 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 			done = true;
 
 		/* warn if we are not stable after 10 iterations */
-		if (!done && params->nfunc >= 10)
+		if (!done && niter >= 10)
 			break;
 	}
 	return done;

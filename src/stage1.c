@@ -399,23 +399,40 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 	 * predictions of the individual */
 	double testreta[OPENPMX_OMEGA_MAX] = { 0 };
 
+	double scalepos[OPENPMX_OMEGA_MAX];
+	double scaleneg[OPENPMX_OMEGA_MAX];
+	forcount(i, nreta) {
+		scalepos[i] = 1.;
+		scaleneg[i] = 1.;
+	}
+
 	/* for each eigenvector */
+	let stage1 = stage1_params->stage1;
 	forcount(i, nreta) {
 		/* magnitude of step is the square root of eigenvalue */
 		var stepsize = sqrt(gsl_vector_get(eval, i));
-		if (stepsize < stage1_params->stage1->gradient_step)
-			stepsize = stage1_params->stage1->gradient_step;
+		if (stepsize < stage1->gradient_step)
+			stepsize = stage1->gradient_step;
 
 		/* sample on the positive direction of the eigenvectors and correct for sampling weight */
-		forcount(j, nreta) {
-			let v = gsl_matrix_get(evec, j, i); /* eigevnectors are coloumns */
-			testreta[j] = reta[j] + stepsize * v;
-			gsl_matrix_set(etavals, i * 2, j, testreta[j]);
+		let niters = 10; 
+		var w1 = 1.;
+		forcount(k, niters) {
+			scalepos[i] *= w1;
+			forcount(j, nreta) {
+				let v = gsl_matrix_get(evec, j, i); /* eigevnectors are coloumns */
+				testreta[j] = reta[j] + stepsize * v * scalepos[i];
+				gsl_matrix_set(etavals, i * 2, j, testreta[j]);
+			}
+			let etaval_iobjfn = stage1_evaluate_individual_iobjfn(nreta, testreta, (void*)stage1_params);
+			let delta = etaval_iobjfn - base_iobjfn;
+			let lik = exp(-0.5*delta);
+			w1 = lik / exp(-0.5*1.);
+			
+//			printf("pos %i %e\n", k, w1);
+			if (fabs(w1 - 1.) < stage1->icov_resample_tol)
+				break;
 		}
-		var etaval_iobjfn = stage1_evaluate_individual_iobjfn(nreta, testreta, (void*)stage1_params);
-		var delta = etaval_iobjfn - base_iobjfn;
-		var lik = exp(-0.5*delta);
-		let w1 = lik / exp(-0.5*1.);
 
 		/* save the eta used in the individual */
 		icovweight[i * 2] = w1;
@@ -423,15 +440,23 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 			icovsample[(i * 2) * nomega + k] = stage1_params->testeta[k];
 
 		/* sample on the negative direction of the eigenvectors and correct for sampling weight */
-		forcount(j, nreta) {
-			let v = gsl_matrix_get(evec, j, i); /* eigevnectors are coloumns */
-			testreta[j] = reta[j] - stepsize * v;
-			gsl_matrix_set(etavals, i * 2 + 1, j, testreta[j]);
+		var w2 = 1.;
+		forcount(k, niters) {
+			scaleneg[i] *= w2;
+			forcount(j, nreta) {
+				let v = gsl_matrix_get(evec, j, i); /* eigevnectors are coloumns */
+				testreta[j] = reta[j] - stepsize * v * scaleneg[i];
+				gsl_matrix_set(etavals, i * 2 + 1, j, testreta[j]);
+			}
+			let etaval_iobjfn = stage1_evaluate_individual_iobjfn(nreta, testreta, (void*)stage1_params);
+			let delta = etaval_iobjfn - base_iobjfn;
+			let lik = exp(-0.5*delta);
+			w2 = lik / exp(-0.5*1.);
+
+//			printf("neg %i %e\n", k, w2);
+			if (fabs(w2 - 1.) < stage1->icov_resample_tol)
+				break;
 		}
-		etaval_iobjfn = stage1_evaluate_individual_iobjfn(nreta, testreta, (void*)stage1_params);
-		delta = etaval_iobjfn - base_iobjfn;
-		lik = exp(-0.5*delta);
-		let w2 = lik / exp(-0.5*1.);
 
 		/* save the eta used in the individual */
 		icovweight[i * 2 + 1] = w2;
@@ -472,11 +497,12 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 	 * function that we will minimize to */
 	var sumlogeval = 0.;
 	forcount(i, nreta) {
+//		printf("%f %f\n", scalepos[i], scaleneg[i]);
 		let w1 = icovweight[i * 2];
 		let w2 = icovweight[i * 2 + 1];
 		let eivar = gsl_vector_get(eval, i);
-		let eisd1 = sqrt(eivar); 						/* distance in positive direction */
-		let eisd2 = sqrt(eivar); 						/* distance in negative direction */
+		let eisd1 = sqrt(eivar) * scalepos[i];			/* distance in positive direction */
+		let eisd2 = sqrt(eivar) * scaleneg[i]; 			/* distance in negative direction */
 		let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
 //		sumlogeval += log(eiwgtsd*eiwgtsd);
 		sumlogeval += 2.*log(eiwgtsd);

@@ -45,32 +45,32 @@ typedef struct {
 
 RECORDINFO recordinfo_init(const DATACONFIG* const dataconfig);
 
-inline double DATA_FIELD(const void* p, const int offset)
+static inline double DATA_FIELD(const void* p, const int offset)
 {
 	return *(const double*)((const char*)p + offset);
 }
 
-inline const RECORD* RECORD_INDEX(const RECORD* p, const int size, const int i)
+static inline const RECORD* RECORD_INDEX(const RECORD* p, const int size, const int i)
 {
 	return (const RECORD*)((const char*)p + size * (int)i);
 }
 
-inline double RECORDINFO_ID(const RECORDINFO* const recordinfo, const RECORD* p)
+static inline double RECORDINFO_ID(const RECORDINFO* const recordinfo, const RECORD* p)
 {
 	return *(const double*)((const char*)p + recordinfo->offsetID);
 }
 
-inline double RECORDINFO_TIME(const RECORDINFO* const recordinfo, const RECORD* p)
+static inline double RECORDINFO_TIME(const RECORDINFO* const recordinfo, const RECORD* p)
 {
 	return *(const double*)((const char*)p + recordinfo->offsetTIME);
 }
 
-inline double RECORDINFO_DV(const RECORDINFO* const recordinfo, const RECORD* p)
+static inline double RECORDINFO_DV(const RECORDINFO* const recordinfo, const RECORD* p)
 {
 	return *(const double*)((const char*)p + recordinfo->offsetDV);
 }
 
-inline double RECORDINFO_MDV(const RECORDINFO* const recordinfo, const RECORD* p)
+static inline double RECORDINFO_MDV(const RECORDINFO* const recordinfo, const RECORD* p)
 {
 	if (recordinfo->offsetMDV == -1) {
 		return (isnan(RECORDINFO_DV(recordinfo, p)) ? 1. : 0.);
@@ -78,7 +78,7 @@ inline double RECORDINFO_MDV(const RECORDINFO* const recordinfo, const RECORD* p
 		return *(const double*)((const char*)p + recordinfo->offsetMDV);
 }
 
-inline double RECORDINFO_EVID(const RECORDINFO* const recordinfo, const RECORD* p)
+static inline double RECORDINFO_EVID(const RECORDINFO* const recordinfo, const RECORD* p)
 {
 	if (recordinfo->offsetEVID == -1)
 		return (RECORDINFO_MDV(recordinfo, p) != 0 ? 1. : 0.);
@@ -113,7 +113,7 @@ static inline double RECORDINFO_CMT(const RECORDINFO* const recordinfo, const RE
 	return ret;
 }
 
-inline const RECORD* RECORDINFO_INDEX(const RECORDINFO* const recordinfo, const RECORD* p, const int i)
+static inline const RECORD* RECORDINFO_INDEX(const RECORDINFO* const recordinfo, const RECORD* p, const int i)
 {
 	return RECORD_INDEX(p, recordinfo->dataconfig->recordfields.size, i);
 }

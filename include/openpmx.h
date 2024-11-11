@@ -242,8 +242,12 @@ typedef struct {
 	double step_initial;
 	double step_refine;
 	double step_final;
-	bool omit_icov_resample;
 	int maxeval;
+
+	/* icov resample */
+	bool omit_icov_resample;
+	int icov_resample_iters;
+	double icov_resample_tol;
 } STAGE1CONFIG;
 
 /* for OBJFN minimization */
@@ -287,82 +291,6 @@ void pmx_table(OPENPMX* pmx, const char* fields, const TABLECONFIG* const tablec
 #ifdef __cplusplus
 }
 #endif
-
-/*---------------------------------------------------------------------*/
-/* C++ interface */
-/*---------------------------------------------------------------------*/
-#ifdef __cplusplus
-namespace openpmx {
-	class PPMX
-	{
-		private:
-			::OPENPMX* _pmx;
-
-			PPMX() = delete;
-			PPMX(const PPMX&) = delete;
-
-		public:
-			PPMX(::OPENPMX& thepmx)
-				:_pmx(&thepmx)
-			{
-				assert(_pmx->state == 0);
-			};
-			~PPMX()
-			{
-				::pmx_cleanup(_pmx);
-			};
-
-			void estimate(void)
-			{
-				::pmx_estimate(_pmx, 0);
-			};
-			void estimate(ESTIMCONFIG& estimconfig)
-			{
-				::pmx_estimate(_pmx, &estimconfig);
-			};
-			void evaluate(void)
-			{
-				::pmx_evaluate(_pmx, 0);
-			};
-			void evaluate(STAGE1CONFIG& stage1config)
-			{
-				::pmx_evaluate(_pmx, &stage1config);
-			};
-			void simulate(void)
-			{
-				::pmx_simulate(_pmx, 0);
-			};
-			void simulate(const SIMCONFIG& simconfig)
-			{
-				::pmx_simulate(_pmx, &simconfig);
-			};
-			void table(const char* fields)
-			{
-				::pmx_table(_pmx, fields, 0);
-			};
-			void table(const char* fields, const TABLECONFIG& tableconfig)
-			{
-				::pmx_table(_pmx, fields, &tableconfig);
-			};
-
-	};
-};
-#endif
-
-/*---------------------------------------------------------------------*/
-/* models */
-/*---------------------------------------------------------------------*/
-int remifentanil_eleveld(const double AGE,
-						 const double WGT, 
-						 const double HGT, 
-						 const double M1F2,
-						 double* const _V1, 
-						 double* const _V2, 
-						 double* const _V3, 
-						 double* const _CL, 
-						 double* const _Q2, 
-						 double* const _Q3,
-						 double* const _KE0);
 
 /* OPENPMX_H */
 #endif
