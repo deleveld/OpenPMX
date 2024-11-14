@@ -119,7 +119,8 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 						.end = end } );
 	}
 
-	/* walk through infusions and doses up until the time of the current record */
+	/* advance through time and handle infusions and doses when they start
+	 * or stop up until the time of the current record */
 	assert(advan->time <= RECORDINFO_TIME(recordinfo, record));
 	do {
 		let currenttime = advan->time;
@@ -164,6 +165,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 
 		/* are any bolus needed to be given right now */
 		/* we take them off the infusion list so they wont be seen again */
+		/* a fake boilus with cmt == -1 means an extra call to init */
 		bool need_reset_now = false;
 		bool need_init_now = false;
 		forvector(i, advan->infusions) {

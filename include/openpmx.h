@@ -246,7 +246,6 @@ typedef struct {
 
 	/* icov resample */
 	bool omit_icov_resample;
-	int icov_resample_iters;
 	double icov_resample_tol;
 } STAGE1CONFIG;
 
@@ -256,7 +255,6 @@ typedef struct {
 	double step_refine;
 	double step_final;
 	int maxeval;
-	bool fast;
 } OPTIMCONFIG;
 
 /* for simulations */

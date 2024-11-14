@@ -150,6 +150,8 @@ typedef struct {
 	const STAGE1CONFIG* const stage1;
 	const IEVALUATE_ARGS ievaluate_args;
 	double* const eval_msec;
+	double* bestiobjfn;
+	double* besteta;
 } STAGE1_PARAMS;
 
 static double stage1_evaluate_individual_iobjfn(const long int nreta,
@@ -185,7 +187,13 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 	/* functions for Bae and Yim objective function Term 3 */
 	var term3 = sample_min2ll(nreta, reta, stage1_params->nonzero);
 
-	return objfn_term1 + objfn_term2 + term3;
+	/* save the best one */
+	let iobjfn = objfn_term1 + objfn_term2 + term3;
+	if (iobjfn <= *stage1_params->bestiobjfn) {
+		memcpy(stage1_params->besteta, stage1_params->testeta, OPENPMX_OMEGA_MAX * sizeof(double));
+		*stage1_params->bestiobjfn = iobjfn;
+	}
+	return iobjfn;
 }
 
 #ifdef OPTIMIZER_INNER_BOBYQA
@@ -225,14 +233,16 @@ static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 #ifdef OPTIMIZER_INNER_BOBYQA
 	int retcode;
 	let iprint = 0;
-	let npt = 2*n+1;				/* recommended, used for refine stage */
+	let npt_recommended = 2*n+1;	/* recommended, used for refine stage */
 //	let npt_min = n+2;				/* minimum */
 //	let npt_max = (n+1)*(n+2)/2;	/* maximum */
+
+	var npt = npt_recommended;
 	let wsize = (npt+5)*(npt+n)+3*n*(n+5)/2 + 10; 	/* a little bit extra room to be sure */
 	var w = mallocvar(double, wsize);
+	var rhobeg = stage1->step_initial;
+	var rhoend = stage1->step_refine;
 	if (all_eta_zero) {
-		let rhobeg = stage1->step_initial;
-		let rhoend = stage1->step_refine;
 		retcode = bobyqa(n, npt,
 						 stage1_evaluate_individual_iobjfn,
 						 (void*)stage1_params,
@@ -247,10 +257,10 @@ static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 	}
 
 	/* regular refinement optimization */
-	/* we dont need to realloc because the previous memory in w is enough
-	 * and we dont really have much benefit by realloc */
-	let rhobeg = stage1->step_refine;
-	let rhoend = stage1->step_final;
+	/* we dont need to realloc because the previous memory in w is enough */
+	npt = npt_recommended;
+	rhobeg = stage1->step_refine;
+	rhoend = stage1->step_final;
 	retcode = bobyqa(n, npt,
 					 stage1_evaluate_individual_iobjfn, (void*)stage1_params,
 					 reta, lower, upper,
@@ -266,7 +276,9 @@ static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 
 	/* final results, i.e. the etas of the reduced matrix, get expanded */
 	assert(stage1_params->testeta == popparam->eta);
+
 	unreduce_eta(stage1_params->testeta, reta, nonzero);
+//	memcpy(stage1_params->testeta, stage1_params->besteta, OPENPMX_OMEGA_MAX * sizeof(double));
 }
 
 /* calculate individual variance covariance matrix
@@ -312,8 +324,6 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 		if (step < gradient_step)
 			step = gradient_step;
 		/* TODO: this still needs to be verified that it is optimal compared to just using gradient_step */
-//		if (params->stage1->test)
-//			step = gradient_step;
 
 		/* step eta forward */
 		let above = v + step;
@@ -497,7 +507,6 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 	 * function that we will minimize to */
 	var sumlogeval = 0.;
 	forcount(i, nreta) {
-//		printf("%f %f\n", scalepos[i], scaleneg[i]);
 		let w1 = icovweight[i * 2];
 		let w2 = icovweight[i * 2 + 1];
 		let eivar = gsl_vector_get(eval, i);
@@ -506,6 +515,7 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
 //		sumlogeval += log(eiwgtsd*eiwgtsd);
 		sumlogeval += 2.*log(eiwgtsd);
+//		printf("%f %f %f %f\n", scalepos[i], scaleneg[i], w1, w2);
 	}
 	let icov_lndet = -1. * sumlogeval; /* we get lndet from inverse, so we have -1 here */
 
@@ -551,6 +561,8 @@ void stage1_thread(INDIVID* const individ,
 		it is only nomega wide. We just have to copy back and forth. */
 	int nfunc = 0;
 	double testeta[OPENPMX_OMEGA_MAX] = { 0 };
+	double bestiobjfn = DBL_MAX;
+	double besteta[OPENPMX_OMEGA_MAX] = { 0 };
 	let stage1_params = (const STAGE1_PARAMS) {
 		.testeta = testeta,
 		.nonzero = nonzero,
@@ -563,6 +575,8 @@ void stage1_thread(INDIVID* const individ,
 			.popparam = popparam_init(popmodel, advanfuncs, testeta),
 			.logstream = scatteroptions->logstream,
 		},
+		.bestiobjfn = &bestiobjfn,
+		.besteta = besteta,
 		.eval_msec = &individ->eval_msec,
 	};
 	double reta[OPENPMX_OMEGA_MAX] = { 0 };

@@ -40,7 +40,7 @@
 /* different optimizers */
 
 #define OPTIMIZER_OUTER_BOBYQA
-//#define OPTIMIZER_OUTER_GSL
+//#define OPTIMIZER_OUTER_GSL_NELDERMEAD
 
 static void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel)
 {
@@ -212,7 +212,7 @@ static void update_best_imodel(const int xlength,
 
 	/* update the user */
 	let options = params->options;
-	if (options->verbose)
+	if (options->verbose && !options->brief)
 		improved_model = popmodel;
 	if (improved_model) {
 		let maxd = calculate_maxd(xlength, x);
@@ -282,7 +282,7 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 #include "bobyqa/bobyqa.h"
 #endif
 
-#ifdef OPTIMIZER_OUTER_GSL
+#ifdef OPTIMIZER_OUTER_GSL_NELDERMEAD
 #include <gsl/gsl_multimin.h>
 static double gsl_stage2_objfn(const gsl_vector *v, void *params)
 {
@@ -311,7 +311,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 	let step_refine = options->estimate.optim.step_refine;
 	let step_final = options->estimate.optim.step_final;
 
-#ifdef OPTIMIZER_OUTER_GSL
+#ifdef OPTIMIZER_OUTER_GSL_NELDERMEAD
 	/* Initialize method and iterate */
 	var minex_func = (gsl_multimin_function) {
 		.n = n,
@@ -319,16 +319,12 @@ static const char* focei(STAGE2_PARAMS* const params)
 		.params = params,
 	};
 
-	let gsl_initial = gsl_vector_alloc(n);
+	var gsl_initial = gsl_vector_view_array(initial, n);
 	let ss = gsl_vector_alloc(n);
+	gsl_vector_set_all(ss, step_initial); /* Starting step size */
+
 	var s = gsl_multimin_fminimizer_alloc(gsl_multimin_fminimizer_nmsimplex2, n);
-
-	/* Starting point */
-	forcount(i, n)
-		initial[i] = 0.;
-	gsl_vector_set_all(ss, step_initial);
-
-	gsl_multimin_fminimizer_set(s, &minex_func, gsl_initial, ss);
+	gsl_multimin_fminimizer_set(s, &minex_func, &gsl_initial.vector, ss);
 	int iter = 0;
 	int status;
 	do {
@@ -342,10 +338,6 @@ static const char* focei(STAGE2_PARAMS* const params)
 	}
 	while (status == GSL_CONTINUE && iter < maxeval);
 
-	/* write back */
-	forcount(i, n)
-		initial[i] = gsl_vector_get(s->x, i);
-
 	gsl_multimin_fminimizer_free(s);
 	gsl_vector_free(ss);
 #endif
@@ -354,18 +346,16 @@ static const char* focei(STAGE2_PARAMS* const params)
 	let npt = 2*n+1;			/* reccommended */
 //	let npt1 = n+2;				/* minimum */
 //	let npt2 = (n+1)*(n+2)/2;	/* maximum */
-
 	let iprint = 0;
 	let wsize = (npt+5)*(npt+n)+3*n*(n+5)/2 + 10; /* a little bit extra room to be sure */
 	let w = mallocvar(double, wsize);
 
 	forcount(i, n)
 		initial[i] = 0.;
-
 	var neval = maxeval;
 	var rhobeg = step_initial;
 	var rhoend = step_refine;
-	info(0, "initial: rho %f to %f\n", rhobeg, rhoend);
+	info(0, "initial: rho [%g, %g]\n", rhobeg, rhoend);
 	var retcode = bobyqa(n, npt,
 						 focei_stage2_evaluate_population_objfn, (void*)params,
 						 initial, lower, upper,
@@ -374,7 +364,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 	if (retcode != BOBYQA_SUCCESS)
 		info(params->outstream, "initial BOBYQA error code %i\n", retcode);
 
-	if (options->estimate.optim.fast == false && step_final < step_refine) {
+	if (step_final < step_refine) {
 		let best = &params->best;
 		var lastobjfn = best->result.objfn;
 		var dobjfn = DBL_MAX - lastobjfn;
@@ -386,7 +376,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 			neval = maxeval - params->nfunc;
 			rhobeg = step_refine;
 			rhoend = step_final;
-			info(params->outstream, "refine: rho %f to %f\n", rhobeg, rhoend);
+			info(params->outstream, "refine: rho [%g, %g]\n", rhobeg, rhoend);
 			retcode = bobyqa(n, npt,
 							 focei_stage2_evaluate_population_objfn, (void*)params,
 							 initial, lower, upper,
@@ -396,7 +386,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 				info(params->outstream, "refine BOBYQA error code %i\n", retcode);
 
 			dobjfn = best->result.objfn - lastobjfn;
-			info(params->outstream, "dobjfn %f\n", dobjfn);
+			info(params->outstream, "dobjfn: %f\n", dobjfn);
 			lastobjfn = best->result.objfn;
 		}
 		while (dobjfn < -0.01);
@@ -712,8 +702,10 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 		options.estimate = estimconfig_default(estimate);
 		*estimate = options.estimate;
 	}
-	options.estimate.optim.step_refine = 1e-1;
-	options.estimate.optim.step_final = 1e-2;
+	options.estimate.stage1.omit_icov_resample = true;
+	options.estimate.optim.step_initial = 1.;
+	options.estimate.optim.step_refine = 0.1;
+	options.estimate.optim.step_final = 0.1;
 
 	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
 	popmodel.result.type = OBJFN_INITIAL;

@@ -70,8 +70,6 @@ ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate)
 		ret.optim.step_final = v;
 	if (ret.optim.maxeval == 0)
 		ret.optim.maxeval = 10000;
-	if (ret.optim.fast == 0)
-		ret.optim.fast = false;
 
 	return ret;
 }

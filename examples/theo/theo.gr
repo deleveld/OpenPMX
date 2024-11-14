@@ -20,6 +20,8 @@ $OMEGABLOCK(
 	0.01, 0.01, .1)
 $SIGMA(1, 1)
 $MAIN
+//	openpmx.brief = true;
+//	openpmx.verbose = true;
 	estimate();
 	table("ID BWT", .name="covariates", .firstonly=true);
 	table("ID TIME yhat yhatvar");
