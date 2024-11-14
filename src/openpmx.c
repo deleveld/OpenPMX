@@ -71,6 +71,9 @@ ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate)
 	if (ret.optim.maxeval == 0)
 		ret.optim.maxeval = 10000;
 
+	if (ret.posthoc.deriv.step == 0.)
+		ret.posthoc.deriv.step = ret.optim.step_refine;
+
 	return ret;
 }
 

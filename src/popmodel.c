@@ -322,13 +322,16 @@ void extfile_trailer(const char* filename, const POPMODEL* const popmodel)
 static void info_iteration(FILE* f1,
 						   const double runtime_s,
 						   const double d1,
-						   const POPMODEL* popmodel)
+						   const POPMODEL* popmodel,
+						   const char* suffix)
 {
 	let _objfn = popmodel->result.objfn;
 	let nfunc = popmodel->result.nfunc;
 	info(f1, "time: %.3f nfunc: %i objfn: %.6f", runtime_s, nfunc, _objfn);
 	if (d1 != 0.)
 		info(f1, " d: %g", d1);
+	if (suffix)
+		info(f1, "%s", suffix);
 	info(f1, "\n");
 }
 
@@ -516,12 +519,13 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 							   FILE* outstream,
 							   const int xlength,
 							   const double* const x,
-							   const double maxd)
+							   const double maxd,
+							   const char* suffix)
 {
 	if (verbose)
 		popmodel_information(outstream, popmodel);
 	if (!brief) {
-		info_iteration(outstream, runtime_s, maxd, popmodel);
+		info_iteration(outstream, runtime_s, maxd, popmodel, suffix);
 		FILE* f = (verbose) ? stdout : 0;
 		print_iteration(f, outstream, popmodel, xlength, x);
 	}

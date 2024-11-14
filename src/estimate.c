@@ -41,6 +41,7 @@
 
 #define OPTIMIZER_OUTER_BOBYQA
 //#define OPTIMIZER_OUTER_GSL_NELDERMEAD
+//#define OPTIMIZER_OUTER_GSL_BFGS
 
 static void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel)
 {
@@ -198,7 +199,8 @@ static void update_best_imodel(const int xlength,
 	let popmodel = &params->test.popmodel;
 
 	const POPMODEL* improved_model = 0;
-	if (popmodel->result.objfn < best->result.objfn) {
+	let dobjfn = popmodel->result.objfn - best->result.objfn;
+	if (dobjfn < 0.) {
 
 		/* update the best estimation and its objective function and function evaluations so far */
 		/* save the best eta so we can keep restarting there for speed and hopefully some consistancy */
@@ -220,6 +222,8 @@ static void update_best_imodel(const int xlength,
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
 		let runtime_s = timespec_time_difference(&params->begin, &now) / 1000.;
+		char message[1024] = { 0 };
+		sprintf(message, " dobjfn: %f", dobjfn);
 		popmodel_eval_information(improved_model,
 								  runtime_s,
 								  params->filename,
@@ -227,7 +231,7 @@ static void update_best_imodel(const int xlength,
 								  options->brief,
 								  params->outstream,
 								  xlength, x,
-								  maxd);
+								  maxd, message);
 	}
 }
 
@@ -284,9 +288,67 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 
 #ifdef OPTIMIZER_OUTER_GSL_NELDERMEAD
 #include <gsl/gsl_multimin.h>
-static double gsl_stage2_objfn(const gsl_vector *v, void *params)
+static double gsl_stage2_objfn(const gsl_vector* v, void *params)
 {
 	return focei_stage2_evaluate_population_objfn(v->size, v->data, params);
+}
+#endif
+
+#ifdef OPTIMIZER_OUTER_GSL_BFGS
+#include <gsl/gsl_multimin.h>
+static double foce_stage2_f(const gsl_vector* const v, void* const params)
+{
+	return focei_stage2_evaluate_population_objfn(v->size, v->data, params);
+}
+
+static void foce_stage2_df(const gsl_vector * const x, void* const _params, gsl_vector* const J)
+{
+	let params = (const STAGE2_PARAMS *) _params;
+	let step_size = params->options->estimate.optim.step_final;
+	let n = params->test.nparam;
+	var xx = gsl_vector_alloc(n);
+
+	forcount(i, n) {
+		let v = gsl_vector_get(x, i);
+		volatile let h = step_size;
+		volatile let above1 = v + h;
+		volatile let above2 = v + 2. * h;
+		volatile let below1 = v - h;
+		volatile let below2 = v - 2. * h;
+
+		gsl_vector_memcpy(xx, x);
+
+		gsl_vector_set(xx, i, above2);
+		volatile let f_above2 = foce_stage2_f(xx, _params);
+
+		gsl_vector_set(xx, i, above1);
+		volatile let f_above1 = foce_stage2_f(xx, _params);
+
+		gsl_vector_set(xx, i, below1);
+		volatile let f_below1 = foce_stage2_f(xx, _params);
+
+		gsl_vector_set(xx, i, below2);
+		volatile let f_below2 = foce_stage2_f(xx, _params);
+
+//		let deriv = (f_above1 - f_below1) / (above1 - below1);	/* arbitrary method */
+
+		/* http://www.holoborodko.com/pavel/numerical-methods/numerical-derivative/smooth-low-noise-differentiators/#noiserobust_2 */
+		let deriv = (2. * (f_above1 - f_below1) + f_above2 - f_below2) / (8. * h);
+
+		/* http://www.holoborodko.com/pavel/numerical-methods/numerical-derivative/lanczos-low-noise-differentiators/#lanczos_2 */
+//		let deriv = ((f_above1 - f_below1) + 2. * (f_above2 - f_below2)) / (10. * h);
+
+		gsl_vector_set(J, i, deriv);
+	}
+	gsl_vector_free(xx);
+}
+static void foce_stage2_fdf(const gsl_vector* const x,
+							void* data,
+							double* const f,
+							gsl_vector* const J)
+{
+	*f = foce_stage2_f(x, data);
+	foce_stage2_df(x, data, J);
 }
 #endif
 
@@ -340,6 +402,45 @@ static const char* focei(STAGE2_PARAMS* const params)
 
 	gsl_multimin_fminimizer_free(s);
 	gsl_vector_free(ss);
+#endif
+
+#ifdef OPTIMIZER_OUTER_GSL_BFGS
+	var my_func = (gsl_multimin_function_fdf) {
+		.f = foce_stage2_f,
+		.df = foce_stage2_df, /* TODO: consider http://www.holoborodko.com/pavel/numerical-methods/numerical-derivative/smooth-low-noise-differentiators/ */
+		.fdf = foce_stage2_fdf,
+		.n = (size_t)n,
+		.params = (void*)params,
+	};
+
+	/* setup and run minimizer */
+	/* arbitrary values */
+	var prevobjfn = DBL_MAX;
+	while (1) {
+		var gsl_initial = gsl_vector_view_array(initial, n);
+		var s = gsl_multimin_fdfminimizer_alloc(gsl_multimin_fdfminimizer_vector_bfgs2, n);
+		gsl_multimin_fdfminimizer_set(s, &my_func, &gsl_initial.vector, step_refine, 0.1);
+
+		/* multimin iterate */
+		int status;
+		while (1) {
+			status = gsl_multimin_fdfminimizer_iterate(s);
+			if (status == GSL_ENOPROG)
+				break;
+			let grad = gsl_multimin_fdfminimizer_gradient(s);
+			status = gsl_multimin_test_gradient(grad, step_final);
+			if (status !=  GSL_CONTINUE)
+				break;
+			if (params->nfunc >=  maxeval) 
+				break;
+		}
+		gsl_multimin_fdfminimizer_free(s);
+
+		let objfn = params->best.result.objfn;
+		if (prevobjfn - objfn < 0.01)
+			break;
+		prevobjfn = objfn;
+	}
 #endif
 
 #ifdef OPTIMIZER_OUTER_BOBYQA
@@ -402,6 +503,24 @@ static const char* focei(STAGE2_PARAMS* const params)
 	return 0;
 }
 
+static void print_model(STAGE2_PARAMS* params, const char* suffix)
+{
+	let popmodel = &params->test.popmodel;
+	let options = params->options;
+		
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	let runtime_s = timespec_time_difference(&params->begin, &now) / 1000.;
+	popmodel_eval_information(popmodel,
+							  runtime_s,
+							  params->filename,
+							  options->verbose,
+							  options->brief,
+							  params->outstream,
+							  0, 0, 0,
+							  suffix);
+}
+
 static bool stabilize_model(STAGE2_PARAMS* params)
 {
 	let idata = params->idata;
@@ -418,16 +537,9 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 		++niter;
 		popmodel->result.nfunc = params->nfunc;
 
-		struct timespec now;
-		clock_gettime(CLOCK_REALTIME, &now);
-		let runtime_s = timespec_time_difference(&params->begin, &now) / 1000.;
-		popmodel_eval_information(popmodel,
-								  runtime_s,
-								  params->filename,
-								  options->verbose,
-								  options->brief,
-								  params->outstream,
-								  0, 0, 0);
+		char message[1024] = { 0 };
+		sprintf(message, " dobjfn: %f", popmodel->result.objfn - params->best.result.objfn);
+		print_model(params, message);
 
 		/* are we stable? */
 		/* besteta we update later, individual eta values keep getting updated */
@@ -439,6 +551,90 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 			break;
 	}
 	return done;
+}
+
+static void evaluate_deriv(STAGE2_PARAMS* params)
+{
+	let idata = params->idata;
+	let advanfuncs = params->advanfuncs;
+	let options = params->options;
+
+	let f0 = params->best.result.objfn;
+	info(params->outstream, "deriv f0 %f\n", f0);
+
+	var step = params->options->estimate.posthoc.deriv.step;
+	var test = &params->test;
+	forcount(k, test->nparam) {
+		let popmodel = &params->test.popmodel;
+		double x[OPENPMX_THETA_MAX + OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX + OPENPMX_SIGMA_MAX] = { 0 };
+
+		x[k] = 1. * step;
+		encode_update(test, x);
+		encode_evaluate(test, idata, advanfuncs, options);
+		params->nfunc += 1;
+		let fp1 = popmodel->result.objfn;
+		char message[1024] = { 0 };
+		sprintf(message, " dobjfn: %f", fp1 - f0);
+		print_model(params, message);
+		x[k] = 0.;
+
+		x[k] = -1. * step;
+		encode_update(test, x);
+		encode_evaluate(test, idata, advanfuncs, options);
+		params->nfunc += 1;
+		let fm1 = popmodel->result.objfn;
+		sprintf(message, " dobjfn: %f", fm1 - f0);
+		print_model(params, message);
+		x[k] = 0.;
+
+		x[k] = 2. * step;
+		encode_update(test, x);
+		encode_evaluate(test, idata, advanfuncs, options);
+		params->nfunc += 1;
+		let fp2 = popmodel->result.objfn;
+		sprintf(message, " dobjfn: %f", fp2 - f0);
+		print_model(params, message);
+		x[k] = 0.;
+
+		x[k] = -2. * step;
+		encode_update(test, x);
+		encode_evaluate(test, idata, advanfuncs, options);
+		params->nfunc += 1;
+		let fm2 = popmodel->result.objfn;
+		sprintf(message, " dobjfn: %f", fm2 - f0);
+		print_model(params, message);
+		x[k] = 0.;
+
+		x[k] = 3. * step;
+		encode_update(test, x);
+		encode_evaluate(test, idata, advanfuncs, options);
+		params->nfunc += 1;
+		let fp3 = popmodel->result.objfn;
+		sprintf(message, " dobjfn: %f", fp3 - f0);
+		print_model(params, message);
+		x[k] = 0.;
+
+		x[k] = -3. * step;
+		encode_update(test, x);
+		encode_evaluate(test, idata, advanfuncs, options);
+		params->nfunc += 1;
+		let fm3 = popmodel->result.objfn;
+		sprintf(message, " dobjfn: %f", fm3 - f0);
+		print_model(params, message);
+		x[k] = 0.;
+
+		/* http://www.holoborodko.com/pavel/numerical-methods/numerical-derivative/smooth-low-noise-differentiators/#noiserobust_2 */
+		let deriv1 = (5.*(fp1 - fm1) + 4.*(fp2 - fm2) + fp3 - fm3) / (32. * step);
+
+		/* https://en.wikipedia.org/wiki/Finite_difference_coefficient */
+		let deriv2 = ((fp3 + fm3) + 2.*(fp2 - fm2) - (fp1 + fm1) - 4.*f0) / (16. * pow(step, 2));
+
+		info(params->outstream, "param %i deriv1 %g deriv2 %g\n", k, deriv1, deriv2);
+		
+	}
+	/* TODO : add warnings here for decreases in objfn and zero gradient and second deriv */
+	
+	params->best.result.nfunc = params->nfunc;
 }
 
 static void focei_popmodel_stage2(STAGE2_PARAMS* params)
@@ -481,11 +677,15 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 		params->best.result.type = OBJFN_FINAL;
 		params->best.result.nfunc = params->nfunc;
 
-		/* TODO: we can add a posthoc test to make sure the result is stable */
+		/* at end ew encode the best so far */
 		encode_offset(&params->test, &params->best);
 		if (!stabilize_model(params))
 			warning(outstream, "final evaluation not stable\n");
 	}
+
+	/* posthoc evaluation of derivates */
+	if (!options->estimate.posthoc.deriv.omit) 
+		evaluate_deriv(params);
 }
 
 typedef enum {
@@ -679,6 +879,7 @@ void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 		*stage1 = options.estimate.stage1;
 	}
 	options.estimate.optim.maxeval = 1;
+	options.estimate.posthoc.deriv.omit = true;
 
 	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
 	popmodel.result.type = OBJFN_INITIAL;
@@ -705,7 +906,8 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	options.estimate.stage1.omit_icov_resample = true;
 	options.estimate.optim.step_initial = 1.;
 	options.estimate.optim.step_refine = 0.1;
-	options.estimate.optim.step_final = 0.1;
+	options.estimate.optim.step_final = 0.01;
+	options.estimate.posthoc.deriv.omit = true;
 
 	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
 	popmodel.result.type = OBJFN_INITIAL;

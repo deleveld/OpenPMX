@@ -70,7 +70,8 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 							   FILE* outstream,
 							   const int xlength,
 							   const double* const x,
-							   const double maxd);
+							   const double maxd,
+							   const char* suffix);
 
 void popmodel_information(FILE* f2,
 						  const POPMODEL* const popmodel);

@@ -150,8 +150,6 @@ typedef struct {
 	const STAGE1CONFIG* const stage1;
 	const IEVALUATE_ARGS ievaluate_args;
 	double* const eval_msec;
-	double* bestiobjfn;
-	double* besteta;
 } STAGE1_PARAMS;
 
 static double stage1_evaluate_individual_iobjfn(const long int nreta,
@@ -187,12 +185,7 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 	/* functions for Bae and Yim objective function Term 3 */
 	var term3 = sample_min2ll(nreta, reta, stage1_params->nonzero);
 
-	/* save the best one */
 	let iobjfn = objfn_term1 + objfn_term2 + term3;
-	if (iobjfn <= *stage1_params->bestiobjfn) {
-		memcpy(stage1_params->besteta, stage1_params->testeta, OPENPMX_OMEGA_MAX * sizeof(double));
-		*stage1_params->bestiobjfn = iobjfn;
-	}
 	return iobjfn;
 }
 
@@ -278,7 +271,6 @@ static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 	assert(stage1_params->testeta == popparam->eta);
 
 	unreduce_eta(stage1_params->testeta, reta, nonzero);
-//	memcpy(stage1_params->testeta, stage1_params->besteta, OPENPMX_OMEGA_MAX * sizeof(double));
 }
 
 /* calculate individual variance covariance matrix
@@ -561,8 +553,6 @@ void stage1_thread(INDIVID* const individ,
 		it is only nomega wide. We just have to copy back and forth. */
 	int nfunc = 0;
 	double testeta[OPENPMX_OMEGA_MAX] = { 0 };
-	double bestiobjfn = DBL_MAX;
-	double besteta[OPENPMX_OMEGA_MAX] = { 0 };
 	let stage1_params = (const STAGE1_PARAMS) {
 		.testeta = testeta,
 		.nonzero = nonzero,
@@ -575,8 +565,6 @@ void stage1_thread(INDIVID* const individ,
 			.popparam = popparam_init(popmodel, advanfuncs, testeta),
 			.logstream = scatteroptions->logstream,
 		},
-		.bestiobjfn = &bestiobjfn,
-		.besteta = besteta,
 		.eval_msec = &individ->eval_msec,
 	};
 	double reta[OPENPMX_OMEGA_MAX] = { 0 };
