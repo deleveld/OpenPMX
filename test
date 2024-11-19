@@ -21,7 +21,7 @@ fi
 set -eu
 
 (./install ${TARGET})
-(cd examples/theo; ../../openpmx theo.gr)
+(cd examples/theo; ../../openpmx theo.gr; ../../graphics theo.gr)
 # (cd examples/warfarin; ../../openpmx warfarin.gr)
 # (cd examples/schnider; ../../openpmx schnider.gr)
 # (cd examples/c; ./test)

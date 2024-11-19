@@ -19,7 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <values.h>
+#include <float.h>
 
 #include "openpmx.h"
 #include "omegainfo.h"
@@ -161,20 +161,6 @@ static double objfn(const IDATA* const idata,
 	return objfn;
 }
 
-static double calculate_maxd(const int xlength,
-							 const double x[static xlength])
-{
-	var d = 0.;
-	if (x && xlength > 0) {
-		forcount(j, xlength) {
-			let delta = fabs(x[j]);
-			if (d < delta)
-				d = delta;
-		}
-	}
-	return d;
-}
-
 typedef struct {
 	IDATA* const idata;
 	const ADVANFUNCS* const advanfuncs;
@@ -184,6 +170,7 @@ typedef struct {
 	int nfunc;
 	POPMODEL best;
 	double* besteta;
+	const int neta;
 
 	struct timespec begin;
 	FILE* outstream;
@@ -197,33 +184,30 @@ static void update_best_imodel(const int xlength,
 {
 	let idata = params->idata;
 	let popmodel = &params->test.popmodel;
+	let options = params->options;
 
 	const POPMODEL* improved_model = 0;
 	let dobjfn = popmodel->result.objfn - best->result.objfn;
-	if (dobjfn < 0.) {
+	if (dobjfn < 0.) { 
 
 		/* update the best estimation and its objective function and function evaluations so far */
 		/* save the best eta so we can keep restarting there for speed and hopefully some consistancy */
 		*best = *popmodel;
 		improved_model = best;
-		if (params->besteta) {
-			let firstindivid = &idata->individ[0];
-			memcpy(params->besteta, firstindivid->eta, idata->nindivid * idata->nomega * sizeof(double));
-		}
+		let firstindivid = &idata->individ[0];
+		memcpy(params->besteta, firstindivid->eta, params->neta * sizeof(double));
 	}
 
 	/* update the user */
-	let options = params->options;
 	if (options->verbose && !options->brief)
 		improved_model = popmodel;
 	if (improved_model) {
-		let maxd = calculate_maxd(xlength, x);
-
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
 		let runtime_s = timespec_time_difference(&params->begin, &now) / 1000.;
-		char message[1024] = { 0 };
-		sprintf(message, " dobjfn: %f", dobjfn);
+		char message[1024] = "";
+		if (popmodel->result.objfn != DBL_MAX && best->result.objfn != DBL_MAX)
+			sprintf(message, " dobjfn: %f", dobjfn);
 		popmodel_eval_information(improved_model,
 								  runtime_s,
 								  params->filename,
@@ -231,8 +215,15 @@ static void update_best_imodel(const int xlength,
 								  options->brief,
 								  params->outstream,
 								  xlength, x,
-								  maxd, message);
+								  message);
 	}
+}
+
+static void reset_eta(IDATA* const idata, const double* eta)
+{
+	assert(eta);
+	var firstindivid = &idata->individ[0];
+	memcpy(firstindivid->eta, eta, idata->nindivid * idata->nomega * sizeof(double));
 }
 
 static void encode_evaluate(ENCODE* const test,
@@ -263,15 +254,11 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 	assert(_xlength == params->test.nparam);
 	encode_update(&params->test, _x);
 
-	/* do the internal stage 1, start with eta from best run */
-	assert(params->besteta);
-	var firstindivid = &idata->individ[0];
-	memcpy(firstindivid->eta, params->besteta, idata->nindivid * idata->nomega * sizeof(double));
-
 	/* do the actual test, this sets the objfn */
 	let advanfuncs = params->advanfuncs;
 	let options = params->options;
 	let popmodel = &params->test.popmodel;
+	reset_eta(idata, params->besteta);
 	encode_evaluate(&params->test, idata, advanfuncs, options);
 	params->nfunc += 1;
 	popmodel->result.nfunc = params->nfunc;
@@ -437,7 +424,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 		gsl_multimin_fdfminimizer_free(s);
 
 		let objfn = params->best.result.objfn;
-		if (prevobjfn - objfn < 0.01)
+		if (prevobjfn - objfn < 0.0005)
 			break;
 		prevobjfn = objfn;
 	}
@@ -490,7 +477,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 			info(params->outstream, "dobjfn: %f\n", dobjfn);
 			lastobjfn = best->result.objfn;
 		}
-		while (dobjfn < -0.01);
+		while (dobjfn < -0.005);
 	}
 
 	free(w);
@@ -503,11 +490,17 @@ static const char* focei(STAGE2_PARAMS* const params)
 	return 0;
 }
 
-static void print_model(STAGE2_PARAMS* params, const char* suffix)
+static void print_model(STAGE2_PARAMS* params,
+						const int xlength,
+						const double* const x)
 {
 	let popmodel = &params->test.popmodel;
 	let options = params->options;
-		
+
+	char message[128] = "";
+	if (popmodel->result.objfn != DBL_MAX && params->best.result.objfn != DBL_MAX)
+		sprintf(message, " dobjfn: %f", popmodel->result.objfn - params->best.result.objfn);
+
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	let runtime_s = timespec_time_difference(&params->begin, &now) / 1000.;
@@ -517,8 +510,8 @@ static void print_model(STAGE2_PARAMS* params, const char* suffix)
 							  options->verbose,
 							  options->brief,
 							  params->outstream,
-							  0, 0, 0,
-							  suffix);
+							  xlength, x, 
+							  message);
 }
 
 static bool stabilize_model(STAGE2_PARAMS* params)
@@ -526,111 +519,131 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 	let idata = params->idata;
 	let advanfuncs = params->advanfuncs;
 	let options = params->options;
-	
+	let popmodel = &params->test.popmodel;
+
+	info(params->outstream, "stabilize:\n");
+	reset_eta(idata, params->besteta);
+
 	var done = false;
 	var niter = 0;
 	while (!done) {
-		let popmodel = &params->test.popmodel;
-		let prev_objfn = popmodel->result.objfn;
+		let lastobjfn = popmodel->result.objfn;
 		encode_evaluate(&params->test, idata, advanfuncs, options);
 		params->nfunc += 1;
 		++niter;
 		popmodel->result.nfunc = params->nfunc;
 
-		char message[1024] = { 0 };
-		sprintf(message, " dobjfn: %f", popmodel->result.objfn - params->best.result.objfn);
-		print_model(params, message);
+		print_model(params, 0, 0);
 
 		/* are we stable? */
 		/* besteta we update later, individual eta values keep getting updated */
-		if (fabs(popmodel->result.objfn - prev_objfn) < 0.01) 
-			done = true;
-
 		/* warn if we are not stable after 10 iterations */
-		if (!done && niter >= 10)
+		let dobjfn = popmodel->result.objfn - lastobjfn;
+		if (fabs(dobjfn) < 0.005) 
+			done = true;
+		else if (niter >= 10)
 			break;
+			
+		params->best = *popmodel;
 	}
+
+	var firstindivid = &idata->individ[0];
+	memcpy(params->besteta, firstindivid->eta, idata->nindivid * idata->nomega * sizeof(double));
+
 	return done;
 }
 
+#include <gsl/gsl_spline.h>
+
 static void evaluate_deriv(STAGE2_PARAMS* params)
 {
+	/* http://www.holoborodko.com/pavel/numerical-methods/numerical-derivative/smooth-low-noise-differentiators/#noiserobust_2 */
+	
 	let idata = params->idata;
 	let advanfuncs = params->advanfuncs;
 	let options = params->options;
+	let popmodel = &params->test.popmodel;
+	var test = &params->test;
+	let n = test->nparam;
+
+	info(params->outstream, "deriv:\n");
 
 	let f0 = params->best.result.objfn;
-	info(params->outstream, "deriv f0 %f\n", f0);
 
-	var step = params->options->estimate.posthoc.deriv.step;
-	var test = &params->test;
-	forcount(k, test->nparam) {
-		let popmodel = &params->test.popmodel;
+	var step2 = params->options->estimate.optim.step_initial;
+	var step1 = params->options->estimate.optim.step_refine;
+	forcount(k, n) {
 		double x[OPENPMX_THETA_MAX + OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX + OPENPMX_SIGMA_MAX] = { 0 };
+		double xa[5] = { 0 };
+		double ya[5] = { 0 };
+		xa[2] = 0.;
+		ya[2] = 0.;
 
-		x[k] = 1. * step;
-		encode_update(test, x);
-		encode_evaluate(test, idata, advanfuncs, options);
-		params->nfunc += 1;
-		let fp1 = popmodel->result.objfn;
-		char message[1024] = { 0 };
-		sprintf(message, " dobjfn: %f", fp1 - f0);
-		print_model(params, message);
-		x[k] = 0.;
+		memset(x, 0, sizeof(x));
 
-		x[k] = -1. * step;
+		x[k] = -1. * step2;
 		encode_update(test, x);
+		reset_eta(idata, params->besteta); 
 		encode_evaluate(test, idata, advanfuncs, options);
+		popmodel->result.nfunc = params->nfunc;
 		params->nfunc += 1;
-		let fm1 = popmodel->result.objfn;
-		sprintf(message, " dobjfn: %f", fm1 - f0);
-		print_model(params, message);
-		x[k] = 0.;
-
-		x[k] = 2. * step;
-		encode_update(test, x);
-		encode_evaluate(test, idata, advanfuncs, options);
-		params->nfunc += 1;
-		let fp2 = popmodel->result.objfn;
-		sprintf(message, " dobjfn: %f", fp2 - f0);
-		print_model(params, message);
-		x[k] = 0.;
-
-		x[k] = -2. * step;
-		encode_update(test, x);
-		encode_evaluate(test, idata, advanfuncs, options);
-		params->nfunc += 1;
+		popmodel->result.nfunc = params->nfunc;
 		let fm2 = popmodel->result.objfn;
-		sprintf(message, " dobjfn: %f", fm2 - f0);
-		print_model(params, message);
+		print_model(params, n, x);
+		xa[0] = x[k];
+		ya[0] = fm2 - f0;
 		x[k] = 0.;
 
-		x[k] = 3. * step;
+		x[k] = -1. * step1;
 		encode_update(test, x);
+		reset_eta(idata, params->besteta); 
 		encode_evaluate(test, idata, advanfuncs, options);
 		params->nfunc += 1;
-		let fp3 = popmodel->result.objfn;
-		sprintf(message, " dobjfn: %f", fp3 - f0);
-		print_model(params, message);
+		popmodel->result.nfunc = params->nfunc;
+		let fm1 = popmodel->result.objfn;
+		print_model(params, n, x);
+		xa[1] = x[k];
+		ya[1] = fm1 - f0;
 		x[k] = 0.;
 
-		x[k] = -3. * step;
+		xa[2] = 0.;
+		ya[2] = 0.;
+
+		x[k] = 1. * step1;
 		encode_update(test, x);
+		reset_eta(idata, params->besteta); 
 		encode_evaluate(test, idata, advanfuncs, options);
 		params->nfunc += 1;
-		let fm3 = popmodel->result.objfn;
-		sprintf(message, " dobjfn: %f", fm3 - f0);
-		print_model(params, message);
+		popmodel->result.nfunc = params->nfunc;
+		let fp1 = popmodel->result.objfn;
+		print_model(params, n, x);
+		xa[3] = x[k];
+		ya[3] = fp1 - f0;
 		x[k] = 0.;
 
-		/* http://www.holoborodko.com/pavel/numerical-methods/numerical-derivative/smooth-low-noise-differentiators/#noiserobust_2 */
-		let deriv1 = (5.*(fp1 - fm1) + 4.*(fp2 - fm2) + fp3 - fm3) / (32. * step);
+		x[k] = 1. * step2;
+		encode_update(test, x);
+		reset_eta(idata, params->besteta); 
+		encode_evaluate(test, idata, advanfuncs, options);
+		params->nfunc += 1;
+		popmodel->result.nfunc = params->nfunc;
+		let fp2 = popmodel->result.objfn;
+		print_model(params, n, x);
+		xa[4] = x[k];
+		ya[4] = fp2 - f0;
+		x[k] = 0.;
 
-		/* https://en.wikipedia.org/wiki/Finite_difference_coefficient */
-		let deriv2 = ((fp3 + fm3) + 2.*(fp2 - fm2) - (fp1 + fm1) - 4.*f0) / (16. * pow(step, 2));
+		var interp = gsl_spline_alloc(gsl_interp_cspline, 5);
+		var accelp = gsl_interp_accel_alloc();		
+		gsl_spline_init(interp, xa, ya, 5);
 
-		info(params->outstream, "param %i deriv1 %g deriv2 %g\n", k, deriv1, deriv2);
-		
+		let deriv1 = gsl_spline_eval_deriv(interp, 0.01, accelp);
+		let deriv0 = gsl_spline_eval_deriv(interp, 0., accelp);
+		let deriv2 = gsl_spline_eval_deriv(interp, -0.01, accelp);
+		info(params->outstream, "param %i deriv %g %g %g\n", k, deriv1, deriv0, deriv2);
+
+		gsl_interp_accel_free(accelp);
+		gsl_spline_free(interp);
 	}
 	/* TODO : add warnings here for decreases in objfn and zero gradient and second deriv */
 	
@@ -659,12 +672,11 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 	/* first run so we can set objective function and yhat. */
 	/* this is the first evaluation, the encode_offset at the best model is
 	 * already done. We may have to evaluate several times for a stable objfn */
+	/* after the iterations, we save the besteta which we use to start with later */
 	params->nfunc = 0; 
 	if (!stabilize_model(params))
 		warning(outstream, "initial evaluation not stable\n");
 
-	/* after the iterations, we save the besteta which we use to start with later */
-	memcpy(params->besteta, firstindivid->eta, idata->nindivid * idata->nomega * sizeof(double));
 	/* we dont really need this since we dont change popmodel or best since starting
 	 * best = *popmodel;
 	 * encode_offset(&params->test, best); */
@@ -677,15 +689,15 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 		params->best.result.type = OBJFN_FINAL;
 		params->best.result.nfunc = params->nfunc;
 
-		/* at end ew encode the best so far */
+		/* at end we encode the best so far */
 		encode_offset(&params->test, &params->best);
-		if (!stabilize_model(params))
-			warning(outstream, "final evaluation not stable\n");
+//		if (!stabilize_model(params))
+//			warning(outstream, "final evaluation not stable\n");
 	}
 
 	/* posthoc evaluation of derivates */
-	if (!options->estimate.posthoc.deriv.omit) 
-		evaluate_deriv(params);
+//	if (!options->estimate.posthoc.deriv.omit) 
+//		evaluate_deriv(params);
 }
 
 typedef enum {
@@ -764,6 +776,7 @@ static STAGE2_PARAMS stage2_params(const char* filename,
 			fatal(outstream, "%s: could not open file \"%s%s\"\n", __func__, filename, OPENPMX_OUTFILE);
 	}
 
+	let neta = idata->nindivid * idata->nomega;
 	var params = (STAGE2_PARAMS) {
 		.idata = idata,
 		.advanfuncs = advanfuncs,
@@ -772,6 +785,7 @@ static STAGE2_PARAMS stage2_params(const char* filename,
 		.nfunc = 0,
 		.best = *popmodel,
 		.besteta = 0,
+		.neta = neta,
 		.begin = { 0 }, 							/* set after initialization */
 		.outstream = outstream,
 		.filename = filename,
@@ -781,7 +795,7 @@ static STAGE2_PARAMS stage2_params(const char* filename,
 	assert(idata->nomega > 0);
 
 	params.best = params.test.popmodel; /* will set objfn to invalid */
-	params.besteta = callocvar(double, idata->nindivid * idata->nomega);
+	params.besteta = callocvar(double, neta);
 
 	/* make sure everything is consistent */
 	encode_offset(&params.test, &params.best);

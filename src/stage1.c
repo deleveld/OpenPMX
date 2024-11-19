@@ -17,7 +17,7 @@
 
 #include <string.h>
 #include <assert.h>
-#include <values.h>
+#include <float.h>
 #include <math.h>
 
 #include "stage1.h"

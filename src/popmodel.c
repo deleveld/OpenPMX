@@ -20,7 +20,7 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
-#include <values.h>
+#include <float.h>
 
 #include "popmodel.h"
 #include "print.h"
@@ -210,15 +210,13 @@ void extfile_header(const char* filename,
 		}
 	}
 	fprintf(f, OPENPMX_HEADER_FORMAT, "OBJ");
-	fprintf(f, OPENPMX_HEADER_FORMAT, "MAXD");
 	fprintf(f, "\n");
 
 	fclose(f);
 }
 
 void extfile_append(const char* filename,
-					const POPMODEL* const popmodel,
-					const double maxd)
+					const POPMODEL* const popmodel)
 {
 	var f = results_fopen(filename, OPENPMX_EXTFILE, "a");
 	if (f == 0)
@@ -240,7 +238,6 @@ void extfile_append(const char* filename,
 			fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->omega[i][j]);
 
 	fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->result.objfn);
-	fprintf(f, OPENPMX_TABLE_FORMAT, maxd);
 	fprintf(f, "\n");
 
 	fclose(f);
@@ -264,10 +261,9 @@ void extfile_trailer(const char* filename, const POPMODEL* const popmodel)
 		forcount(j, i+1)
 			fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->omega[i][j]);
 
-	/* objfn and maxd */
+	/* objfn */
 	fprintf(f, "  ");
 	fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->result.objfn);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, "\n");
 
 	fprintf(f, OPENPMX_IFORMAT, -1000000006);
@@ -282,9 +278,8 @@ void extfile_trailer(const char* filename, const POPMODEL* const popmodel)
 		forcount(j, i+1)
 			fprintf(f, OPENPMX_TABLE_FORMAT, (double)popmodel->omegafixed[i][j]);
 
-	/* objfn and maxd */
+	/* objfn */
 	fprintf(f, "  ");
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, "\n");
 
@@ -300,7 +295,6 @@ void extfile_trailer(const char* filename, const POPMODEL* const popmodel)
 			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, "  ");
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, "\n");
 
 	fprintf(f, OPENPMX_IFORMAT, -2000000002);
@@ -313,7 +307,6 @@ void extfile_trailer(const char* filename, const POPMODEL* const popmodel)
 			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, "  ");
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, "\n");
 
 	fclose(f);
@@ -321,15 +314,12 @@ void extfile_trailer(const char* filename, const POPMODEL* const popmodel)
 
 static void info_iteration(FILE* f1,
 						   const double runtime_s,
-						   const double d1,
 						   const POPMODEL* popmodel,
 						   const char* suffix)
 {
 	let _objfn = popmodel->result.objfn;
 	let nfunc = popmodel->result.nfunc;
 	info(f1, "time: %.3f nfunc: %i objfn: %.6f", runtime_s, nfunc, _objfn);
-	if (d1 != 0.)
-		info(f1, " d: %g", d1);
 	if (suffix)
 		info(f1, "%s", suffix);
 	info(f1, "\n");
@@ -519,19 +509,18 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 							   FILE* outstream,
 							   const int xlength,
 							   const double* const x,
-							   const double maxd,
 							   const char* suffix)
 {
 	if (verbose)
 		popmodel_information(outstream, popmodel);
 	if (!brief) {
-		info_iteration(outstream, runtime_s, maxd, popmodel, suffix);
+		info_iteration(outstream, runtime_s, popmodel, suffix);
 		FILE* f = (verbose) ? stdout : 0;
 		print_iteration(f, outstream, popmodel, xlength, x);
 	}
 	if (filename) {
 		if (verbose || !brief)
-			extfile_append(filename, popmodel, maxd);
+			extfile_append(filename, popmodel);
 	}
 }
 

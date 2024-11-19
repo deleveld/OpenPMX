@@ -20,7 +20,7 @@
 #include <stdint.h>
 #include <assert.h>
 #include <math.h>
-#include <values.h>
+#include <float.h>
 #include <unistd.h>
 #include <stdarg.h>
 #include <ctype.h>
@@ -107,14 +107,14 @@ static void strip_firstlast_space(char* s)
 
 	/* remove space at end */
 	char* a = s + len - 1;
-	while (a != s && *a && isspace(*a)) {
+	while (a != s && *a && isspace((int)*a)) {
 		*a = 0;
 		--a;
 	}
 
 	/* remove space at begin */
 	a = s;
-	while (*a && isspace(*a))
+	while (*a && isspace((int)*a))
 		++a;
 
 	/* copy data over with classic strcpy

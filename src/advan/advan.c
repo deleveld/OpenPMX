@@ -18,7 +18,7 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
-#include <values.h>
+#include <float.h>
 
 #include "advan.h"
 #include "utils/c22.h"

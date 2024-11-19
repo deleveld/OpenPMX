@@ -67,12 +67,12 @@ ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate)
 	if (ret.optim.step_refine == 0.)
 		ret.optim.step_refine = 0.05;
 	if (ret.optim.step_final == 0.)
-		ret.optim.step_final = v;
+		ret.optim.step_final = v * 10.;
 	if (ret.optim.maxeval == 0)
 		ret.optim.maxeval = 10000;
 
 	if (ret.posthoc.deriv.step == 0.)
-		ret.posthoc.deriv.step = ret.optim.step_refine;
+		ret.posthoc.deriv.step = ret.optim.step_initial;
 
 	return ret;
 }

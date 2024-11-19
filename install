@@ -26,13 +26,11 @@ CC="gcc"
 ### CC="clang"
 
 # general build flags
-CFLAGS="-g -O2 -W -Wall -Wextra -Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -march=native -Wwrite-strings"
-CPP="g++"
-CPPFLAGS="-g -O2 -W -Wall -Wextra -Wfloat-conversion -Wformat -Werror=format-security -Wno-missing-field-initializers -Wwrite-strings"
+CFLAGS="-g -O2 -march=native -W -Wall -Wextra"
+CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -Wwrite-strings -Isrc"
 LFLAGS="-flto"
 RM="rm -f"
-AR="ar r"
-LIBNAME="libopenpmx.so"
+LIBNAME="openpmx"
 
 # openpmx source files
 SOURCEFILES="openpmx.c
@@ -74,9 +72,17 @@ if [ "${TARGET}" = "clean" ]; then
 	exit 0
 fi
 
-# cleaner compiles on clang
-if [ "${CC}" = "clang" ]; then
-	CFLAGS="${CFLAGS} -Wno-gnu-auto-type"
+OPENPMXDIR=$(cd `dirname $0` && pwd)
+
+# on Linux make a shared lib
+AR="ar rcs lib/${LIBNAME}.a"
+PLATFORM="$(uname -s)"
+INCLUDE="-Iinclude"
+if [ "${PLATFORM}" = "Linux" ]; then
+	CLIBFLAGS="${CLIBFLAGS} -fPIC"
+	AR="gcc -shared -o lib/lib${LIBNAME}.so"
+else
+	INCLUDE="-I/mingw64/include"
 fi
 
 # install flag for OpenMP target
@@ -115,18 +121,18 @@ else
 fi
 
 # build openpmxtran
-(set -x; ${CC} ${CFLAGS} -Iinclude src/openpmxtran.c -o bin/openpmxtran ${LFLAGS} -lm)
+(set -x; ${CC} ${CFLAGS} ${CLIBFLAGS} ${INCLUDE} src/openpmxtran.c -o bin/openpmxtran ${LFLAGS} -lm)
 
 # compile the source files to object files and make library
 OBJECTFILES=
 for FILE in ${SOURCEFILES}
 do
 	BASE=$(basename ${FILE})
-	OBJFILE="build/"${BASE%.*}".o"
-	(set -x; ${CC} ${CFLAGS} -fpic -Iinclude -Isrc -c "src/"${FILE} -o ${OBJFILE})
-	OBJECTFILES="${OBJECTFILES} ${OBJFILE}"
+	OBJFILE="${BASE%.*}.o"
+	(set -x; ${CC} ${CFLAGS} ${CLIBFLAGS} ${INCLUDE} -c "src/${FILE}" -o "build/${OBJFILE}")
+	OBJECTFILES="${OBJECTFILES} build/${OBJFILE}"
 done
-(set -x; gcc -shared -o lib/${LIBNAME} ${OBJECTFILES})
+(set -x; ${AR} ${OBJECTFILES})
 
 # write the build script with the correct path
 echo "#!/bin/sh"					>openpmx
@@ -134,10 +140,7 @@ echo "########################################################################"	
 echo "# OpenPMX build options"		>>openpmx
 echo "CC=${CC}"						>>openpmx
 echo "CFLAGS=\"${CFLAGS}\""			>>openpmx
-echo "CPP=${CPP}"					>>openpmx
-echo "CPPFLAGS=\"${CPPFLAGS}\""		>>openpmx
 echo "LFLAGS=\"${LFLAGS}\""			>>openpmx
-OPENPMXDIR=$(cd `dirname $0` && pwd)
 echo "OPENPMXDIR=\"${OPENPMXDIR}\""	>>openpmx
 echo ""								>>openpmx
 cat src/_openpmx_template			>>openpmx

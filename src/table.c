@@ -1,3 +1,4 @@
+
 /* 
  * This file is part of OpenPMX (https://github.com/deleveld/openpmx).
  * Copyright (c) 2022 Douglas Eleveld.
@@ -19,8 +20,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <values.h>
+#include <float.h>
 #include <ctype.h>
+#include <dirent.h>
 
 #include "openpmx.h"
 #include "openpmx_internal.h"
@@ -41,14 +43,14 @@ static void strip_firstlast_space(char* s)
 
 	/* remove space at end */
 	char* a = s + len - 1;
-	while (a != s && *a && isspace(*a)) {
+	while (a != s && *a && isspace((int)*a)) {
 		*a = 0;
 		--a;
 	}
 
 	/* remove space at begin */
 	a = s;
-	while (*a && isspace(*a))
+	while (*a && isspace((int)*a))
 		++a;
 
 	/* copy data over with classic strcpy
@@ -96,7 +98,7 @@ TABLE table_open(const IDATA* const idata,
 						 const TABLECONFIG* const tableconfig)
 {
 	const char* filename = 0;
-	char ext[NAME_MAX] = "";
+	char ext[PATH_MAX + NAME_MAX] = "";
 
 	/* determine the file to open */
 	if (tableconfig) {
@@ -278,7 +280,15 @@ double table_value(const TABLE* const table, const char* const name, const bool 
 		return table->pred;
 	if (strcmp(name, "OBJ") == 0)
 		return table->obj;
+	if (strcmp(name, "cwres") == 0 ||
+		strcmp(name, "CWRES") == 0) {
+		let dv = RECORDINFO_DV(recordinfo, table->record);
+		return (table->yhat - dv) / sqrt(table->yhatvar);
+	}
 
+	if (strcmp(name, "evid") == 0 ||
+		strcmp(name, "EVID") == 0) 
+		return RECORDINFO_EVID(recordinfo, table->record);
 	if (strcmp(name, "MDV") == 0)
 		return RECORDINFO_MDV(recordinfo, table->record);
 	if (strcmp(name, "EVID") == 0)

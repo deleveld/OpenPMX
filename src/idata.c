@@ -19,7 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
-#include <values.h>
+#include <float.h>
 
 #include "idata.h"
 #include "defines.h"

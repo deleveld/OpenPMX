@@ -58,8 +58,7 @@ void extfile_header(const char* filename,
 					const POPMODEL* const popmodel,
 					const bool _offset1);
 void extfile_append(const char* filename,
-					const POPMODEL* const popmodel,
-					const double maxd);
+					const POPMODEL* const popmodel);
 void extfile_trailer(const char* filename, const POPMODEL* const popmodel);
 
 void popmodel_eval_information(const POPMODEL* const popmodel,
@@ -70,7 +69,6 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 							   FILE* outstream,
 							   const int xlength,
 							   const double* const x,
-							   const double maxd,
 							   const char* suffix);
 
 void popmodel_information(FILE* f2,

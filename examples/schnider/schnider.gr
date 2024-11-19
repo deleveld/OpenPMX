@@ -32,9 +32,11 @@ $THETA
 	{            0,	            0,	            0,	 FIXED },
 	{            0,	            0,	            0,	 FIXED },
 	{            1,	            1,	            1,	 FIXED },
+	{           -100,	            10,	            100,	 ESTIMATE },
 $OMEGA(0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
-$SIGMA(	0.0513934)
+$SIGMA(0.1)
 $MAIN
+//	openpmx.verbose = true;
 	estimate();
 	table("ID,AGE,WT,HT,M1F2", .name="covariates");
 	table("ID,TIME,DV,IPRED,PRED,yhat,yhatvar", .name="pred");

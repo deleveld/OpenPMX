@@ -20,7 +20,7 @@
 #include <string.h>
 #include <assert.h>
 #include <math.h>
-#include <values.h>
+#include <float.h>
 
 #include "encode.h"
 #include "linalg.h"
@@ -72,11 +72,12 @@ ENCODE encode_init(const POPMODEL* const popmodel)
 										 .type = OBJFN_INVALID,
 										 .nfunc = 0 };	
 	var temp_omegainfo = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed);
+	let n = encode_nparam(popmodel, &temp_omegainfo);
 
 	return (ENCODE) {
 		.popmodel = temp_popmodel,
 		.omegainfo = temp_omegainfo,
-		.nparam = encode_nparam(popmodel, &temp_omegainfo),
+		.nparam = n,
 		.offset = { 0 },
 		.has_offsets = false,
 	};

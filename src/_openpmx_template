@@ -36,12 +36,6 @@ if [ "${FILE##*.}" = "c" ]; then
 	echo "compile: \"${FILE}\""
 	${CC} ${CFLAGS} -c "${FILE}" -I"${OPENPMXDIR}/include" -o "${OBJFILE}"
 
-# accept C++ code directly
-elif [ "${FILE##*.}" = "cpp" ]; then
-	echo "compile: \"${FILE}\""
-	g++ ${CPPFLAGS} -c "${FILE}" -I"${OPENPMXDIR}/include" -o  "${OBJFILE}"
-	CC=${CPP} # override for linking
-
 # translate control file to C code
 else
 	"${OPENPMXDIR}/bin/openpmxtran" "${FILE}"
