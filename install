@@ -21,16 +21,26 @@ TARGET="${1:-pthread}"
 
 set -eu
 
-# compiler
+# general build flags are for Linux
+# modifications for platforms occurs later in this file
 CC="gcc"
-### CC="clang"
-
-# general build flags
-CFLAGS="-g -O2 -march=native -W -Wall -Wextra"
+LIBNAME="openpmx"
+CFLAGS="-g -O2 -march=native -W -Wall -Wextra -Iinclude"
 CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -Wwrite-strings -Isrc"
 LFLAGS="-flto"
+AR="gcc -shared -o lib/lib${LIBNAME}.so"
 RM="rm -f"
-LIBNAME="openpmx"
+
+# platform specific changes
+PLATFORM="$(uname -s)"
+# linux 
+if [ "${PLATFORM}" = "Linux" ]; then
+	CLIBFLAGS="${CLIBFLAGS} -fPIC"
+# mingw64 
+else
+	CFLAGS="${CFLAGS} -I/mingw64/include"
+	AR="ar rcs lib/${LIBNAME}.a"
+fi
 
 # openpmx source files
 SOURCEFILES="openpmx.c
@@ -74,17 +84,6 @@ fi
 
 OPENPMXDIR=$(cd `dirname $0` && pwd)
 
-# on Linux make a shared lib
-AR="ar rcs lib/${LIBNAME}.a"
-PLATFORM="$(uname -s)"
-INCLUDE="-Iinclude"
-if [ "${PLATFORM}" = "Linux" ]; then
-	CLIBFLAGS="${CLIBFLAGS} -fPIC"
-	AR="gcc -shared -o lib/lib${LIBNAME}.so"
-else
-	INCLUDE="-I/mingw64/include"
-fi
-
 # install flag for OpenMP target
 if [ "${TARGET}" = "openmp" ]; then
 	echo "OpenPMX build: OpenMP"
@@ -121,7 +120,7 @@ else
 fi
 
 # build openpmxtran
-(set -x; ${CC} ${CFLAGS} ${CLIBFLAGS} ${INCLUDE} src/openpmxtran.c -o bin/openpmxtran ${LFLAGS} -lm)
+(set -x; ${CC} ${CFLAGS} src/openpmxtran.c -o bin/openpmxtran ${LFLAGS} -lm)
 
 # compile the source files to object files and make library
 OBJECTFILES=
@@ -129,7 +128,7 @@ for FILE in ${SOURCEFILES}
 do
 	BASE=$(basename ${FILE})
 	OBJFILE="${BASE%.*}.o"
-	(set -x; ${CC} ${CFLAGS} ${CLIBFLAGS} ${INCLUDE} -c "src/${FILE}" -o "build/${OBJFILE}")
+	(set -x; ${CC} ${CFLAGS} ${CLIBFLAGS} -c "src/${FILE}" -o "build/${OBJFILE}")
 	OBJECTFILES="${OBJECTFILES} build/${OBJFILE}"
 done
 (set -x; ${AR} ${OBJECTFILES})
