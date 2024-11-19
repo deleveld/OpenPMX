@@ -184,7 +184,7 @@ static int match_recordname(const char* p, const char* q, int* i, const bool whi
 {
 	var len = strlen(q);
 	if (strncmp(p, q, len) == 0) {
-		if (whitedelim && !isspace(p[len]))
+		if (whitedelim && !isspace((int)p[len]))
 			return 0;
 		if (i)
 			*i = len;

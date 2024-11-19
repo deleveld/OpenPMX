@@ -16,7 +16,7 @@
  */
 
 #include <assert.h>
-#include <values.h>
+#include <float.h>
 #include <unistd.h>
 
 #include "openpmx.h"
