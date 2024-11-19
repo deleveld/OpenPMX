@@ -21,7 +21,7 @@ TARGET="${1:-pthread}"
 OPENPMXDIR=$(cd `dirname $0` && pwd)
 PLATFORM="$(uname -s)"
 
-set -eux
+set -eu
 
 # general build flags are for Linux
 # modifications for platforms occurs later in this file
@@ -32,7 +32,6 @@ CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-ini
 LFLAGS="-flto -L${OPENPMXDIR}/lib"
 AR="gcc -shared -o lib/lib${LIBNAME}.so"
 RM="rm -f"
-
 
 # platform specific changes
 # linux 
@@ -121,7 +120,7 @@ else
 fi
 
 # build openpmxtran
-(set -x; ${CC} ${CFLAGS} src/openpmxtran.c -o bin/openpmxtran -lm)
+(set -x; ${CC} ${CFLAGS} src/openpmxtran.c -o bin/openpmxtran ${LFLAGS} -lm)
 
 # compile the source files to object files and make library
 OBJECTFILES=
