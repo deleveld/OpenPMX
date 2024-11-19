@@ -24,7 +24,7 @@ PLATFORM="$(uname -s)"
 set -eu
 
 # general build flags are for Linux
-# modifications for platforms occurs later in this file
+# some will be changed later depending on platform
 CC="gcc"
 LIBNAME="openpmx"
 CFLAGS="-g -O2 -march=native -W -Wall -Wextra -I${OPENPMXDIR}/include"
@@ -38,7 +38,7 @@ RM="rm -f"
 if [ "${PLATFORM}" = "Linux" ]; then
 	CLIBFLAGS="${CLIBFLAGS} -fPIC"
 # mingw64 
-else
+elif [[ "${PLATFORM}" =~ MINGW64_NT-* ]]; then
 	CFLAGS="${CFLAGS} -I/mingw64/include"
 	LFLAGS="${LFLAGS} -L/mingw64/lib"
 	AR="ar rcs lib/lib${LIBNAME}.a"
@@ -75,11 +75,7 @@ SOURCEFILES="openpmx.c
 			bobyqa/bobyqa.c"
 
 echo "OpenPMX: clean"
-${RM} build/*
-${RM} bin/*
-${RM} lib/*
-${RM} openpmx
-${RM} include/openpmx_compile_options.h
+${RM} build/* bin/* lib/* openpmx include/openpmx_compile_options.h
 if [ "${TARGET}" = "clean" ]; then
 	exit 0
 fi
@@ -109,8 +105,6 @@ elif [ "${TARGET}" = "sanitize" ]; then
 # install flags for single threaded
 elif [ "${TARGET}" = "singlethread" ]; then
 	echo "OpenPMX build: singlethread"
-	CFLAGS="${CFLAGS}"
-	LFLAGS="${LFLAGS}"
 	echo '#define OPENPMX_PARALLEL_SINGLETHREAD' >src/openpmx_compile_options.h
 
 # unknown install flag
