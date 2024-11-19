@@ -7,3 +7,4 @@ examples/schnider/schnider.gr.*
 examples/theo/theo.gr.*
 examples/warfarin/warfarin.gr.*
 src/openpmx_compile_options.h
+bin/openpmxtran.exe

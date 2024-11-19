@@ -18,28 +18,31 @@
 
 # default target is pthreads
 TARGET="${1:-pthread}"
+OPENPMXDIR=$(cd `dirname $0` && pwd)
+PLATFORM="$(uname -s)"
 
-set -eu
+set -eux
 
 # general build flags are for Linux
 # modifications for platforms occurs later in this file
 CC="gcc"
 LIBNAME="openpmx"
-CFLAGS="-g -O2 -march=native -W -Wall -Wextra -Iinclude"
+CFLAGS="-g -O2 -march=native -W -Wall -Wextra -I${OPENPMXDIR}/include"
 CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -Wwrite-strings -Isrc"
-LFLAGS="-flto"
+LFLAGS="-flto -L${OPENPMXDIR}/lib"
 AR="gcc -shared -o lib/lib${LIBNAME}.so"
 RM="rm -f"
 
+
 # platform specific changes
-PLATFORM="$(uname -s)"
 # linux 
 if [ "${PLATFORM}" = "Linux" ]; then
 	CLIBFLAGS="${CLIBFLAGS} -fPIC"
 # mingw64 
 else
 	CFLAGS="${CFLAGS} -I/mingw64/include"
-	AR="ar rcs lib/${LIBNAME}.a"
+	LFLAGS="${LFLAGS} -L/mingw64/lib"
+	AR="ar rcs lib/lib${LIBNAME}.a"
 fi
 
 # openpmx source files
@@ -82,8 +85,6 @@ if [ "${TARGET}" = "clean" ]; then
 	exit 0
 fi
 
-OPENPMXDIR=$(cd `dirname $0` && pwd)
-
 # install flag for OpenMP target
 if [ "${TARGET}" = "openmp" ]; then
 	echo "OpenPMX build: OpenMP"
@@ -120,7 +121,7 @@ else
 fi
 
 # build openpmxtran
-(set -x; ${CC} ${CFLAGS} src/openpmxtran.c -o bin/openpmxtran ${LFLAGS} -lm)
+(set -x; ${CC} ${CFLAGS} src/openpmxtran.c -o bin/openpmxtran -lm)
 
 # compile the source files to object files and make library
 OBJECTFILES=

@@ -256,7 +256,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 			while ((token = strtok_r(rest, delim, &rest))) {
 				var s = strdup(token);
 				strip_firstlast_space(s);
-				if (strcmp(token, ".") == 0) {
+				if (strcmp(s, ".") == 0) {
 					free(s);
 					s = strdup("NAN");
 				}
