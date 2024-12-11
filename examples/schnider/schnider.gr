@@ -1,0 +1,37 @@
+//
+//	Schnider T, Minto C, Gambus P, Andresen C, Goodale D, Shafer S, Youngs E:
+//	The influence of method of administration and covariates on the pharmacokinetics
+//	of propofol in adult volunteers. Anesthesiology 1998; 88:1170–82 PMID: 9605675
+//
+//	Data obtained from http://opentci.org/data/propofol/schnider-1998-study (Nov 6 2020)
+//	 - changed CP name to DV
+//
+$DATA("data.csv")
+$ADVAN(threecomp)
+	.firstonly = 1,
+$IMODEL(V1, V2, V3, CL, Q2, Q3)
+	const double SIZE = WT/70.;
+	V1 = THETA(1) * SIZE * exp(ETA(1));
+	V2 = THETA(2) * SIZE * exp(ETA(2));
+	V3 = THETA(3) * SIZE * exp(ETA(3));
+	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4));
+	Q2 = THETA(5) * pow(SIZE, 0.75) * exp(ETA(5));
+	Q3 = THETA(6) * pow(SIZE, 0.75) * exp(ETA(6));
+$PREDICT(IPRED)
+	IPRED = A(1)/V1;
+	Y = IPRED*(1 + ERR(1));
+$THETA
+	{            2,	      5,		           15,	 ESTIMATE },
+	{            5,	      20,		           50,	 ESTIMATE },
+	{           20,	      100,		         1000,	 ESTIMATE },
+	{          0.1,	      1,		            5,	 ESTIMATE },
+	{          0.1,	      1,		            5,	 ESTIMATE },
+	{          0.1,	     0.5,		            5,	 ESTIMATE },
+$OMEGA(0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+$SIGMA(0.1)
+$MAIN
+//	openpmx.verbose = true;
+	estimate();
+	predict_pred();
+	table("ID,AGE,WT,HT,M1F2", .name="covariates");
+	table("ID,TIME,DV,IPRED,PRED,yhat,yhatvar", .name="pred");

@@ -1,0 +1,15 @@
+The following licenses apply to the code in this repository:
+
+-------------------------------------------------------------------------------
+
+* Copyright (C) 2013, Mike J. D. Powell: BOBYQA algorithm in FORTRAN released
+  under the GNU Lesser General Public License.
+
+-------------------------------------------------------------------------------
+
+* Copyright (C) 2024, Douglas J. Eleveld: OpenPMX, a collection of numerical
+  routines for estimation and simulation of mixed-effect pharmacokinetic
+  and pharmacodynamic models released under the GNU General Public License.
+
+-------------------------------------------------------------------------------
+

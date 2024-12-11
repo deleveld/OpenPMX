@@ -1,0 +1,26 @@
+$DATA("warfarin.csv")
+	rate = 0;
+	if (dvid == 2.)
+		remove = true;
+$ADVAN(onecomp_depot)
+$IMODEL(V, CL, KA)
+	V = THETA(1) * exp(ETA(1));
+	CL = THETA(2) * exp(ETA(2));
+	KA = THETA(3) * exp(ETA(3));
+	const double lag = THETA(4) * exp(ETA(4));
+	ALAG(1, lag);
+$PREDICT(IPRED)
+	IPRED = A(2)/V;
+	Y = IPRED*(1+ERR(1)) + ERR(2);
+$THETA
+	{   1,   8,   50,  ESTIMATE     },
+	{   0.01,   1,   5,  ESTIMATE     },
+	{   0.01,   0.1,   5,  ESTIMATE     },
+	{   0.001,   0.1,   2,  ESTIMATE     },
+$OMEGA(1, 1, 1, 1)
+$SIGMA(1, 1)
+$MAIN
+	estimate();
+	table("ID,wt,age,sex", .name="covariates", .firstonly=true);
+	table("ID,time,dv,dvid,dv,mdv,EVID,yhat,yhatvar", .name="pred");
+

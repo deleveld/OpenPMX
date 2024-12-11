@@ -1,0 +1,142 @@
+#!/bin/sh
+########################################################################
+#
+# This file is part of OpenPMX (https://github.com/deleveld/openpmx).
+# Copyright (c) 2022 Douglas Eleveld.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, version 3.
+#
+# This program is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <http://www.gnu.org/licenses/>.
+
+# default target is pthreads
+TARGET="${1:-pthread}"
+OPENPMXDIR=$(cd `dirname $0` && pwd)
+PLATFORM="$(uname -s)"
+
+set -eu
+
+# general build flags are for Linux
+# some will be changed later depending on platform
+CC="gcc"
+LIBNAME="openpmx"
+CFLAGS="-g -O2 -march=native -W -Wall -Wextra -I${OPENPMXDIR}/include"
+CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -Wwrite-strings -Isrc"
+LFLAGS="-flto -L${OPENPMXDIR}/lib"
+AR="gcc -shared -o lib/lib${LIBNAME}.so"
+RM="rm -f"
+
+# platform specific changes
+# linux 
+if [ "${PLATFORM}" = "Linux" ]; then
+	CLIBFLAGS="${CLIBFLAGS} -fPIC"
+# mingw64 
+elif [[ "${PLATFORM}" =~ MINGW64_NT-* ]]; then
+	CFLAGS="${CFLAGS} -I/mingw64/include"
+	LFLAGS="${LFLAGS} -L/mingw64/lib"
+	AR="ar rcs lib/lib${LIBNAME}.a"
+fi
+
+# openpmx source files
+SOURCEFILES="openpmx.c
+			ievaluate.c
+			predict.c
+			stage1.c
+			checkout.c
+			popmodel.c
+			encode.c
+			omegainfo.c
+			linalg.c
+			print.c
+			idata.c
+			table.c
+			scatter.c
+			estimate.c
+			simulate.c
+			dataconfig/recordinfo.c
+			dataconfig/dataconfig.c
+			advan/advan.c
+			advan/pred.c
+			advan/onecomp.c
+			advan/onecomp_depot.c
+			advan/twocomp.c
+			advan/threecomp.c
+			advan/diffeqn_test.c
+			advan/diffeqn_libgsl.c
+			utils/vector.c
+			utils/various.c
+			bobyqa/bobyqa.c"
+
+echo "OpenPMX: clean"
+${RM} build/* bin/* lib/* openpmx src/openpmx_compile_options.h
+if [ "${TARGET}" = "clean" ]; then
+	exit 0
+fi
+
+# install flag for OpenMP target
+if [ "${TARGET}" = "openmp" ]; then
+	echo "OpenPMX build: OpenMP"
+	CFLAGS="${CFLAGS} -fopenmp"
+	LFLAGS="${LFLAGS} -fopenmp -lgomp"
+	echo '#define OPENPMX_PARALLEL_OPENMP' >src/openpmx_compile_options.h
+
+# install flag for pthreads target
+elif [ "${TARGET}" = "pthread" ]; then
+	echo "OpenPMX build: pthread"
+	CFLAGS="${CFLAGS} -pthread"
+	LFLAGS="${LFLAGS} -pthread"
+	echo '#define OPENPMX_PARALLEL_PTHREADS' >src/openpmx_compile_options.h
+
+# install flag for sanitize target
+elif [ "${TARGET}" = "sanitize" ]; then
+	echo "OpenPMX build: pthread/sanitize"
+	CFLAGS="${CFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
+	LFLAGS="${LFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
+	echo '#define OPENPMX_PARALLEL_PTHREADS' >src/openpmx_compile_options.h
+	echo '#define OPENPMX_SANATIZE' >>src/openpmx_compile_options.h
+
+# install flags for single threaded
+elif [ "${TARGET}" = "singlethread" ]; then
+	echo "OpenPMX build: singlethread"
+	echo '#define OPENPMX_PARALLEL_SINGLETHREAD' >src/openpmx_compile_options.h
+
+# unknown install flag
+else
+	echo "error: install: Target \""${TARGET}"\" not recognized"
+	exit 1
+fi
+
+# build openpmxtran
+(set -x; ${CC} ${CFLAGS} src/openpmxtran.c -o bin/openpmxtran ${LFLAGS} -lm)
+
+# compile the source files to object files and make library
+OBJECTFILES=
+for FILE in ${SOURCEFILES}
+do
+	BASE=$(basename ${FILE})
+	OBJFILE="${BASE%.*}.o"
+	(set -x; ${CC} ${CFLAGS} ${CLIBFLAGS} -c "src/${FILE}" -o "build/${OBJFILE}")
+	OBJECTFILES="${OBJECTFILES} build/${OBJFILE}"
+done
+(set -x; ${AR} ${OBJECTFILES})
+
+# write the build script with the correct path
+echo "#!/bin/sh"					>openpmx
+echo "########################################################################"	>>openpmx
+echo "# OpenPMX build options"		>>openpmx
+echo "CC=${CC}"						>>openpmx
+echo "CFLAGS=\"${CFLAGS}\""			>>openpmx
+echo "LFLAGS=\"${LFLAGS}\""			>>openpmx
+echo "OPENPMXDIR=\"${OPENPMXDIR}\""	>>openpmx
+echo ""								>>openpmx
+cat src/_openpmx_template			>>openpmx
+chmod a+x openpmx
+
+echo "OpenPMX installed to \"${OPENPMXDIR}\""

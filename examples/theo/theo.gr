@@ -1,0 +1,29 @@
+$DATA("THEO")
+$ADVAN(pred)
+	.firstonly = true,
+	.predictall = true,
+$IMODEL(V, K, KA)
+    V  = THETA(1)*exp(ETA(1)) * pow(BWT/70, 1);
+    K  = THETA(2)*exp(ETA(2)) * pow(BWT/70, -0.25);
+    KA = THETA(3)*exp(ETA(3)) * pow(BWT/70, -0.25);
+$PREDICT(IPRED)
+    const double DOSE=320.;
+    IPRED = DOSE / V * KA / (KA - K) * (exp(-K * TIME)-exp(-KA * TIME));
+    Y = IPRED * (1 + ERR(1)) + ERR(2);
+$THETA
+	{ 0.1, 15, 50, ESTIMATE },
+	{ 0.0001, 0.1, 0.3, ESTIMATE },
+	{ 0.0001, 0.5, 5, ESTIMATE },
+$OMEGABLOCK(
+	.1,
+	0.01, .1,
+	0.01, 0.01, .1)
+$SIGMA(1, 1)
+$MAIN
+//	openpmx.brief = true;
+//	openpmx.verbose = true;
+	estimate(.optim.maxeval=1000);
+	predict_pred();
+	table("ID BWT", .name="covariates", .firstonly=true);
+	table("ID TIME evid DV yhat yhatvar cwres PRED IPRED", .name="pred");
+
