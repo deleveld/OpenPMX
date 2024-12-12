@@ -20,6 +20,7 @@
 #include <string.h>
 #include <assert.h>
 #include <float.h>
+#include <limits.h>
 
 #include "openpmx.h"
 #include "omegainfo.h"
@@ -857,8 +858,8 @@ static void estimate_popmodel(const char* filename,
 	/* update results to screen and log */
 	let timestamp = get_timestamp(&params);
 	popmodel_information(params.outstream, popmodel, timestamp);
-	if (params.outstream)
-		popmodel_initcode(params.outstream, popmodel);
+//	if (params.outstream)
+//		popmodel_initcode(params.outstream, popmodel);
 
 	/* update results in tables */
 	if (filename) {

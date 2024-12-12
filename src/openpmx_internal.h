@@ -32,10 +32,11 @@ extern "C" {
 typedef struct {
 	int nthread;
 	const bool _offset1;
-	ESTIMCONFIG estimate;
-	SIMCONFIG simulate;
 	bool verbose;
 	bool progress;
+	bool append_table;
+	ESTIMCONFIG estimate;
+	SIMCONFIG simulate;
 } OPTIONS;
 
 OPTIONS options_default(const OPTIONS* const opt1);

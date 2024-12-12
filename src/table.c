@@ -63,6 +63,8 @@ typedef struct {
 	const ADVANFUNCS* advanfuncs;
 	const THETA* theta;
 	const TABLECONFIG* tableconfig;
+	char filename[PATH_MAX];
+	char ext[NAME_MAX];
 
 	const double zeroerr[OPENPMX_SIGMA_MAX];
 
@@ -89,7 +91,7 @@ typedef struct {
 	const double* err;
 } TABLE;
 
-TABLE table_open(const IDATA* const idata,
+static TABLE table_open(const IDATA* const idata,
 						 const ADVANFUNCS* const advanfuncs,
 						 const THETA* const theta,
 						 const char* pmx_filename,
@@ -98,7 +100,7 @@ TABLE table_open(const IDATA* const idata,
 						 const TABLECONFIG* const tableconfig)
 {
 	const char* filename = 0;
-	char ext[PATH_MAX + NAME_MAX] = "";
+	char ext[PATH_MAX] = "";
 
 	/* determine the file to open */
 	if (tableconfig) {
@@ -133,6 +135,7 @@ TABLE table_open(const IDATA* const idata,
 		.advanfuncs = advanfuncs,
 		.theta = theta,
 		.tableconfig = tableconfig,
+		.filename = "",
 
 		.zeroerr = { 0 },
 
@@ -152,6 +155,10 @@ TABLE table_open(const IDATA* const idata,
 		.yhat = 0,
 		.err = 0,
 	};
+	/* save the full filename and ext */
+	strcpy(ret.filename, filename);
+	strcpy(ret.ext, ext);
+	
 	/* parse fields string and write the header */
 	/* we have to tokenize a copy of the fields */
 	char* token;
@@ -166,12 +173,14 @@ TABLE table_open(const IDATA* const idata,
 	return ret;
 }
 
-void table_close(TABLE* const table)
+static void table_close(TABLE* const table)
 {
+	/* close the stream */
 	if (table->stream)
 		fclose(table->stream);
 	table->stream = 0;
 
+	/* cleanup */
 	vector_free(table->fieldnames);
 	free(table->fields);
 }
@@ -180,7 +189,7 @@ void table_close(TABLE* const table)
    only the saved state is used at each step so it should be I/O limited
    and not cpu limited. It would be very hard to make it multithreaded
    because the rows have to be output in the correct order */
-int table_row(TABLE* const table)
+static int table_row(TABLE* const table)
 {
 	assert(table);
 	let idata = table->idata;
@@ -249,7 +258,7 @@ int table_row(TABLE* const table)
 	return 1;
 }
 
-double table_value(const TABLE* const table, const char* const name, const bool _offset1)
+static double table_value(const TABLE* const table, const char* const name, const bool _offset1)
 {
 	let idata = table->idata;
 	let advanfuncs = table->advanfuncs;

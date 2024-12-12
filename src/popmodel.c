@@ -509,10 +509,8 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 		FILE* f = (verbose) ? stdout : 0;
 		print_iteration(f, outstream, popmodel, xlength, x);
 	}
-	if (extstream) {
-		if (verbose || progress)
-			extfile_append(extstream, popmodel);
-	}
+	if (extstream) 
+		extfile_append(extstream, popmodel);
 }
 
 

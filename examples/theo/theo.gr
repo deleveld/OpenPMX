@@ -22,6 +22,7 @@ $SIGMA(1, 1)
 $MAIN
 //	openpmx.brief = true;
 //	openpmx.verbose = true;
+//	openpmx.append_table = true;
 	estimate(.optim.maxeval=1000);
 	predict_pred();
 	table("ID BWT", .name="covariates", .firstonly=true);
