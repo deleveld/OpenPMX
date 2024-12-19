@@ -59,7 +59,7 @@ The PK analysis example is:
 ### Version 0.01
 - Douglas Eleveld (deleveld@dds.nl) Initial release. 
 
-### Wish-list / TODO
+# Wish-list / TODO
 - During checkout, calculate paramater gradients to identify paramaters that may be numerically unidentifiable
 - Make estimation of caterorical variables possible.
 - Post-estimation evaluation of the objective function in the spirit of NONMEM and $COV. Possibly the gradient can be calculated at the final estimate and the first and second derivatives calculated using splines. It is also possible to transform this back into the scale of the user paramaters?
