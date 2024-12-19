@@ -56,7 +56,7 @@ The PK analysis example is:
 
 # Contributors
 - Your name here (your@email.com) Massively important thing elegantly coded.
-Version 0.01
+### Version 0.01
 - Douglas Eleveld (deleveld@dds.nl) Initial release. 
 
 ### Wish-list / TODO
