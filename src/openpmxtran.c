@@ -308,7 +308,6 @@ typedef struct PARSERESULT {
 	STRING dataconfig;
 	STRINGS record_field_names;
 
-	STRING preamble;
 	const char* advan_method;
 	bool needs_diffeqn;
 	const char* predict_state_maybe_unused;
@@ -341,7 +340,6 @@ static void parserresult_free(PARSERESULT* res)
 		free(res->record_field_names.data[i]);
 	vector_free(res->record_field_names);
 
-	vector_free(res->preamble);
 	vector_free(res->advan_init);
 
 	vector_free(res->imodel_diffeqn_code);
@@ -646,15 +644,10 @@ int main(int argc, char* argv[])
 	char* begin = grfile + i;
 	if (*begin == 0)
 		fatal("could not find any markers in \"%s\"", grfilename);
-	if (i > 0 && strlen(grfile)) {
-		vector_appendn(res.preamble, grfile, i);
-		string_terminate(&res.preamble);
-	}
 
 	while (*begin == '$') {
 		var n = find_marker(begin + 1);
 		char* end = begin + 1 + n;
-
 		const char last_end = *end;
 		*end = 0;
 
@@ -700,12 +693,6 @@ int main(int argc, char* argv[])
 		begin = end;
 	}
 	free(grfile);
-
-	/* copy over preamble */
-	string_append(&res.output, "/* begin OPENPMXTRAN_PREAMBLE */\n");
-	if (vector_size(res.preamble)) 
-		string_append(&res.output, res.preamble.data);
-	string_append(&res.output, "/* end OPENPMXTRAN_PREAMBLE */\n");
 
 	/* read in template file */
 extern char openpmxtran_template[];
