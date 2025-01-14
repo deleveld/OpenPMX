@@ -19,7 +19,7 @@ $IMODEL(V1, V2, V3, CL, Q2, Q3)
 	Q3 = THETA(6) * pow(SIZE, 0.75) * exp(ETA(6));
 $PREDICT(IPRED)
 	IPRED = A(1)/V1;
-	Y = IPRED*(1 + ERR(1));
+	Y = IPRED*(1 + ERR(1)*exp(ETA(7)));
 $THETA
 	{            2,	      5,		           15,	 ESTIMATE },
 	{            5,	      20,		           50,	 ESTIMATE },
@@ -27,7 +27,7 @@ $THETA
 	{          0.1,	      1,		            5,	 ESTIMATE },
 	{          0.1,	      1,		            5,	 ESTIMATE },
 	{          0.1,	     0.5,		            5,	 ESTIMATE },
-$OMEGA(0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+$OMEGA(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
 $SIGMA(0.1)
 $MAIN
 //	openpmx.verbose = true;

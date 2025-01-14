@@ -279,7 +279,6 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 							   const int nreta,
 							   const double reta[static nreta],
 							   const STAGE1_PARAMS* const params,
-							   const double* const yhatvar,
 							   const double* icov)
 {
 	double* testeta = params->testeta;
@@ -298,9 +297,15 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 	assert(nrecord > 0);
 	var f_plus_h = mallocvar(double, nrecord);
 	var f_minus_h = mallocvar(double, nrecord);
+	var yhatvar_plus_h = mallocvar(double, nrecord);
+	var yhatvar_minus_h = mallocvar(double, nrecord);
 	var J = gsl_matrix_alloc(nrecord, nreta);
 	let nomega = popparam->nomega;
 	assert(gradient_step != 0.);
+
+	let advanfuncs = ievaluate_args->advanfuncs;
+	let record = ievaluate_args->record;
+	let recordinfo = &advanfuncs->recordinfo;
 
 	double xx[OPENPMX_OMEGA_MAX] = { 0 };
 	forcount(j, nreta) {
@@ -327,7 +332,7 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 							0,				/* dont save imodel */
 							0,				/* dont save predictvars */
 							0,				/* dont save state */
-							f_plus_h, 0,	/* we need output */
+							f_plus_h, yhatvar_plus_h,	/* we need output */
 							0, 0);			/* dont need to calculate objfn */
 		timespec_duration(&t3, eval_msec);
 		*(params->nfunc) += 1;
@@ -341,22 +346,24 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 							0,				/* dont save imodel */
 							0,				/* dont save predictvars */
 							0,				/* dont save state */
-							f_minus_h, 0,	/* we need output */
+							f_minus_h, yhatvar_minus_h,	/* we need output */
 							0, 0);			/* dont need to calculate objfn */
 		timespec_duration(&t3, eval_msec);
 		*(params->nfunc) += 1;
 
 		/* calculate derivatives, scaling by yhatvar */
+		const RECORD* ptr = record;
 		forcount(k, nrecord) {
-			let upper = f_plus_h[k];
-			let lower = f_minus_h[k];
-			let deriv = (upper - lower) / (above - below);
+			let dv = RECORDINFO_DV(recordinfo, ptr);
+			var deriv = 0.;
+			if (yhatvar_plus_h[k] != 0.) {
+				let upper = (f_plus_h[k] - dv) / sqrt(yhatvar_plus_h[k]);
+				let lower = (f_minus_h[k] - dv) / sqrt(yhatvar_minus_h[k]);
+				deriv = (upper - lower) / (above - below);
+			}
+			gsl_matrix_set(J, k, j, deriv);
 
-			var vk = 0.;
-			if (yhatvar[k] != 0.)
-				vk = deriv / sqrt(yhatvar[k]);
-
-			gsl_matrix_set(J, k, j, vk);
+			ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
 		}
 	}
 	/* we made J such that tJ*J is tGi*invVi*Gi in Term 5 from Bae and Yim */
@@ -364,7 +371,9 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1., J, J, 1., reducedicov);
 
 	free(f_plus_h);
+	free(yhatvar_plus_h);
 	free(f_minus_h);
+	free(yhatvar_minus_h);
 	gsl_matrix_free(J);
 }
 
@@ -625,7 +634,6 @@ void stage1_thread(INDIVID* const individ,
 					   nreta,
 					   reta,
 					   &stage1_params,
-					   individ->yhatvar,
 					   icov);
 	/* we have added the contribution of the population omega inverse with
 	   the contribution from each individual to get the individual covariance,
