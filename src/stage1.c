@@ -355,8 +355,9 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 		const RECORD* ptr = record;
 		forcount(k, nrecord) {
 			let dv = RECORDINFO_DV(recordinfo, ptr);
+			let evid = RECORDINFO_EVID(recordinfo, ptr);
 			var deriv = 0.;
-			if (yhatvar_plus_h[k] != 0.) {
+			if (!isnan(dv) && evid == 0) {
 				let upper = (f_plus_h[k] - dv) / sqrt(yhatvar_plus_h[k]);
 				let lower = (f_minus_h[k] - dv) / sqrt(yhatvar_minus_h[k]);
 				deriv = (upper - lower) / (above - below);
