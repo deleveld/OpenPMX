@@ -46,7 +46,7 @@ STAGE1CONFIG stage1config_default(const STAGE1CONFIG* const stage1)
 	if (ret.maxeval == 0)
 		ret.maxeval = 1000;
 
-	ret.icov_resample = false;
+/*	ret.icov_resample = false; */
 	if (ret.icov_resample_tol == 0)
 		ret.icov_resample_tol = DBL_MAX;
 

@@ -27,7 +27,6 @@
 #include "dataconfig/dataconfig.h"
 #include "dataconfig/recordinfo.h"
 #include "utils/c22.h"
-#include "utils/various.h"
 
 #include "openpmx_compile_options.h"
 
@@ -100,7 +99,57 @@ typedef struct {
 	double _imodel[OPENPMX_IMODEL_MAX];				/* will be cast to IMODEL */
 } ADVAN_MODEL_MEMORY;
 
-/* This is the core function evaluating an individual by advancing over
+/* This is the core function evaluating an individual predictions to calculate
+ * the objective function. Speeding up this function is quite important. */
+ __attribute__ ((hot))
+void individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args,
+						 double* const obs_lndet,
+						 double* const obs_min2ll)
+{
+	let advanfuncs = ievaluate_args->advanfuncs;
+	let record = ievaluate_args->record;
+	let nrecord = ievaluate_args->nrecord;
+	let popparam = &ievaluate_args->popparam;
+
+	char advan_memory[advanfuncs->advan_size];
+	var advan = (ADVAN*)advan_memory;
+	advanfuncs->construct(advan, advanfuncs);
+
+	ADVAN_MODEL_MEMORY advanmem = { 0 };
+	var predictvars = (PREDICTVARS*)advanmem._predictvars;
+	var imodel = (IMODEL*)advanmem._imodel;
+
+	/* iterate over individuals data */
+	let advanconfig = advanfuncs->advanconfig;
+	let predict = advanconfig->predict;
+	let recordinfo = &advanfuncs->recordinfo;
+	let recordsize = recordinfo->dataconfig->recordfields.size;
+	var local_obs_min2ll = 0.;
+	var local_obs_lndet = 0.;
+	const RECORD* ptr = record;
+	forcount(i, nrecord) {
+		let predictstate = advan_advance(advan, imodel, ptr, popparam);
+
+		let dv = RECORDINFO_DV(recordinfo, ptr);
+		let evid = RECORDINFO_EVID(recordinfo, ptr);
+		if (!isnan(dv) && evid == 0) {
+			let yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
+			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
+
+			let err = dv - yhat;
+			local_obs_min2ll += (err * err) / yhatvar;
+
+			local_obs_lndet += log(yhatvar);
+		}
+		ptr = RECORD_INDEX(ptr, recordsize, 1);	
+	}
+	*obs_min2ll = local_obs_min2ll;
+	*obs_lndet = local_obs_lndet;
+		
+	advanfuncs->destruct(advan);
+}
+
+/* This is a core function evaluating an individual by advancing over
  * the records and evaluating the imodel, predictions and objective function.
  * Speeding up this function is quite important.
  * I dont think making arguments restrict would help because the only pointer
@@ -120,9 +169,6 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	let record = ievaluate_args->record;
 	let nrecord = ievaluate_args->nrecord;
 	let popparam = &ievaluate_args->popparam;
-
-	struct timespec t3;
-	clock_gettime(CLOCK_REALTIME, &t3);
 
 	char advan_memory[advanfuncs->advan_size];
 	var advan = (ADVAN*)advan_memory;

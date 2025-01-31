@@ -171,12 +171,7 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 	clock_gettime(CLOCK_REALTIME, &t3);
 	double objfn_term1 = 0.;
 	double objfn_term2 = 0.;
-	individual_evaluate(ievaluate_args,
-						0, /* imodel_saved */
-						0, /* predictvars_saved */
-						0, /* istate */
-						0, /* YHAT */
-						0, /* YHATVAR */
+	individual_fasteval(ievaluate_args,
 						&objfn_term1, /* obs_lndet */
 						&objfn_term2); /* obs_min2ll */
 	timespec_duration(&t3, stage1_params->eval_msec);
