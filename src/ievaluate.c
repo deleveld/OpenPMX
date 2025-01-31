@@ -124,9 +124,7 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	struct timespec t3;
 	clock_gettime(CLOCK_REALTIME, &t3);
 
-	/* for speed we use a fixed-size object instead of a VLA */
-	assert(advanfuncs->advan_size < 1024);
-	char advan_memory[1024];
+	char advan_memory[advanfuncs->advan_size];
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
@@ -207,9 +205,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	let popparam = &ievaluate_args->popparam;
 	let logstream = ievaluate_args->logstream;
 
-	/* for speed we use a fixed-size object instead of a VLA */
-	assert(advanfuncs->advan_size < 1024);
-	char advan_memory[1024];
+	char advan_memory[advanfuncs->advan_size];
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
@@ -333,9 +329,7 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 	let record = ievaluate_args->record;
 	let nrecord = ievaluate_args->nrecord;
 
-	/* for speed we use a fixed-size object instead of a VLA */
-	assert(advanfuncs->advan_size < 1024);
-	char advan_memory[1024];
+	char advan_memory[advanfuncs->advan_size];
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
