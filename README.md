@@ -40,19 +40,19 @@ administration and covariates on the pharmacokinetics of propofol in adult
 volunteers. Anesthesiology 1998;88:1170-82. 
 
 In this example a 3-compartment allometric model is estimated.
-- `../../openpmx schnider.gp`
+- `../../openpmx schnider.gr`
 
 The same example, but using a differential equation solver.
-- `../../openpmx schnider_diffeqn.gp`
+- `../../openpmx schnider_diffeqn.gr`
 
 ### Theophylline
 In directory `examples/theo` these are the Theophylline data from the NONMEM distribution.
-- `../../openpmx theo.gp`
+- `../../openpmx theo.gr`
 
 ### Warfarin
 In directory `examples/warfarin` contains data obtained from [here](http://clinpharmacol.fmhs.auckland.ac.nz/docs/warfarin.csv) and [here](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://holford.fmhs.auckland.ac.nz/docs/pkpd-workshop-nonmem7.pdf).
 The PK analysis example is:
-- `../../openpmx warfarin.gp`
+- `../../openpmx warfarin.gr`
 
 # Contributors
 - Your name here (your@email.com) Massively important thing elegantly coded.
@@ -61,7 +61,7 @@ The PK analysis example is:
 
 # Wish-list / TODO
 - During checkout, calculate paramater gradients to identify paramaters that may be numerically unidentifiable
-- Make estimation of caterorical variables possible.
+- Make estimation of categorical variables possible.
 - Post-estimation evaluation of the objective function in the spirit of NONMEM and $COV. Possibly the gradient can be calculated at the final estimate and the first and second derivatives calculated using splines. It is also possible to transform this back into the scale of the user paramaters?
 - Should there be Bessel correction on CWRES?
 - Calculate NPDE.
@@ -71,5 +71,5 @@ The PK analysis example is:
 # Philosophy
 - Do one thing and do it well.
 - Fewer dependencies are better.
-- Reproducability is good.
+- Reproducibility is good.
 
