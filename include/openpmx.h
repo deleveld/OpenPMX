@@ -253,6 +253,7 @@ typedef struct {
 	double step_refine;
 	double step_final;
 	int maxeval;
+	double dobjfn;
 } OPTIMCONFIG;
 
 /* for simulations */

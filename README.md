@@ -1,5 +1,17 @@
 # The OpenPMX project
 
+Hi everybody out there doing pharmacometrics,
+
+I doing a (free) model estimation software as a side project (wont be big a professional like NONMEM) for PCs. This has been brewing for a number of years and is starting to get ready
+for broader use. I'd like feedback on what people like/dislike with the control, data, and table file structures. It somwhat resembles NONMEM due to practical reasons.
+
+https://www.reddit.com/r/agedlikemilk/comments/1ikfx3s/linux_is_now_the_most_widely_used_os_in_the_world/#lightbox
+
+linux_is_now_the_most_widely_used_os_in_the_world
+
+
+------------
+
 OpenPMX is a collection of numerical routines for estimation and simulation of mixed-effect pharmacokinetic and pharmacodynamic models.
 This repository contains a copy of the latest stable version.
 
@@ -40,19 +52,19 @@ administration and covariates on the pharmacokinetics of propofol in adult
 volunteers. Anesthesiology 1998;88:1170-82. 
 
 In this example a 3-compartment allometric model is estimated.
-- `../../openpmx schnider.gr`
+- `../../openpmx schnider.gp`
 
 The same example, but using a differential equation solver.
-- `../../openpmx schnider_diffeqn.gr`
+- `../../openpmx schnider_diffeqn.gp`
 
 ### Theophylline
 In directory `examples/theo` these are the Theophylline data from the NONMEM distribution.
-- `../../openpmx theo.gr`
+- `../../openpmx theo.gp`
 
 ### Warfarin
 In directory `examples/warfarin` contains data obtained from [here](http://clinpharmacol.fmhs.auckland.ac.nz/docs/warfarin.csv) and [here](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://holford.fmhs.auckland.ac.nz/docs/pkpd-workshop-nonmem7.pdf).
 The PK analysis example is:
-- `../../openpmx warfarin.gr`
+- `../../openpmx warfarin.gp`
 
 # Contributors
 - Your name here (your@email.com) Massively important thing elegantly coded.
@@ -61,7 +73,7 @@ The PK analysis example is:
 
 # Wish-list / TODO
 - During checkout, calculate paramater gradients to identify paramaters that may be numerically unidentifiable
-- Make estimation of categorical variables possible.
+- Make estimation of caterorical variables possible.
 - Post-estimation evaluation of the objective function in the spirit of NONMEM and $COV. Possibly the gradient can be calculated at the final estimate and the first and second derivatives calculated using splines. It is also possible to transform this back into the scale of the user paramaters?
 - Should there be Bessel correction on CWRES?
 - Calculate NPDE.
@@ -71,5 +83,5 @@ The PK analysis example is:
 # Philosophy
 - Do one thing and do it well.
 - Fewer dependencies are better.
-- Reproducibility is good.
+- Reproducability is good.
 

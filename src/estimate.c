@@ -212,9 +212,6 @@ static void update_best_imodel(const int xlength,
 		improved_model = popmodel;
 	if (improved_model) {
 		let runtime_s = get_timestamp(params);
-		char message[1024] = "";
-		if (popmodel->result.objfn != DBL_MAX && best->result.objfn != DBL_MAX)
-			sprintf(message, " dobjfn %f", dobjfn);
 		popmodel_eval_information(improved_model,
 								  runtime_s,
 								  options->verbose,
@@ -222,7 +219,7 @@ static void update_best_imodel(const int xlength,
 								  params->outstream,
 								  params->extstream,
 								  xlength, x,
-								  message);
+								  0);
 	}
 }
 
@@ -416,7 +413,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 		gsl_multimin_fdfminimizer_free(s);
 
 		let objfn = params->best.result.objfn;
-		if (prevobjfn - objfn < 0.0005)
+		if (prevobjfn - objfn < fabs(options->estimate.optim.dobjfn))
 			break;
 		prevobjfn = objfn;
 	}
@@ -446,12 +443,12 @@ static const char* focei(STAGE2_PARAMS* const params)
 	if (retcode != BOBYQA_SUCCESS)
 		info(params->outstream, "initial BOBYQA error code %i\n", retcode);
 
-	var dobjfn = best->result.objfn - lastobjfn;
 	var timestamp = get_timestamp(params);
-	info(params->outstream, "time %.3f nfunc %i dobjfn %f\n", timestamp, params->nfunc, dobjfn);
+	info(params->outstream, "time %.3f nfunc %i objfn %f\n", timestamp, params->nfunc, best->result.objfn);
 	lastobjfn = best->result.objfn;
 
 	if (step_final < step_refine) {
+		var dobjfn = best->result.objfn - lastobjfn;
 		do {
 			encode_offset(&params->test, &params->best);
 			forcount(i, n)
@@ -471,10 +468,10 @@ static const char* focei(STAGE2_PARAMS* const params)
 
 			dobjfn = best->result.objfn - lastobjfn;
 			var timestamp = get_timestamp(params);
-			info(params->outstream, "time %.3f nfunc %i dobjfn %f\n", timestamp, params->nfunc, dobjfn);
+			info(params->outstream, "time %.3f nfunc %i objfn %f\n", timestamp, params->nfunc, best->result.objfn);
 			lastobjfn = best->result.objfn;
 		}
-		while (dobjfn < -0.005);
+		while (dobjfn < -1.*fabs(options->estimate.optim.dobjfn));
 	}
 	info(0, "optim rho %g\n", rhoend);
 
@@ -497,7 +494,7 @@ static void print_model(STAGE2_PARAMS* params,
 
 	char message[128] = "";
 	if (popmodel->result.objfn != DBL_MAX && params->best.result.objfn != DBL_MAX)
-		sprintf(message, " dobjfn %f", popmodel->result.objfn - params->best.result.objfn);
+		sprintf(message, " objfn %f", popmodel->result.objfn);
 
 	let runtime_s = get_timestamp(params);
 	popmodel_eval_information(popmodel,
@@ -541,7 +538,7 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 		/* besteta we update later, individual eta values keep getting updated */
 		/* warn if we are not stable after 10 iterations */
 		let dobjfn = popmodel->result.objfn - lastobjfn;
-		if (fabs(dobjfn) < 0.005) 
+		if (fabs(dobjfn) < 0.01) 
 			done = true;
 		else if (niter >= 10)
 			break;

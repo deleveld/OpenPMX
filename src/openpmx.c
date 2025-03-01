@@ -70,6 +70,8 @@ ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate)
 		ret.optim.step_final = v * 10.;
 	if (ret.optim.maxeval == 0)
 		ret.optim.maxeval = 10000;
+	if (ret.optim.dobjfn == 0.)
+		ret.optim.dobjfn = 1.e-3;
 
 	if (ret.posthoc.gradient.step == 0.)
 		ret.posthoc.gradient.step = ret.optim.step_initial;

@@ -387,13 +387,8 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 	let ntheta = popmodel->ntheta;
 	info(f2, "THETA(%i)\n", ntheta);
 	forcount(i, ntheta) {
-		let l = popmodel->lower[i];
 		let v = popmodel->theta[i];
-		let u = popmodel->upper[i];
-		char ratiomessage[1024] = "";
-		if (popmodel->thetaestim[i] == ESTIMATE)
-			sprintf(ratiomessage, "%.1f", (v - l) / (u - l) * 100.);
-		info(f2, OPENPMX_FFORMAT " (%s)\n", v, ratiomessage);
+		info(f2, OPENPMX_FFORMAT "\n", v);
 	}
 
 	/* info about omega matrix */
