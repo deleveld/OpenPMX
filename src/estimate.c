@@ -492,9 +492,9 @@ static void print_model(STAGE2_PARAMS* params,
 	let popmodel = &params->test.popmodel;
 	let options = params->options;
 
-	char message[128] = "";
-	if (popmodel->result.objfn != DBL_MAX && params->best.result.objfn != DBL_MAX)
-		sprintf(message, " objfn %f", popmodel->result.objfn);
+//	char message[128] = "";
+//	if (popmodel->result.objfn != DBL_MAX && params->best.result.objfn != DBL_MAX)
+//		sprintf(message, " objfn %f", popmodel->result.objfn);
 
 	let runtime_s = get_timestamp(params);
 	popmodel_eval_information(popmodel,
@@ -504,7 +504,7 @@ static void print_model(STAGE2_PARAMS* params,
 							  params->outstream,
 							  params->extstream,
 							  xlength, x, 
-							  message);
+							  0);
 }
 
 static bool stabilize_model(STAGE2_PARAMS* params)
