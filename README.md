@@ -40,6 +40,7 @@ This library is distributed in the hope that it will be useful, but WITHOUT ANY 
 	1. Install [MSYS2](https://www.msys2.org/)
 	2. Install [gcc](https://gcc.gnu.org), I used `pacman -S mingw-w64-x86_64-gcc`
 	3. Install [GSL](https://www.gnu.org/software/gsl/), I used `pacman -S mingw-w64-x86_64-gsl`
+	It runs under MSYS2 but seems slow for some reason, looking into it.
 * Ubuntu:
 	1.  Install [GSL](https://www.gnu.org/software/gsl/) with `sudo apt install libgsl-dev`
 
