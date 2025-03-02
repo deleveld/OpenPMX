@@ -3,7 +3,9 @@
 Hi everybody out there doing pharmacometrics,
 
 I have been writing some free model estimation software as a side project. It wont be a big professional thing like
-[NONMEM](https://www.iconplc.com/solutions/technologies/nonmem). This has been brewing for a number of years and might be
+[NONMEM](https://www.iconplc.com/solutions/technologies/nonmem),
+[nlmixr2](https://nlmixr2.org/), or [Monolix](https://lixoft.com/products/monolix/).
+This has been brewing for a number of years and might be
 starting to get ready for broader use. I'd like feedback on what people like/dislike with the control, data, and table
 file structures. It somewhat resembles NONMEM due to practical reasons but it is written in C instead of FORTRAN.
 
@@ -11,7 +13,7 @@ I made some examples but I dont really know if its practical right now or if fur
 me know what are some essential features that might be needed. Suggestions are welcome but I cant promise that I will (or
 that I'm smart enough to) implement them.
 
-It allows multi-threaded estimation and doesnt share code with any other projects, except for the open-source BYBYQA algorithm
+It allows multi-threaded estimation, and doesnt share code with any other projects except for the open-source BYBYQA algorithm
 and needling linking to [GSL](https://www.gnu.org/software/gsl/). Right now it only compiles with [gcc](https://gcc.gnu.org/).
 
 Douglas Eleveld
