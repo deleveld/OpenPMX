@@ -68,6 +68,8 @@ typedef struct {
 /*---------------------------------------------------------------------*/
 typedef struct ADVAN ADVAN;
 typedef struct {
+	/* opaque pointer into the ADVAN so we can change setting in init
+	 * and predict functions */
 	ADVAN* advan;
 	
 	/* info about the record being processed */
@@ -143,10 +145,6 @@ typedef struct ADVANCONFIG {
 			const double reltol;
 			const char* steptype;
 		} diffeqn;
-		/* for wrapper solvers */
-		struct {
-			const ADVANMETHOD method;
-		} inner;
 	} args;
 } ADVANCONFIG;
 
@@ -244,7 +242,6 @@ typedef struct {
 
 	/* icov resample */
 	bool icov_resample;
-	double icov_resample_tol;
 } STAGE1CONFIG;
 
 /* for OBJFN minimization */

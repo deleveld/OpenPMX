@@ -43,17 +43,20 @@ POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
 
 	/* initialize to invalid values to catch errors */
 	forcount(i, OPENPMX_THETA_MAX) {
-		ret.lower[i] = DBL_MAX;
-		ret.theta[i] = DBL_MAX;
-		ret.upper[i] = DBL_MAX;
-		ret.thetaestim[i] = FIXED;
+		ret.lower[i] = NAN;
+		ret.theta[i] = NAN;
+		ret.upper[i] = NAN;
+		ret.thetaestim[i] = THETA_INVALID;
 	}
 	forcount(i, OPENPMX_OMEGABLOCK_MAX) {
 		ret.blocktype[i] = OMEGA_INVALID;
 		ret.blockdim[i] = 0;
 	}
+	forcount(i, OPENPMX_OMEGA_MAX) 
+		forcount(j, OPENPMX_OMEGA_MAX)
+			ret.omega[i][j] = NAN;
 	forcount(i, OPENPMX_SIGMA_MAX) {
-		ret.sigma[i] = DBL_MAX;
+		ret.sigma[i] = NAN;
 		ret.sigmafixed[i] = 1;
 	}
 
@@ -63,6 +66,11 @@ POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
 		if (est == THETA_INVALID) 
 			break;
 		ret.ntheta = i + 1;
+
+		if (isnan(theta[i].lower) ||
+			isnan(theta[i].value) ||
+			isnan(theta[i].upper))
+			fatal(0, "THETA invalid { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
 		
 		ret.lower[i] = theta[i].lower;
 		ret.theta[i] = theta[i].value;
@@ -75,9 +83,16 @@ POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
 		if (est == ESTIMATE) {
 			if (theta[i].value == theta[i].lower ||
 				theta[i].value == theta[i].upper)
-				fatal(0, "THETA %i at boundary { %g, %g, %g, ESTIMATE }\n", i, theta[i].lower, theta[i].value, theta[i].upper);
+				fatal(0, "THETA at boundary { %g, %g, %g, ESTIMATE }\n", theta[i].lower, theta[i].value, theta[i].upper);
 		}
 		ret.thetaestim[i] = est;
+	}
+	for(int i=ret.ntheta; i<OPENPMX_THETA_MAX; i++) {
+		if (theta[i].lower != 0. ||
+			theta[i].value != 0. ||
+			theta[i].upper != 0. ||
+			theta[i].type != THETA_INVALID)
+			fatal(0, "THETA not fully initialized { %g, %g, %g, ??? }\n", theta[i].lower, theta[i].value, theta[i].upper);
 	}
 
 	/* find the dimensions to the whole omega matrix by adding the size of each block */

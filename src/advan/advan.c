@@ -71,10 +71,11 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 					   RECORDINFO_EVID(recordinfo, record) == 3 ||
 					   RECORDINFO_EVID(recordinfo, record) == 4);
 
-	if (advanconfig->firstonly == false || reset_state) {
+	if (reset_state || advanconfig->firstonly == false) {
 		if (reset_state) {
 			/*	If we dont zero the model it keeps the values from the previous
 			 * time we called. This seems to be somewhat elegant in the user code.
+			 * Sine the model retains values from the previous record. 
 			 * memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size); */
  
 			memset(state, 0, OPENPMX_STATE_MAX * sizeof(double));
@@ -99,7 +100,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	/* now handle any doses, if this is a dose add it to the list */
 	let amt = RECORDINFO_AMT(recordinfo, record);
 	if (amt > 0.) {
-		let cmt = (int)RECORDINFO_CMT(recordinfo, record);
+		let cmt = RECORDINFO_CMT(recordinfo, record);
 		let lagtime = advan->amtlag[cmt];
 		let start = RECORDINFO_TIME(recordinfo, record) + lagtime;
 		let rate = RECORDINFO_RATE(recordinfo, record);
