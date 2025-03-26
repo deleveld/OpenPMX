@@ -67,9 +67,9 @@ POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
 			break;
 		ret.ntheta = i + 1;
 
-		if (isnan(theta[i].lower) ||
-			isnan(theta[i].value) ||
-			isnan(theta[i].upper))
+		if (!isfinite(theta[i].lower) ||
+			!isfinite(theta[i].value) ||
+			!isfinite(theta[i].upper))
 			fatal(0, "THETA invalid { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
 		
 		ret.lower[i] = theta[i].lower;
@@ -111,6 +111,9 @@ POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
 		fatal(0, "Omega size (%i) is too large, Max is %i\n", ret.nomega, OPENPMX_OMEGA_MAX);
 
 	/* initialize the omega matrix from the blocks */
+	forcount(i, ret.nomega) 
+		forcount(j, ret.nomega)
+			ret.omega[i][j] = 0.;
 	var d = 0;
 	forcount(i, ret.nblock) {
 		let ndim = omegablocks[i].ndim;
@@ -153,7 +156,7 @@ POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
 				++n;
 			}
 		} else
-			fatal(0, "illegal OMEGATYPE (%i)\n", type);
+			fatal(0, "invalid OMEGA block type (%i)\n", type);
 
 		d += ndim;
 	}
@@ -165,7 +168,7 @@ POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
 			if (i == j && v <= 0.) {
 				ret.omega[i][j] = fabs(v);
 				if (ret.omegafixed[i][j] == 2)
-					fatal(0, "variances on diagonal that are set as fixed cannot be part of a SAME block\n");
+					fatal(0, "variances on diagonal set fixed cannot be part of a SAME block\n");
 				ret.omegafixed[i][j] = 1;
 			} else if (v == 0.)
 				ret.omegafixed[i][j] = 1;
@@ -178,12 +181,18 @@ POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
 	for (int i=OPENPMX_SIGMA_MAX-1; i>=0; i--) {
 		ret.nsigma = i + 1;
 		let v = sigma[i];
-		let fabsv = fabs(v);
-		if (fabsv != 0.)
+		/* test for non-zero, or negative zero */
+		if (v != 0.)
+			break;
+		if (signbit(v))
 			break;
 	}
 	forcount(i, ret.nsigma) {
 		let v = sigma[i];
+
+		if (!isfinite(v))
+			fatal(0, "invalid sigma %g\n", v);
+		
 		let fabsv = fabs(v);
 		ret.sigma[i] = fabsv;
 		ret.sigmafixed[i] = (v <= 0.) ? 1 : 0;
@@ -327,52 +336,6 @@ static void info_iteration(FILE* f1,
 	info(f1, "\n");
 }
 
-static void print_iteration(FILE* f1,
-							FILE* f2,
-							const POPMODEL* popmodel,
-							const int xlength,
-							const double* const x)
-{
-	openpmx_printf(f1, f2, 0, "param:");
-
-	let etheta = popmodel->theta;
-	let ntheta = popmodel->ntheta;
-	let thetaestim = popmodel->thetaestim;
-	forcount(j, ntheta) {
-		if (thetaestim[j] != FIXED) {
-			let v = etheta[j];
-			openpmx_printf(f1, f2, 0, " % -11.4e", v);
-		}
-	}
-	let sigma = popmodel->sigma;
-	let nsigma = popmodel->nsigma;
-	let sigmafixed = popmodel->sigmafixed;
-	forcount(j, nsigma) {
-		if (sigmafixed[j] == 0) {
-			let v = sigma[j];
-			openpmx_printf(f1, f2, 0, " % -11.4e", v);
-		}
-	}
-	let nomega = popmodel->nomega;
-	forcount(j, nomega) {
-		for (var k=0; k<=j; k++) {
-			let v = popmodel->omega[j][k];
-			let f = popmodel->omegafixed[j][k];
-			if (f == 0 && v != 0)
-				openpmx_printf(f1, f2, 0, " % -11.4e", v);
-		}
-	}
-	if (x && xlength > 0) {
-		openpmx_printf(f1, f2, 0, "\ntpara:");
-		forcount(j, xlength)
-			openpmx_printf(f1, f2, 0, " % -11.4e", x[j]);
-//		openpmx_printf(f1, f2, 0, "\nd    :");
-//		forcount(j, xlength)
-//			openpmx_printf(f1, f2, 0, " % -11.4e", fabs(x[j]));
-	}
-	openpmx_printf(f1, f2, 0, "\n");
-}
-
 void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double timestamp)
 {
 	const char* message = 0;
@@ -504,21 +467,16 @@ void popmodel_initcode(FILE* f2, const POPMODEL* const popmodel)
 
 void popmodel_eval_information(const POPMODEL* const popmodel,
 							   const double runtime_s,
-							   const bool verbose,
-							   const bool progress,
+							   const bool details,
 							   FILE* outstream,
 							   FILE* extstream,
-							   const int xlength,
-							   const double* const x,
 							   const char* suffix)
 {
-	if (verbose)
+	if (details)
 		popmodel_information(outstream, popmodel, runtime_s);
-	if (progress) {
-		info_iteration(outstream, runtime_s, popmodel, suffix);
-		FILE* f = (verbose) ? stdout : 0;
-		print_iteration(f, outstream, popmodel, xlength, x);
-	}
+
+	info_iteration(outstream, runtime_s, popmodel, suffix);
+
 	if (extstream) 
 		extfile_append(extstream, popmodel);
 }

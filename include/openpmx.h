@@ -204,8 +204,8 @@ typedef struct {
 	const char* filename;
 	int nthread;
 	bool _offset1;
+	bool details;
 	bool verbose;
-	bool progress;
 
 	/* the problem structure to analyse */
 	const DATACONFIG data;
@@ -262,12 +262,6 @@ typedef struct {
 typedef struct {
 	STAGE1CONFIG stage1;
 	OPTIMCONFIG optim;
-	struct {
-		struct {
-			bool omit;
-			double step;
-		} gradient;
-	} posthoc;
 } ESTIMCONFIG;
 
 void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const evalconfig);

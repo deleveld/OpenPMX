@@ -129,10 +129,9 @@ void individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args,
 	const RECORD* ptr = record;
 	forcount(i, nrecord) {
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
-
-		let dv = RECORDINFO_DV(recordinfo, ptr);
 		let evid = RECORDINFO_EVID(recordinfo, ptr);
-		if (!isnan(dv) && evid == 0) {
+		if (evid == 0) {
+			let dv = RECORDINFO_DV(recordinfo, ptr);
 			let yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 
@@ -192,10 +191,9 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	forcount(i, nrecord) {
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
 
-		let dv = RECORDINFO_DV(recordinfo, ptr);
 		let evid = RECORDINFO_EVID(recordinfo, ptr);
 		var yhat = 0.;
-		if ((!isnan(dv) && evid == 0) || predictall)
+		if (evid == 0 || predictall) 
 			yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 		if (YHAT)
 			YHAT[i] = yhat;
@@ -212,12 +210,13 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 		}
 		
 		/* objective function only for observations */
-		if (!isnan(dv) && evid == 0) {
+		if (evid == 0) {
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 			if (YHATVAR)
 				YHATVAR[i] = yhatvar;
 
 			/* we dont really need to have the if here but its probably faster if its in */
+			let dv = RECORDINFO_DV(recordinfo, ptr);
 			if (obs_min2ll) {
 				let err = dv - yhat;
 				let min2ll_term = (err * err) / yhatvar;
@@ -268,19 +267,24 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	let predictall = advanconfig->predictall;
 	let recordinfo = &advanfuncs->recordinfo;
 	const RECORD* ptr = record;
+	let id = RECORDINFO_ID(recordinfo, ptr);
 	forcount(i, nrecord) {
 		let evid = RECORDINFO_EVID(recordinfo, ptr);
 		let time = RECORDINFO_TIME(recordinfo, ptr);
 
+		let dv = RECORDINFO_DV(recordinfo, ptr);
+		if (evid == 0 && !isfinite(dv))
+			fatal(logstream, "DV is not finite for observation (EVID 0) at TIME (%.16e) for ID %f record %i\n", time, id, i);
+
 		/* time must increase except for reset events */
 		if (time < lasttime && evid != 3 && evid != 4)
-			fatal(logstream, "TIME (%.16e) not monotonic for ID %f record %i, previous (%.16e)\n", time, RECORDINFO_ID(recordinfo, ptr), i, lasttime);
+			fatal(logstream, "TIME (%.16e) not monotonic for ID %f record %i, previous (%.16e)\n", time, id, i, lasttime);
 		lasttime = time;
 
 		/* compartment must be within the number of states */
 		let cmt = RECORDINFO_CMT(recordinfo, ptr);
 		if (cmt < 0 || cmt >= advanfuncs->nstate)
-			fatal(logstream, "CMT (%.16e) not within number of states (%i) for ID %f record %i\n", cmt, RECORDINFO_ID(recordinfo, ptr), i, advanfuncs->nstate);
+			fatal(logstream, "CMT (%.16e) not within number of states (%i) for ID %f record %i\n", cmt, id, i, advanfuncs->nstate);
 
 		/* state should not be accessed outside of its limits */
 		for (int j=advanfuncs->nstate; j<OPENPMX_STATE_MAX; j++)
@@ -293,68 +297,72 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		if (assure_state_finite(advan->state, advanfuncs->nstate) == 0) {
 			forcount(j, advanfuncs->nstate)
 				warning(logstream, "compartment %i state %.16e finite %i\n", j, advan->state[j], isfinite(advan->state[j]));
-			fatal(logstream, "non-finite state for ID %f record %i\n", RECORDINFO_ID(recordinfo, ptr), i);
+			fatal(logstream, "non-finite state for ID %f record %i time %f\n", id, i, time);
 		}
 
-		let dv = RECORDINFO_DV(recordinfo, ptr);
-		let amt = RECORDINFO_AMT(recordinfo, ptr);
-		if (amt < 0.)
-			fatal(logstream, "ID %f record %i: AMT less than zero\n", RECORDINFO_ID(recordinfo, ptr), i);
-		let rate = RECORDINFO_RATE(recordinfo, ptr);
-		if (rate < 0.)
-			fatal(logstream, "ID %f record %i: RATE less than zero\n", RECORDINFO_ID(recordinfo, ptr), i);
-
 		var yhat = 0.;
-		if ((!isnan(dv) && evid == 0) || predictall)
+		if (evid == 0 || predictall)
 			yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 
 		/* observations */
-		if (!isnan(dv) && evid == 0) {
+		if (evid == 0) {
 
 			/* predictions for observations should be finite */
 			if (isfinite(yhat) != 1)
-				fatal(logstream, "non-finite YHAT for ID %f record %i\n", RECORDINFO_ID(recordinfo, ptr), i);
+				fatal(logstream, "non-finite YHAT for ID %f record %i\n", id, i);
 
 			/* prediction variance of observations should be finite and positive */
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 			if (isfinite(yhatvar) != 1)
-				fatal(logstream, "non-finite YHATVAR for ID %f record %i\n", RECORDINFO_ID(recordinfo, ptr), i);
+				fatal(logstream, "non-finite YHATVAR for ID %f record %i\n", id, i);
 
 			/* predictions with zero error are an error */
-			if ((!isnan(dv) && evid == 0) && yhatvar == 0.)
-				fatal(logstream, "zero YHATVAR for ID %f record %i\n", RECORDINFO_ID(recordinfo, ptr), i);
+			if (evid == 0 && yhatvar == 0.)
+				fatal(logstream, "zero YHATVAR for ID %f record %i\n", id, i);
 
 			/* observation should be finite */
 			if (isfinite(dv) != 1)
-				fatal(logstream, "non-finite DV for ID %f record %i\n", RECORDINFO_ID(recordinfo, ptr), i);
+				fatal(logstream, "non-finite DV for ID %f record %i\n", id, i);
 
 		/* dose or reset-and-dose event */
 		} else if (evid == 1 || evid == 4) {
 
+			let amt = RECORDINFO_AMT(recordinfo, ptr);
+			if (!isfinite(amt))
+				fatal(logstream, "ID %f record %i: AMT is not finite (%f)\n", id, i, amt);
+			if (amt < 0.)
+				fatal(logstream, "ID %f record %i: AMT less than zero\n", id, i);
+			let rate = RECORDINFO_RATE(recordinfo, ptr);
+			if (rate < 0.)
+				fatal(logstream, "ID %f record %i: RATE less than zero\n", id, i);
+
 			if (isfinite(amt) != 1 || amt == 0.)
-				warning(logstream, "AMT is missing (%.16e) assumed 0 for dose event ID %f time %f record %i\n", amt, RECORDINFO_ID(recordinfo, ptr), RECORDINFO_TIME(recordinfo, ptr), i);
+				warning(logstream, "AMT is missing (%.16e) assumed 0 for dose event ID %f time %f record %i\n", amt, id, RECORDINFO_TIME(recordinfo, ptr), i);
 			if (isfinite(rate) != 1)
-				warning(logstream, "RATE is missing (%.16e) assumed 0 for dose event ID %f time %f record %i\n", rate, RECORDINFO_ID(recordinfo, ptr), RECORDINFO_TIME(recordinfo, ptr), i);
+				warning(logstream, "RATE is missing (%.16e) assumed 0 for dose event ID %f time %f record %i\n", rate, id, RECORDINFO_TIME(recordinfo, ptr), i);
 
 			if (isfinite(dv) == 1 && dv != 0.)
-				warning(logstream, "non-zero DV (%.16e) for dose event ID %f record %i\n", dv, RECORDINFO_ID(recordinfo, ptr), i);
+				warning(logstream, "non-zero DV (%.16e) for dose event ID %f record %i\n", dv, id, i);
 
 		/* reset event */
 		} else if (evid == 3) {
 
+			/* broken when AMT is NAN?
+			let amt = RECORDINFO_AMT(recordinfo, ptr);
 			if (isfinite(amt) == 1 && amt != 0.)
-				warning(logstream, "AMT is non-zero (%.16e) for reset event ID %f record %i\n", amt, RECORDINFO_ID(recordinfo, ptr), i);
+				warning(logstream, "AMT is non-zero (%.16e) for reset event ID %f record %i\n", amt, id, i);
 
 			if (isfinite(rate) == 1 && rate != 0.)
-				warning(logstream, "RATE is non-zero (%.16e) for reset event ID %f record %i\n", rate, RECORDINFO_ID(recordinfo, ptr), i);
+				warning(logstream, "RATE is non-zero (%.16e) for reset event ID %f record %i\n", rate, id, i);
 
 			if (isfinite(dv) == 1 && dv != 0.)
-				warning(logstream, "non-zero DV (%.16e) for reset event ID %f record %i\n", dv, RECORDINFO_ID(recordinfo, ptr), i);
+				warning(logstream, "non-zero DV (%.16e) for reset event ID %f record %i\n", dv, id, i);
+			*/
 
 		/* other event type */
 		} else {
 			if (isfinite(dv) == 1 && dv != 0.)
-				warning(logstream, "non-zero DV (%.16e) for non-observation for ID %f record %i\n", dv, RECORDINFO_ID(recordinfo, ptr), i);
+				warning(logstream, "non-zero DV (%.16e) for non-observation for ID %f record %i\n", dv, id, i);
 		}
 
 		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);

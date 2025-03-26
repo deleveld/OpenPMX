@@ -77,7 +77,7 @@ static struct {
 	THREADTASK threadtask;
 } ttasks;
 
-static void pthreads_cleanup(FILE* logstream, const bool progress)
+static void pthreads_cleanup(FILE* logstream)
 {
 	if (tpool.init) {
 
@@ -86,15 +86,12 @@ static void pthreads_cleanup(FILE* logstream, const bool progress)
 		tpool.stop = true;
 		pthread_cond_broadcast(&tpool.cond);
 		pthread_mutex_unlock(&tpool.mutex);
-		if (progress)
-			info(logstream, "tpool: stop ");
+		info(logstream, "tpool: stop ");
 		forcount(i, tpool.nrunning) {
 			pthread_join(tpool.running[i], 0);
-			if (progress)
-				info(logstream, " %i", i);
+			info(logstream, " %i", i);
 		}
-		if (progress)
-			info(logstream, "\n");
+		info(logstream, "\n");
 		pthread_mutex_destroy(&tpool.mutex);
 		pthread_cond_destroy(&tpool.cond);
 
@@ -202,15 +199,12 @@ void scatter_threads(const IDATA* const idata,
 	   condition is signalled */
 	if (!tpool.init) {
 		tpool.running = callocvar(pthread_t, nthreads);
-		if (options->progress)
-			info(scatteroptions->logstream, "tpool: start");
+		info(scatteroptions->logstream, "tpool: start");
 		forcount(i, nthreads) {
 			pthread_create(&tpool.running[i], NULL, run_threadpool_task, 0);
-			if (options->progress)
-				info(scatteroptions->logstream, " %i", i);
+			info(scatteroptions->logstream, " %i", i);
 		}
-		if (options->progress)
-			info(scatteroptions->logstream, "\n");
+		info(scatteroptions->logstream, "\n");
 		tpool.nrunning = nthreads;
 		tpool.init = true;
 	}
@@ -260,10 +254,9 @@ void scatter_threads(const IDATA* const idata,
 	free(individs);
 }
 
-void scatter_cleanup(const bool progress)
+void scatter_cleanup(void)
 {
-	(void) progress;
 #ifdef OPENPMX_PARALLEL_PTHREADS
-	pthreads_cleanup(0, progress);
+	pthreads_cleanup(0);
 #endif
 }

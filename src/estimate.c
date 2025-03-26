@@ -186,9 +186,7 @@ static double get_timestamp(const STAGE2_PARAMS* const params)
 	return timespec_time_difference(&params->begin, &now) / 1000.;
 }
 
-static void update_best_imodel(const int xlength,
-							   const double x[static xlength],
-							   const STAGE2_PARAMS* const params,
+static void update_best_imodel(const STAGE2_PARAMS* const params,
 							   POPMODEL* const best)
 {
 	let idata = params->idata;
@@ -214,11 +212,9 @@ static void update_best_imodel(const int xlength,
 		let runtime_s = get_timestamp(params);
 		popmodel_eval_information(improved_model,
 								  runtime_s,
-								  options->verbose,
-								  options->progress,
+								  options->details || options->verbose,
 								  params->outstream,
 								  params->extstream,
-								  xlength, x,
 								  0);
 	}
 }
@@ -243,9 +239,10 @@ static void encode_evaluate(ENCODE* const test,
 	scatteroptions.stage1_order = true;
 	scatter_threads(idata, advanfuncs, popmodel, nonzero, options, &scatteroptions, stage1_thread);
 
-	popmodel->result = (PMXRESULT) { .objfn = objfn(idata, omegainfo),
-									 .type = OBJFN_CURRENT,
-									 .nfunc = 0 };
+	popmodel->result = (PMXRESULT) {
+		.objfn = objfn(idata, omegainfo),
+		.type = OBJFN_CURRENT,
+		.nfunc = 0 };
 }
 
 static double focei_stage2_evaluate_population_objfn(const long int _xlength,
@@ -268,7 +265,7 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 	popmodel->result.nfunc = params->nfunc;
 
 	/* update best imodel and inform the user if we improve */
-	update_best_imodel(_xlength, _x, params, &params->best);
+	update_best_imodel(params, &params->best);
 
 	return popmodel->result.objfn;
 }
@@ -485,9 +482,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 	return 0;
 }
 
-static void print_model(STAGE2_PARAMS* params,
-						const int xlength,
-						const double* const x)
+static void print_model(STAGE2_PARAMS* params)
 {
 	let popmodel = &params->test.popmodel;
 	let options = params->options;
@@ -499,11 +494,9 @@ static void print_model(STAGE2_PARAMS* params,
 	let runtime_s = get_timestamp(params);
 	popmodel_eval_information(popmodel,
 							  runtime_s,
-							  options->verbose,
-							  options->progress,
+							  options->details || options->verbose,
 							  params->outstream,
 							  params->extstream,
-							  xlength, x, 
 							  0);
 }
 
@@ -532,7 +525,7 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 		++niter;
 		popmodel->result.nfunc = params->nfunc;
 
-		print_model(params, 0, 0);
+		print_model(params);
 
 		/* are we stable? */
 		/* besteta we update later, individual eta values keep getting updated */
@@ -591,7 +584,7 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 		params->nfunc += 1;
 		popmodel->result.nfunc = params->nfunc;
 		let fm2 = popmodel->result.objfn;
-		print_model(params, n, x);
+		print_model(params);
 		xa[0] = x[k];
 		ya[0] = fm2 - f0;
 		x[k] = 0.;
@@ -603,7 +596,7 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 		params->nfunc += 1;
 		popmodel->result.nfunc = params->nfunc;
 		let fm1 = popmodel->result.objfn;
-		print_model(params, n, x);
+		print_model(params);
 		xa[1] = x[k];
 		ya[1] = fm1 - f0;
 		x[k] = 0.;
@@ -618,7 +611,7 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 		params->nfunc += 1;
 		popmodel->result.nfunc = params->nfunc;
 		let fp1 = popmodel->result.objfn;
-		print_model(params, n, x);
+		print_model(params);
 		xa[3] = x[k];
 		ya[3] = fp1 - f0;
 		x[k] = 0.;
@@ -630,13 +623,13 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 		params->nfunc += 1;
 		popmodel->result.nfunc = params->nfunc;
 		let fp2 = popmodel->result.objfn;
-		print_model(params, n, x);
+		print_model(params);
 		xa[4] = x[k];
 		ya[4] = fp2 - f0;
 		x[k] = 0.;
 
 		var interp = gsl_spline_alloc(gsl_interp_cspline, 5);
-		var accelp = gsl_interp_accel_alloc();		
+		var accelp = gsl_interp_accel_alloc();
 		gsl_spline_init(interp, xa, ya, 5);
 
 		let deriv = gsl_spline_eval_deriv(interp, 0., accelp);
@@ -650,7 +643,7 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 	
 	params->best.result.nfunc = params->nfunc;
 }
-
+	
 static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 {
 	let idata = params->idata;
@@ -905,7 +898,6 @@ void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 		*stage1 = options.estimate.stage1;
 	}
 	options.estimate.optim.maxeval = 1;
-	options.estimate.posthoc.gradient.omit = true;
 
 	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
 	popmodel.result.type = OBJFN_INITIAL;
@@ -932,7 +924,6 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	options.estimate.optim.step_initial = 1.;
 	options.estimate.optim.step_refine = 0.1;
 	options.estimate.optim.step_final = 0.01;
-	options.estimate.posthoc.gradient.omit = true;
 
 	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
 	popmodel.result.type = OBJFN_INITIAL;

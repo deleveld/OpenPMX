@@ -67,15 +67,14 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	var state = advan->state;
 
 	/* reset the state on first start or on EVID==3 or EVID==4 events */
-	let reset_state = (advan->initcount == 0 ||
-					   RECORDINFO_EVID(recordinfo, record) == 3 ||
-					   RECORDINFO_EVID(recordinfo, record) == 4);
+	let evid = RECORDINFO_EVID(recordinfo, record);
+	let reset_state = (advan->initcount == 0 || evid == 3 || evid == 4);
 
 	if (reset_state || advanconfig->firstonly == false) {
 		if (reset_state) {
 			/*	If we dont zero the model it keeps the values from the previous
 			 * time we called. This seems to be somewhat elegant in the user code.
-			 * Sine the model retains values from the previous record. 
+			 * Since the model retains values from the previous record. 
 			 * memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size); */
  
 			memset(state, 0, OPENPMX_STATE_MAX * sizeof(double));
@@ -98,24 +97,26 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	}
 
 	/* now handle any doses, if this is a dose add it to the list */
-	let amt = RECORDINFO_AMT(recordinfo, record);
-	if (amt > 0.) {
-		let cmt = RECORDINFO_CMT(recordinfo, record);
-		let lagtime = advan->amtlag[cmt];
-		let start = RECORDINFO_TIME(recordinfo, record) + lagtime;
-		let rate = RECORDINFO_RATE(recordinfo, record);
-		let duration = (rate != 0.) ? (amt / rate) : (0.);
-		let end = start + duration;
+	if (evid == 1) {
+		let amt = RECORDINFO_AMT(recordinfo, record);
+		if (amt > 0.) {
+			let cmt = RECORDINFO_CMT(recordinfo, record);
+			let lagtime = advan->amtlag[cmt];
+			let start = RECORDINFO_TIME(recordinfo, record) + lagtime;
+			let rate = RECORDINFO_RATE(recordinfo, record);
+			let duration = (rate != 0.) ? (amt / rate) : (0.);
+			let end = start + duration;
 
-		vector_append(advan->infusions,
-					  (ADVANINFUSION) {
-						.cmt = cmt,
-						.amt = amt,
-						.rate = rate,
-						.start = start,
-						.end = end } );
+			vector_append(advan->infusions,
+						  (ADVANINFUSION) {
+							.cmt = cmt,
+							.amt = amt,
+							.rate = rate,
+							.start = start,
+							.end = end } );
+		}
 	}
-
+	
 	/* advance through time and handle infusions and doses when they start
 	 * or stop up until the time of the current record */
 	assert(advan->time <= RECORDINFO_TIME(recordinfo, record));

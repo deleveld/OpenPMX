@@ -50,7 +50,7 @@ void scatter_threads(const IDATA* const idata,
 					 SCATTEROPTIONS* scatteroptions,
 					 THREADTASK threadtask);
 
-void scatter_cleanup(const bool progress);
+void scatter_cleanup(void);
 
 #ifdef __cplusplus
 }

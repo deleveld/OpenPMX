@@ -22,6 +22,7 @@
 
 #include "omegainfo.h"
 #include "linalg.h"
+#include "print.h"
 #include "utils/c22.h"
 
 #include <gsl/gsl_linalg.h>
@@ -68,9 +69,18 @@ void omegainfo_update_inverse_lndet(OMEGAINFO* const omegainfo,
 
 		/* log(det(omega)) term is a part of the objective function */
 		let lndet = matrix_lndet_from_cholesky(&cholesky.matrix);
-		assert(isfinite(lndet) == 1);
 		omegainfo->omega_nonzero_lndet = lndet;
 
+		/* test for errors */
+		if (!isfinite(lndet)) {
+			fprintf(stderr, "log(det(OMEGA)) failed\nomega:\n");
+			forcount(i, n) {
+				forcount(j, n) 
+					fprintf(stderr, "\t%g", omega[i][j]);
+				fprintf(stderr, "\n");
+			}
+			assert(isfinite(lndet));
+		}
 	} else {
 		omegainfo->omega_nonzero_lndet = 0.;
 		gsl_matrix_set_zero(&cholesky.matrix);

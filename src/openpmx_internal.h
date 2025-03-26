@@ -32,9 +32,8 @@ extern "C" {
 typedef struct {
 	int nthread;
 	const bool _offset1;
+	bool details;
 	bool verbose;
-	bool progress;
-	bool append_table;
 	ESTIMCONFIG estimate;
 	SIMCONFIG simulate;
 } OPTIONS;

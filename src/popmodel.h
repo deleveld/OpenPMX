@@ -62,12 +62,9 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel);
 
 void popmodel_eval_information(const POPMODEL* const popmodel,
 							   const double runtime_s,
-							   const bool verbose,
-							   const bool progress,
+							   const bool details,
 							   FILE* outstream,
 							   FILE* extstream,
-							   const int xlength,
-							   const double* const x,
 							   const char* suffix);
 
 void popmodel_information(FILE* f2,

@@ -349,10 +349,10 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 		/* calculate derivatives, scaling by yhatvar */
 		const RECORD* ptr = record;
 		forcount(k, nrecord) {
-			let dv = RECORDINFO_DV(recordinfo, ptr);
 			let evid = RECORDINFO_EVID(recordinfo, ptr);
 			var deriv = 0.;
-			if (!isnan(dv) && evid == 0) {
+			if (evid == 0) {
+				let dv = RECORDINFO_DV(recordinfo, ptr);
 				let upper = (f_plus_h[k] - dv) / sqrt(yhatvar_plus_h[k]);
 				let lower = (f_minus_h[k] - dv) / sqrt(yhatvar_minus_h[k]);
 				deriv = (upper - lower) / (above - below);
@@ -481,11 +481,16 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		let w1 = icovweight[i * 2];
 		let w2 = icovweight[i * 2 + 1];
 		let eivar = gsl_vector_get(eval, i);
-		let eisd1 = sqrt(eivar);						/* distance in positive direction */
-		let eisd2 = sqrt(eivar); 						/* distance in negative direction */
-		let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
-		sumlogeval += 2.*log(eiwgtsd);
-//		printf("%f %f %f %f\n", scalepos[i], scaleneg[i], w1, w2);
+
+		/* weighting via SD */
+//		let eisd1 = sqrt(eivar);						/* distance in positive direction */
+//		let eisd2 = sqrt(eivar); 						/* distance in negative direction */
+//		let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
+//		sumlogeval += 2.*log(eiwgtsd);
+			
+		/* weighting via variance */
+		let eiwgtvar = (eivar * w1 + eivar * w2) / 2.;	/* average the variances, i.e, two of them weighted by 0.5 */
+		sumlogeval += log(eiwgtvar);
 	}
 	let icov_lndet = -1. * sumlogeval; /* we get lndet from inverse, so we have -1 here */
 

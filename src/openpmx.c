@@ -42,7 +42,7 @@ STAGE1CONFIG stage1config_default(const STAGE1CONFIG* const stage1)
 	if (ret.step_refine == 0.)
 		ret.step_refine = 0.1;
 	if (ret.step_final == 0.)
-		ret.step_final = v;
+		ret.step_final = v * 10.;
 	if (ret.maxeval == 0)
 		ret.maxeval = 1000;
 
@@ -70,9 +70,6 @@ ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate)
 		ret.optim.maxeval = 10000;
 	if (ret.optim.dobjfn == 0.)
 		ret.optim.dobjfn = 1.e-3;
-
-	if (ret.posthoc.gradient.step == 0.)
-		ret.posthoc.gradient.step = ret.optim.step_initial;
 
 	return ret;
 }
@@ -130,8 +127,8 @@ OPTIONS options_init_from_pmx(const OPENPMX* const pmx)
 		.nthread = pmx->nthread,
 		._offset1 = pmx->_offset1,
 
+		.details = pmx->details,
 		.verbose = pmx->verbose,
-		.progress = pmx->progress,
 	};
 	return options_default(&ret);
 }
@@ -166,9 +163,9 @@ void pmxstate_ensure(OPENPMX* const pmx)
 		pmx->state = pmxstate_alloc(pmx);
 }
 
-static void pmxstate_free(PMXSTATE* pstate, const bool progress)
+static void pmxstate_free(PMXSTATE* pstate)
 {
-	scatter_cleanup(progress);
+	scatter_cleanup();
 
 	advanfuncs_free((void*)pstate->advanfuncs); /* keeping advanfuncs const in PMXSTATE is nice, but this cludge is needed to free */
 	idata_destruct(&pstate->idata);
@@ -199,7 +196,7 @@ void pmx_copy_popparams(OPENPMX* dest, const OPENPMX* const src)
 
 void pmx_cleanup(OPENPMX* pmx)
 {
-	pmxstate_free(pmx->state, pmx->progress);
+	pmxstate_free(pmx->state);
 	pmx->state = 0;
 }
 
