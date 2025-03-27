@@ -121,7 +121,7 @@ POPPARAM popparam_init(const POPMODEL* const popmodel,
 	};
 }
 
-OPTIONS options_init_from_pmx(const OPENPMX* const pmx)
+OPTIONS options_init(const OPENPMX* const pmx)
 {
 	var ret = (OPTIONS) {
 		.nthread = pmx->nthread,
@@ -136,7 +136,7 @@ OPTIONS options_init_from_pmx(const OPENPMX* const pmx)
 static PMXSTATE* pmxstate_alloc(const OPENPMX* const pmx)
 {
 	let advanfuncs = advanfuncs_alloc(&pmx->data, &pmx->advan);
-	let popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
+	let popmodel = popmodel_init(pmx);
 
 	var temp = (PMXSTATE) {
 		.advanfuncs = advanfuncs,

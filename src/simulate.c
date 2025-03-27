@@ -208,9 +208,8 @@ void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig)
 	pmxstate_ensure(pmx);
 	var pstate = pmx->state;
 
-	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
-
-	var options = options_init_from_pmx(pmx);
+	var popmodel = popmodel_init(pmx);
+	var options = options_init(pmx);
 	if (simconfig)
 		options.simulate = simconfig_default(simconfig);
 

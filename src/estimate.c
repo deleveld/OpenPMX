@@ -869,13 +869,13 @@ void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	pmxstate_ensure(pmx);
 	var pstate = pmx->state;
 
-	var options = options_init_from_pmx(pmx);
+	var options = options_init(pmx);
 	if (estimate) {
 		options.estimate = estimconfig_default(estimate);
 		*estimate = options.estimate;
 	}
 
-	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
+	var popmodel = popmodel_init(pmx);
 	popmodel.result.type = OBJFN_INITIAL;
 
 	estimate_popmodel(pmx->filename,
@@ -892,14 +892,14 @@ void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 	pmxstate_ensure(pmx);
 	var pstate = pmx->state;
 
-	var options = options_init_from_pmx(pmx);
+	var options = options_init(pmx);
 	if (stage1) {
 		options.estimate.stage1 = stage1config_default(stage1);
 		*stage1 = options.estimate.stage1;
 	}
 	options.estimate.optim.maxeval = 1;
 
-	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
+	var popmodel = popmodel_init(pmx);
 	popmodel.result.type = OBJFN_INITIAL;
 
 	estimate_popmodel(pmx->filename,
@@ -916,7 +916,7 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	pmxstate_ensure(pmx);
 	var pstate = pmx->state;
 
-	var options = options_init_from_pmx(pmx);
+	var options = options_init(pmx);
 	if (estimate) {
 		options.estimate = estimconfig_default(estimate);
 		*estimate = options.estimate;
@@ -925,7 +925,7 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	options.estimate.optim.step_refine = 0.1;
 	options.estimate.optim.step_final = 0.01;
 
-	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
+	var popmodel = popmodel_init(pmx);
 	popmodel.result.type = OBJFN_INITIAL;
 
 	estimate_popmodel(pmx->filename,

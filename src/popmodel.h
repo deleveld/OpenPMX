@@ -50,9 +50,7 @@ typedef struct {
 	PMXRESULT result;
 } POPMODEL;
 
-POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
-					   const OMEGA* omegablocks, // not sure why static here causes warning [static OPENPMX_OMEGABLOCK_MAX],
-					   const double sigma[static OPENPMX_SIGMA_MAX]);
+POPMODEL popmodel_init(const OPENPMX* const pmx);
 
 void extfile_header(FILE * f,
 					const POPMODEL* const popmodel,

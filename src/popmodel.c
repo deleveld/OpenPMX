@@ -30,11 +30,12 @@
 
 #include "openpmx_compile_options.h"
 
-/* TODO: why does this give a compiler error */
-POPMODEL popmodel_init(const THETA theta[static OPENPMX_THETA_MAX],
-					   const OMEGA* omegablocks, // not sure why static here causes warning [static OPENPMX_OMEGABLOCK_MAX],
-					   const double sigma[static OPENPMX_SIGMA_MAX])
+POPMODEL popmodel_init(const OPENPMX* const pmx)
 {
+	let theta = pmx->theta;
+	let omegablocks = pmx->omega;
+	let sigma = pmx->sigma;
+	
 	POPMODEL ret = { 0 };
 	ret.ntheta = 0;
 	ret.nblock = 0;

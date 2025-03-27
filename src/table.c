@@ -61,7 +61,7 @@ static void strip_firstlast_space(char* s)
 typedef struct {
 	const IDATA* idata;
 	const ADVANFUNCS* advanfuncs;
-	const THETA* theta;
+	const POPMODEL popmodel;
 	const TABLECONFIG* tableconfig;
 	char filename[PATH_MAX];
 	char ext[NAME_MAX];
@@ -92,12 +92,12 @@ typedef struct {
 } TABLE;
 
 static TABLE table_open(const IDATA* const idata,
-						 const ADVANFUNCS* const advanfuncs,
-						 const THETA* const theta,
-						 const char* pmx_filename,
-						 int* tablenum,
-						 const char* _fields,
-						 const TABLECONFIG* const tableconfig)
+						const ADVANFUNCS* const advanfuncs,
+						const POPMODEL* const popmodel,
+						const char* pmx_filename,
+						int* tablenum,
+						const char* _fields,
+						const TABLECONFIG* const tableconfig)
 {
 	const char* filename = 0;
 	char ext[PATH_MAX] = "";
@@ -133,7 +133,7 @@ static TABLE table_open(const IDATA* const idata,
 	var ret = (TABLE) {
 		.idata = idata,
 		.advanfuncs = advanfuncs,
-		.theta = theta,
+		.popmodel = *popmodel,
 		.tableconfig = tableconfig,
 		.filename = "",
 
@@ -315,7 +315,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	if (_offset1 == false) {
 		if (sscanf(name, "theta[%i]", &i)) {
 			assert(i >= 0 && i < idata->ntheta);
-			return table->theta[i].value;
+			return table->popmodel.theta[i];
 		}
 		if (sscanf(name, "eta[%i]", &i)) {
 			assert(i >= 0 && i < idata->nomega);
@@ -335,7 +335,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	} else {
 		if (sscanf(name, "THETA(%i)", &i) == 1) {
 			assert(i-1 >= 0 && i-1 < idata->ntheta);
-			return table->theta[i-1].value;
+			return table->popmodel.theta[i-1];
 		}
 		if (sscanf(name, "ETA(%i)", &i) == 1) {
 			assert(i-1 >= 0 && i-1 < idata->nomega);
@@ -361,14 +361,15 @@ void pmx_table(OPENPMX* pmx,
 			   const TABLECONFIG* const tableconfig)
 {
 	pmxstate_ensure(pmx);
-
+	
+	let popmodel = popmodel_init(pmx);
 	TABLE table = table_open(&pmx->state->idata,
-							  pmx->state->advanfuncs,
-							  pmx->theta,
-							  pmx->filename,
-							  &pmx->state->tablecount,
-							  fields,
-							  tableconfig);
+							 pmx->state->advanfuncs,
+							 &popmodel,
+							 pmx->filename,
+							 &pmx->state->tablecount,
+							 fields,
+							 tableconfig);
 
 	FILE* f = table.stream;
 	if (f == 0)

@@ -164,26 +164,6 @@ ADVANFUNCS* pmx_advan_wrapper(const DATACONFIG* const dataconfig, const ADVANCON
 /* basic types */
 /*---------------------------------------------------------------------*/
 typedef struct {
-	double lower, value, upper;
-	enum {
-		THETA_INVALID = 0,
-		FIXED = 1,
-		ESTIMATE = 2,
-	} type;
-} THETA;
-
-typedef struct {
-	enum {
-		OMEGA_INVALID = 0,
-		OMEGA_DIAG,
-		OMEGA_BLOCK,
-		OMEGA_SAME,
-	} type;
-	int ndim;
-	double values[OPENPMX_OMEGABLOCKSIZE_MAX];
-} OMEGA;
-
-typedef struct {
 	double objfn;
 	enum {
 		OBJFN_INVALID = 0,
@@ -212,9 +192,26 @@ typedef struct {
 	const ADVANCONFIG advan;
 
 	/* the population paramaters and results of last run */
-	THETA theta[OPENPMX_THETA_MAX];
-	OMEGA omega[OPENPMX_OMEGABLOCK_MAX];
+	struct {
+		double lower, value, upper;
+		enum {
+			THETA_INVALID = 0,
+			FIXED = 1,
+			ESTIMATE = 2,
+		} type;
+	} theta[OPENPMX_THETA_MAX];
+	struct {
+		enum {
+			OMEGA_INVALID = 0,
+			OMEGA_DIAG,
+			OMEGA_BLOCK,
+			OMEGA_SAME,
+		} type;
+		int ndim;
+		double values[OPENPMX_OMEGABLOCKSIZE_MAX];
+	} omega[OPENPMX_OMEGABLOCK_MAX];
 	double sigma[OPENPMX_SIGMA_MAX];
+
 	PMXRESULT result;
 
 	/* internal use */

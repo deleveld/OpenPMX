@@ -43,7 +43,7 @@ OPTIONS options_default(const OPTIONS* const opt1);
 STAGE1CONFIG stage1config_default(const STAGE1CONFIG* const stage1);
 SIMCONFIG simconfig_default(const SIMCONFIG* const simulate);
 ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate);
-OPTIONS options_init_from_pmx(const OPENPMX* const pmx);
+OPTIONS options_init(const OPENPMX* const pmx);
 
 POPPARAM popparam_init(const POPMODEL* const popmodel,
 					   const ADVANFUNCS* const advanfuncs,

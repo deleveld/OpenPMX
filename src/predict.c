@@ -131,8 +131,8 @@ void pmx_predict(OPENPMX* pmx)
 	pmxstate_ensure(pmx);
 	var pstate = pmx->state;
 
-	var options = options_init_from_pmx(pmx);
-	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
+	var options = options_init(pmx);
+	var popmodel = popmodel_init(pmx);
 	popmodel.result.type = OBJFN_PREDICT;
 
 	idata_predict_yhat(&pstate->idata,
@@ -146,8 +146,8 @@ void pmx_predict_pred(OPENPMX* pmx)
 	pmxstate_ensure(pmx);
 	var pstate = pmx->state;
 
-	var options = options_init_from_pmx(pmx);
-	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma);
+	var options = options_init(pmx);
+	var popmodel = popmodel_init(pmx);
 	popmodel.result.type = OBJFN_PREDICT;
 
 	idata_predict_pred(&pstate->idata,
