@@ -297,7 +297,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		if (assure_state_finite(advan->state, advanfuncs->nstate) == 0) {
 			forcount(j, advanfuncs->nstate)
 				warning(logstream, "compartment %i state %.16e finite %i\n", j, advan->state[j], isfinite(advan->state[j]));
-			fatal(logstream, "non-finite state for ID %f time %f record %i\n", id, i, time);
+			fatal(logstream, "non-finite state for ID %f time %f record %i\n", id, time, i);
 		}
 
 		var yhat = 0.;
@@ -309,7 +309,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 
 			/* predictions for observations should be finite */
 			if (isfinite(yhat) != 1)
-				fatal(logstream, "non-finite YHAT for ID %f record %i\n", id, i);
+				fatal(logstream, "non-finite YHAT for ID %f time %f record %i\n", id, time, i);
 
 			/* prediction variance of observations should be finite and positive */
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
@@ -350,26 +350,26 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 				warning(logstream, "RATE is missing (%.16e) assumed 0 for dose event ID %f time %f record %i\n", rate, id, time, i);
 
 			if (isfinite(dv) == 1 && dv != 0.)
-				warning(logstream, "non-zero DV (%.16e) for dose event ID %f record %i\n", dv, id, i);
+				warning(logstream, "non-zero DV (%.16e) for dose event ID %f time %f record %i\n", dv, id, time, i);
 
 		/* reset event */
 		} else if (evid == 3) {
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
 			if (isfinite(amt) == 1 && amt != 0.)
-				warning(logstream, "AMT is non-zero (%.16e) for reset event ID %f record %i\n", amt, id, i);
+				warning(logstream, "AMT is non-zero (%.16e) for reset event ID %f time %f record %i\n", amt, id, time, i);
 
 			let rate = RECORDINFO_RATE(recordinfo, ptr);
 			if (isfinite(rate) == 1 && rate != 0.)
-				warning(logstream, "RATE is non-zero (%.16e) for reset event ID %f record %i\n", rate, id, i);
+				warning(logstream, "RATE is non-zero (%.16e) for reset event ID %f time %f record %i\n", rate, id, time, i);
 
 			if (isfinite(dv) == 1 && dv != 0.)
-				warning(logstream, "non-zero DV (%.16e) for reset event ID %f record %i\n", dv, id, i);
+				warning(logstream, "non-zero DV (%.16e) for reset event ID %f time %f record %i\n", dv, id, time, i);
 
 		/* other event type */
 		} else {
 			if (isfinite(dv) == 1 && dv != 0.)
-				warning(logstream, "non-zero DV (%.16e) for non-observation for ID %f record %i\n", dv, id, i);
+				warning(logstream, "non-zero DV (%.16e) for non-observation for ID %f time %f record %i\n", dv, id, time, i);
 		}
 
 		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);

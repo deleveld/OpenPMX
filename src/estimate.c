@@ -431,7 +431,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 	var neval = maxeval;
 	var rhobeg = step_initial;
 	var rhoend = step_refine;
-	info(0, "optim rho %g %g\n", rhobeg, rhoend);
+	info(params->outstream, "optim rho %g %g\n", rhobeg, rhoend);
 	var retcode = bobyqa(n, npt,
 						 focei_stage2_evaluate_population_objfn, (void*)params,
 						 initial, lower, upper,
@@ -454,7 +454,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 			neval = maxeval - params->nfunc;
 			rhobeg = step_refine;
 			rhoend = step_final;
-//			info(params->outstream, "refine: rho [%g, %g]\n", rhobeg, rhoend);
+			info(params->outstream, "optim rho %g %g\n", rhobeg, rhoend);
 			retcode = bobyqa(n, npt,
 							 focei_stage2_evaluate_population_objfn, (void*)params,
 							 initial, lower, upper,
@@ -470,7 +470,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 		}
 		while (dobjfn < -1.*fabs(options->estimate.optim.dobjfn));
 	}
-	info(0, "optim rho %g\n", rhoend);
+	info(params->outstream, "optim rho %g\n", rhoend);
 
 	free(w);
 #endif

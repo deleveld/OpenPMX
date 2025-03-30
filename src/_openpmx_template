@@ -21,9 +21,8 @@ set -eu
 FILE="${1}"
 BASE=$(basename "${FILE}")
 
-TEMP=.
-#$(mktemp -d)
-#trap "rm -rf ${TEMP}" EXIT
+TEMP=$(mktemp -d)
+trap "rm -rf ${TEMP}" EXIT
 
 OBJFILE="${TEMP}/${BASE}.o"
 EXECFILE="${TEMP}/a.out"
