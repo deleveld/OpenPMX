@@ -274,17 +274,17 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 
 		let dv = RECORDINFO_DV(recordinfo, ptr);
 		if (evid == 0 && !isfinite(dv))
-			fatal(logstream, "DV is not finite for observation (EVID 0) at TIME (%.16e) for ID %f record %i\n", time, id, i);
+			fatal(logstream, "DV is not finite for observation (EVID 0) for ID %f time %f record %i\n", id, time, i);
 
 		/* time must increase except for reset events */
 		if (time < lasttime && evid != 3 && evid != 4)
-			fatal(logstream, "TIME (%.16e) not monotonic for ID %f record %i, previous (%.16e)\n", time, id, i, lasttime);
+			fatal(logstream, "time not monotonic for ID %f time %f record %i previous %f\n", id, time, i, lasttime);
 		lasttime = time;
 
 		/* compartment must be within the number of states */
 		let cmt = RECORDINFO_CMT(recordinfo, ptr);
 		if (cmt < 0 || cmt >= advanfuncs->nstate)
-			fatal(logstream, "CMT (%.16e) not within number of states (%i) for ID %f record %i\n", cmt, id, i, advanfuncs->nstate);
+			fatal(logstream, "CMT (%.16e) not within number of states (%i) for ID %f time %f record %i\n", cmt, id, time, i, advanfuncs->nstate);
 
 		/* state should not be accessed outside of its limits */
 		for (int j=advanfuncs->nstate; j<OPENPMX_STATE_MAX; j++)
@@ -297,7 +297,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		if (assure_state_finite(advan->state, advanfuncs->nstate) == 0) {
 			forcount(j, advanfuncs->nstate)
 				warning(logstream, "compartment %i state %.16e finite %i\n", j, advan->state[j], isfinite(advan->state[j]));
-			fatal(logstream, "non-finite state for ID %f record %i time %f\n", id, i, time);
+			fatal(logstream, "non-finite state for ID %f time %f record %i\n", id, i, time);
 		}
 
 		var yhat = 0.;
@@ -314,32 +314,40 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			/* prediction variance of observations should be finite and positive */
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 			if (isfinite(yhatvar) != 1)
-				fatal(logstream, "non-finite YHATVAR for ID %f record %i\n", id, i);
+				fatal(logstream, "non-finite YHATVAR for ID %f time %f record %i\n", id, time, i);
 
 			/* predictions with zero error are an error */
 			if (evid == 0 && yhatvar == 0.)
-				fatal(logstream, "zero YHATVAR for ID %f record %i\n", id, i);
+				fatal(logstream, "zero YHATVAR for ID %f time %f record %i\n", id, time, i);
 
 			/* observation should be finite */
 			if (isfinite(dv) != 1)
-				fatal(logstream, "non-finite DV for ID %f record %i\n", id, i);
+				fatal(logstream, "non-finite DV for ID %f time %f record %i\n", id, time, i);
+
+			let amt = RECORDINFO_AMT(recordinfo, ptr);
+			if (isfinite(amt) == 1 && amt != 0.)
+				warning(logstream, "AMT is non-zero (%.16e) for observation event ID %f time %f record %i\n", amt, id, time, i);
+
+			let rate = RECORDINFO_RATE(recordinfo, ptr);
+			if (isfinite(rate) == 1 && rate != 0.)
+				warning(logstream, "RATE is non-zero (%.16e) for observation event ID %f time %f record %i\n", rate, id, time, i);
 
 		/* dose or reset-and-dose event */
 		} else if (evid == 1 || evid == 4) {
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
 			if (!isfinite(amt))
-				fatal(logstream, "ID %f record %i: AMT is not finite (%f)\n", id, i, amt);
-			if (amt < 0.)
-				fatal(logstream, "ID %f record %i: AMT less than zero\n", id, i);
+				fatal(logstream, "ID %f time %f record %i: AMT is not finite (%f)\n", id, time, i, amt);
+			if (amt <= 0.)
+				fatal(logstream, "ID %f time %f record %i: AMT less than or equal to zero (%f)\n", id, time, i, amt);
 			let rate = RECORDINFO_RATE(recordinfo, ptr);
 			if (rate < 0.)
 				fatal(logstream, "ID %f record %i: RATE less than zero\n", id, i);
 
 			if (isfinite(amt) != 1 || amt == 0.)
-				warning(logstream, "AMT is missing (%.16e) assumed 0 for dose event ID %f time %f record %i\n", amt, id, RECORDINFO_TIME(recordinfo, ptr), i);
+				warning(logstream, "AMT is missing (%.16e) assumed 0 for dose event ID %f time %f record %i\n", amt, id, time, i);
 			if (isfinite(rate) != 1)
-				warning(logstream, "RATE is missing (%.16e) assumed 0 for dose event ID %f time %f record %i\n", rate, id, RECORDINFO_TIME(recordinfo, ptr), i);
+				warning(logstream, "RATE is missing (%.16e) assumed 0 for dose event ID %f time %f record %i\n", rate, id, time, i);
 
 			if (isfinite(dv) == 1 && dv != 0.)
 				warning(logstream, "non-zero DV (%.16e) for dose event ID %f record %i\n", dv, id, i);
@@ -347,7 +355,6 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		/* reset event */
 		} else if (evid == 3) {
 
-			/* broken when AMT is NAN? */
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
 			if (isfinite(amt) == 1 && amt != 0.)
 				warning(logstream, "AMT is non-zero (%.16e) for reset event ID %f record %i\n", amt, id, i);

@@ -98,7 +98,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	}
 
 	/* now handle any doses, if this is a dose add it to the list */
-	if (evid == 1) {
+	if (evid == 1 || evid == 4) {
 		let amt = RECORDINFO_AMT(recordinfo, record);
 		if (amt > 0.) {
 			let cmt = RECORDINFO_CMT(recordinfo, record);

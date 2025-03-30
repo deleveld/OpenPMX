@@ -29,8 +29,9 @@ CC="gcc"
 LIBNAME="openpmx"
 CFLAGS="-g -O2 -march=native -W -Wall -Wextra"
 CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -Wwrite-strings -Isrc"
-LFLAGS="-flto"
-AR="gcc -shared -o lib/lib${LIBNAME}.so"
+LFLAGS="-flto -static"
+###AR="gcc -shared -o lib/lib${LIBNAME}.so"
+AR="ar rcs lib/lib${LIBNAME}.a"
 RM="rm -vf"
 
 # platform specific changes

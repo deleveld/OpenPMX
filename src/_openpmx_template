@@ -21,8 +21,9 @@ set -eu
 FILE="${1}"
 BASE=$(basename "${FILE}")
 
-TEMP=$(mktemp -d)
-trap "rm -rf ${TEMP}" EXIT
+TEMP=.
+#$(mktemp -d)
+#trap "rm -rf ${TEMP}" EXIT
 
 OBJFILE="${TEMP}/${BASE}.o"
 EXECFILE="${TEMP}/a.out"
@@ -42,6 +43,7 @@ fi
 # execute
 # echo "execute \"${EXECFILE}\""
 if [ -f "${EXECFILE}" ]; then
-	env LD_LIBRARY_PATH=${OPENPMXDIR}/lib:${LD_LIBRARY_PATH:-} "${EXECFILE}"
+###	env LD_LIBRARY_PATH=${OPENPMXDIR}/lib:${LD_LIBRARY_PATH:-} "${EXECFILE}"
+	"${EXECFILE}"
 fi
 

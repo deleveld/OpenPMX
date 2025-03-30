@@ -237,7 +237,6 @@ typedef struct {
 	double step_final;
 	int maxeval;
 
-	/* icov resample */
 	bool icov_resample;
 } STAGE1CONFIG;
 
