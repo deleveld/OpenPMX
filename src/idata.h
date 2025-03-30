@@ -69,7 +69,6 @@ typedef struct {
 	const int predictvars_size;
 
 	INDIVID* const individ;		/* information about each individual */
-
 	/* pointers to these can be found at the first individual
 	IMODEL* const imodel;
 	double* const istate;

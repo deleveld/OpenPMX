@@ -36,7 +36,7 @@ void _vector_reserve(VECTOR_DATA * vect, const int newsize, const size_t sizeofd
 
 	if (newsize > abs(vect->_capacity)) {
 
-		/* fail reallocate when we are suppose to be fixed size buffer */
+		/* fail reallocate when we are supposed to be fixed size buffer */
 		assert(vect->_capacity >= 0);
 
 		/* fail if it didnt work */
@@ -54,12 +54,7 @@ void _vector_resize(VECTOR_DATA * vect, const int newsize, const size_t sizeofda
 	if (newsize > abs(vect->_capacity)) {
 		const int n = (newsize * 3) / 2;
 		const int cap = (n > 16) ? n : 16;
-
-		/* try to allocate some extra room */
-		/* fail if it didnt work */
-		vect->_data = realloc(vect->_data, cap * sizeofdata);
-		vect->_capacity = cap;
-		assert(vect->_data);
+		_vector_reserve(vect, cap, sizeofdata);
 	}
 	vect->_size = newsize;
 }

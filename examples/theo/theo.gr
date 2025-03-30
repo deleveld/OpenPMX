@@ -22,7 +22,7 @@ $SIGMA(1, 1, 0.)
 $MAIN
 //	openpmx.details = true;
 //	openpmx.verbose = true;
-	estimate(.optim.maxeval=1000);
+	estimate();
 	predict_pred();
 	table("ID BWT", .name="covariates", .firstonly=true);
 	table("ID TIME evid DV yhat yhatvar cwres PRED IPRED", .name="pred");

@@ -347,17 +347,17 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		/* reset event */
 		} else if (evid == 3) {
 
-			/* broken when AMT is NAN?
+			/* broken when AMT is NAN? */
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
 			if (isfinite(amt) == 1 && amt != 0.)
 				warning(logstream, "AMT is non-zero (%.16e) for reset event ID %f record %i\n", amt, id, i);
 
+			let rate = RECORDINFO_RATE(recordinfo, ptr);
 			if (isfinite(rate) == 1 && rate != 0.)
 				warning(logstream, "RATE is non-zero (%.16e) for reset event ID %f record %i\n", rate, id, i);
 
 			if (isfinite(dv) == 1 && dv != 0.)
 				warning(logstream, "non-zero DV (%.16e) for reset event ID %f record %i\n", dv, id, i);
-			*/
 
 		/* other event type */
 		} else {

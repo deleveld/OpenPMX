@@ -32,27 +32,22 @@ extern "C" {
 		int _capacity;
 	} VECTOR_DATA;
 
-#define VECTOR(type) \
-	union { \
-		VECTOR_DATA _vector; \
-		type* data; \
+#define VECTOR(type)                                                   \
+	union {                                                            \
+		VECTOR_DATA _vector;                                           \
+		type* data;                                                    \
 	}
+
+#define vector_alloc(mxvect) 		{  }
+#define vector_init_buffer(mxvect, _a, _b)                             \
+do {                                                                   \
+	(mxvect)._vector = (VECTOR_DATA) { ._data=&((_a)[0]), ._size = 0, ._capacity=-abs(_b), };\
+} while (0)
 
 #define vector_free(mxvect) _vector_free(&(mxvect)._vector);
 
-#define vector_buffer(mxvect, _a, _b)				\
-	do {											\
-		VECTOR_DATA* _mxvect = &(mxvect)._vector; 	\
-		assert(_mxvect->_data == 0);				\
-		assert(_mxvect->_size == 0);				\
-		assert(_mxvect->_capacity == 0);			\
-		_mxvect->_data = &(_a)[0];					\
-		_mxvect->_capacity = -(_b);					\
-		assert(_mxvect->_capacity < 0);				\
-	} while (0)
-
 #define vector_size(mxvect)			((const int)((mxvect)._vector._size))
-#define vector_capacity(mxvect)		((const int)((mxvect)._vector._capacity))
+#define vector_capacity(mxvect)		((const int)abs((mxvect)._vector._capacity))
 
 #define vector_at(mxvect, ...)		((mxvect).data[__VA_ARGS__])
 
@@ -62,19 +57,19 @@ extern "C" {
 #define vector_resize(mxvect, n)	_vector_resize(&(mxvect)._vector, (n), sizeof((mxvect).data[0]))
 #define vector_reserve(mxvect, n)	_vector_reserve(&(mxvect)._vector, (n), sizeof((mxvect).data[0]))
 
-#define vector_append(mxvect, ...) 							\
-	do { 													\
-		const int vector_append_n1 = vector_size(mxvect); 	\
-		vector_resize(mxvect, vector_append_n1 + 1); 		\
-		(mxvect).data[vector_append_n1] = (__VA_ARGS__); 	\
+#define vector_append(mxvect, ...)                                     \
+	do {                                                               \
+		const int mx__n = vector_size(mxvect);                         \
+		vector_resize(mxvect, mx__n + 1);                              \
+		(mxvect).data[mx__n] = (__VA_ARGS__);                          \
 	} while (0)
 
-#define vector_appendn(mxvect, dat, n) 						\
-	do { 													\
-		const int mx__n = (int)(n); 						\
-		const int mx__n1 = vector_size(mxvect) + mx__n; 	\
-		vector_resize(mxvect, mx__n1); 						\
-		memcpy(&(mxvect).data[mx__n1 - mx__n], (dat), mx__n * sizeof((mxvect).data[0])); \
+#define vector_appendn(mxvect, _dat, _n)                               \
+	do {                                                               \
+		const int mx__n = vector_size(mxvect);                         \
+		vector_resize(mxvect, mx__n + (int)_n);                        \
+		for (int mx__i=0; mx__i<(int)_n; ++mx__i)                      \
+			(mxvect).data[mx__n + mx__i] = (_dat)[mx__i];              \
 	} while (0)
 
 #define vector_remove(mxvect, ind, n) _vector_remove(&(mxvect)._vector, (ind), (n), (int)sizeof((mxvect).data[0]))

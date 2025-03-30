@@ -35,9 +35,10 @@ void advan_base_construct(ADVAN* advan, const ADVANFUNCS* advanfuncs)
 		advan->bioavail[i] = 1.;
 
 	/* this allows running without any allocations. TODO: There should be a warning
-	 * if more there an unexpected number of overlapping infusions */
+	 * if more there an unexpected number of overlapping infusions. Right now vector_reserve()
+	 * would assert() */
 //	vector_reserve(advan->infusions, OPENPMX_SIMULINFUSION_MAX);
-	vector_buffer(advan->infusions, advan->_infusions_buffer, OPENPMX_SIMULINFUSION_MAX);
+	vector_init_buffer(advan->infusions, advan->_infusions_buffer, OPENPMX_SIMULINFUSION_MAX);
 }
 
 void advan_base_destruct(ADVAN* advan)

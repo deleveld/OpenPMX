@@ -20,27 +20,24 @@ set -eu
 # control, object, and executable
 FILE="${1}"
 BASE=$(basename "${FILE}")
+
 TEMP=$(mktemp -d)
+trap "rm -rf ${TEMP}" EXIT
+
 OBJFILE="${TEMP}/${BASE}.o"
 EXECFILE="${TEMP}/a.out"
 
-trap "rm -rf ${TEMP}" EXIT
-
-# accept C code directly
-if [ "${FILE##*.}" = "c" ]; then
-	echo "compile \"${FILE}\""
-	${CC} ${CFLAGS} -c "${FILE}" -o "${OBJFILE}"
-
 # translate control file to C code
-else
+if [ "${FILE##*.}" != "c" ]; then
 	"${OPENPMXDIR}/bin/openpmxtran" "${FILE}"
-#	echo "compile \"${FILE}.c\""
-	${CC} ${CFLAGS} -c "${FILE}.c" -o "${OBJFILE}"
 fi
+
+# compile the C code
+(set -x; ${CC} ${CFLAGS} -I${OPENPMXDIR}/include -c "${FILE}.c" -o "${OBJFILE}")
 
 # we have object files, so link now
 # echo "link \"${OBJFILE}\""
-${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXDIR}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm
+(set -x; ${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXDIR}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm)
 
 # execute
 # echo "execute \"${EXECFILE}\""

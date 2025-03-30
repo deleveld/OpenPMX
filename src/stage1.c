@@ -444,7 +444,7 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		forcount(k, nomega)
 			icovsample[(i * 2 + 1) * nomega + k] = stage1_params->testeta[k];
 	}
-
+	
 	/* should we do weighted covariance calculation of the sampled points?
 	 * NO because the lndet_icov does not match the sampling matrix!
 	 * It should be in the documentation that this is the symmetric matrix
@@ -483,14 +483,17 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		let eivar = gsl_vector_get(eval, i);
 
 		/* weighting via SD */
-//		let eisd1 = sqrt(eivar);						/* distance in positive direction */
-//		let eisd2 = sqrt(eivar); 						/* distance in negative direction */
-//		let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
-//		sumlogeval += 2.*log(eiwgtsd);
+		if (0) {
+			let eisd1 = sqrt(eivar);						/* distance in positive direction */
+			let eisd2 = sqrt(eivar); 						/* distance in negative direction */
+			let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
+			sumlogeval += 2.*log(eiwgtsd);
 			
 		/* weighting via variance */
-		let eiwgtvar = (eivar * w1 + eivar * w2) / 2.;	/* average the variances, i.e, two of them weighted by 0.5 */
-		sumlogeval += log(eiwgtvar);
+		} else {
+			let eiwgtvar = (eivar * w1 + eivar * w2) / 2.;	/* average the variances, i.e, two of them weighted by 0.5 */
+			sumlogeval += log(eiwgtvar);
+		}
 	}
 	let icov_lndet = -1. * sumlogeval; /* we get lndet from inverse, so we have -1 here */
 
@@ -643,7 +646,7 @@ void stage1_thread(INDIVID* const individ,
 			warning(0, "icov resample lndet is not finite, ignoring\n");
 	}
 
-	/* We use icov for determining the step size when doing the icov calculation
+		/* We use icov for determining the step size when doing the icov calculation
 	   via gradients in stage1_reducedicov so we cant skip this */
 	let rowcol = nonzero->rowcol;
 	forcount(i, nreta) {

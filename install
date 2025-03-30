@@ -27,11 +27,11 @@ set -eu
 # some will be changed later depending on platform
 CC="gcc"
 LIBNAME="openpmx"
-CFLAGS="-g -O2 -march=native -W -Wall -Wextra -I${OPENPMXDIR}/include"
+CFLAGS="-g -O2 -march=native -W -Wall -Wextra"
 CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -Wwrite-strings -Isrc"
-LFLAGS="-flto -L${OPENPMXDIR}/lib"
+LFLAGS="-flto"
 AR="gcc -shared -o lib/lib${LIBNAME}.so"
-RM="rm -f"
+RM="rm -vf"
 
 # platform specific changes
 # linux 
@@ -40,7 +40,7 @@ if [ "${PLATFORM}" = "Linux" ]; then
 # mingw64 
 elif [[ "${PLATFORM}" =~ MINGW64_NT-* ]]; then
 	CFLAGS="${CFLAGS} -I/mingw64/include"
-	LFLAGS="${LFLAGS} -L/mingw64/lib"
+	LFLAGS="${LFLAGS} -L\"${OPENPMXDIR}/lib\" -L/mingw64/lib"
 	AR="ar rcs lib/lib${LIBNAME}.a"
 fi
 
@@ -75,7 +75,11 @@ SOURCEFILES="openpmx.c
 			bobyqa/bobyqa.c"
 
 echo "OpenPMX: clean"
-${RM} build/* bin/* lib/* openpmx src/openpmx_compile_options.h
+${RM} "${OPENPMXDIR}/build/*"
+${RM} "${OPENPMXDIR}/bin/*"
+${RM} "${OPENPMXDIR}/lib/*"
+${RM} "${OPENPMXDIR}/openpmx"
+${RM} "${OPENPMXDIR}/src/openpmx_compile_options.h"
 if [ "${TARGET}" = "clean" ]; then
 	exit 0
 fi
@@ -85,27 +89,27 @@ if [ "${TARGET}" = "openmp" ]; then
 	echo "OpenPMX build: OpenMP"
 	CFLAGS="${CFLAGS} -fopenmp"
 	LFLAGS="${LFLAGS} -fopenmp -lgomp"
-	echo '#define OPENPMX_PARALLEL_OPENMP' >src/openpmx_compile_options.h
+	echo '#define OPENPMX_PARALLEL_OPENMP' >"${OPENPMXDIR}/src/openpmx_compile_options.h"
 
 # install flag for pthreads target
 elif [ "${TARGET}" = "pthread" ]; then
-	echo "OpenPMX build: pthread"
+	echo "build: pthread"
 	CFLAGS="${CFLAGS} -pthread"
 	LFLAGS="${LFLAGS} -pthread"
-	echo '#define OPENPMX_PARALLEL_PTHREADS' >src/openpmx_compile_options.h
+	echo '#define OPENPMX_PARALLEL_PTHREADS' >"${OPENPMXDIR}/src/openpmx_compile_options.h"
 
 # install flag for sanitize target
 elif [ "${TARGET}" = "sanitize" ]; then
-	echo "OpenPMX build: pthread/sanitize"
+	echo "build: pthread/sanitize"
 	CFLAGS="${CFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
 	LFLAGS="${LFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
-	echo '#define OPENPMX_PARALLEL_PTHREADS' >src/openpmx_compile_options.h
-	echo '#define OPENPMX_SANATIZE' >>src/openpmx_compile_options.h
+	echo '#define OPENPMX_PARALLEL_PTHREADS' >"${OPENPMXDIR}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_SANATIZE' >>"${OPENPMXDIR}/src/openpmx_compile_options.h"
 
 # install flags for single threaded
 elif [ "${TARGET}" = "singlethread" ]; then
-	echo "OpenPMX build: singlethread"
-	echo '#define OPENPMX_PARALLEL_SINGLETHREAD' >src/openpmx_compile_options.h
+	echo "build: singlethread"
+	echo '#define OPENPMX_PARALLEL_SINGLETHREAD' >"${OPENPMXDIR}/src/openpmx_compile_options.h"
 
 # unknown install flag
 else
@@ -114,7 +118,7 @@ else
 fi
 
 # build openpmxtran
-(set -x; ${CC} ${CFLAGS} src/openpmxtran.c -o bin/openpmxtran ${LFLAGS} -lm)
+(cd "${OPENPMXDIR}"; set -x; ${CC} ${CFLAGS} "src/openpmxtran.c" -o "bin/openpmxtran" ${LFLAGS} -lm)
 
 # compile the source files to object files and make library
 OBJECTFILES=
@@ -122,21 +126,21 @@ for FILE in ${SOURCEFILES}
 do
 	BASE=$(basename ${FILE})
 	OBJFILE="${BASE%.*}.o"
-	(set -x; ${CC} ${CFLAGS} ${CLIBFLAGS} -c "src/${FILE}" -o "build/${OBJFILE}")
+	(cd "${OPENPMXDIR}"; set -x; ${CC} ${CFLAGS} ${CLIBFLAGS} -Iinclude -c "src/${FILE}" -o "build/${OBJFILE}")
 	OBJECTFILES="${OBJECTFILES} build/${OBJFILE}"
 done
-(set -x; ${AR} ${OBJECTFILES})
+(cd "${OPENPMXDIR}"; set -x; ${AR} ${OBJECTFILES})
 
 # write the build script with the correct path
-echo "#!/bin/sh"					>openpmx
-echo "########################################################################"	>>openpmx
-echo "# OpenPMX build options"		>>openpmx
-echo "CC=${CC}"						>>openpmx
-echo "CFLAGS=\"${CFLAGS}\""			>>openpmx
-echo "LFLAGS=\"${LFLAGS}\""			>>openpmx
-echo "OPENPMXDIR=\"${OPENPMXDIR}\""	>>openpmx
-echo ""								>>openpmx
-cat src/_openpmx_template			>>openpmx
-chmod a+x openpmx
+echo "#!/bin/sh"							>"${OPENPMXDIR}/openpmx"
+echo "########################################################################"	>>"${OPENPMXDIR}/openpmx"
+echo "# OpenPMX build options"				>>"${OPENPMXDIR}/openpmx"
+echo "CC=${CC}"								>>"${OPENPMXDIR}/openpmx"
+echo "CFLAGS=\"${CFLAGS}\""					>>"${OPENPMXDIR}/openpmx"
+echo "LFLAGS=\"${LFLAGS}\""					>>"${OPENPMXDIR}/openpmx"
+echo "OPENPMXDIR=\"${OPENPMXDIR}\""			>>"${OPENPMXDIR}/openpmx"
+echo ""										>>"${OPENPMXDIR}/openpmx"
+cat "${OPENPMXDIR}/src/_openpmx_template"	>>"${OPENPMXDIR}/openpmx"
+chmod a+x "${OPENPMXDIR}/openpmx"
 
 echo "OpenPMX installed to \"${OPENPMXDIR}\""
