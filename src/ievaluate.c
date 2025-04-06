@@ -250,7 +250,8 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	let popparam = &ievaluate_args->popparam;
 	let logstream = ievaluate_args->logstream;
 
-	char advan_memory[advanfuncs->advan_size];
+	char advan_memory[advanfuncs->advan_size + 1000];
+	memset(advan_memory, 0, advanfuncs->advan_size + 1000);
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
@@ -271,69 +272,42 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	forcount(i, nrecord) {
 		let evid = RECORDINFO_EVID(recordinfo, ptr);
 		let time = RECORDINFO_TIME(recordinfo, ptr);
-
 		let dv = RECORDINFO_DV(recordinfo, ptr);
-		if (evid == 0 && !isfinite(dv))
-			fatal(logstream, "DV is not finite for observation (EVID 0) for ID %f time %f record %i\n", id, time, i);
 
 		/* time must increase except for reset events */
 		if (time < lasttime && evid != 3 && evid != 4)
 			fatal(logstream, "time not monotonic for ID %f time %f record %i previous %f\n", id, time, i, lasttime);
 		lasttime = time;
 
-		/* compartment must be within the number of states */
-		let cmt = RECORDINFO_CMT(recordinfo, ptr);
-		if (cmt < 0 || cmt >= advanfuncs->nstate)
-			fatal(logstream, "CMT (%.16e) not within number of states (%i) for ID %f time %f record %i\n", cmt, id, time, i, advanfuncs->nstate);
-
 		/* state should not be accessed outside of its limits */
 		for (int j=advanfuncs->nstate; j<OPENPMX_STATE_MAX; j++)
 			advan->state[j] = NAN;
 
-		/* advance to the record time */
-		let predictstate = advan_advance(advan, imodel, ptr, popparam);
-
-		/* state always should remain finite */
-		if (assure_state_finite(advan->state, advanfuncs->nstate) == 0) {
-			forcount(j, advanfuncs->nstate)
-				warning(logstream, "compartment %i state %.16e finite %i\n", j, advan->state[j], isfinite(advan->state[j]));
-			fatal(logstream, "non-finite state for ID %f time %f record %i\n", id, time, i);
-		}
-
-		var yhat = 0.;
-		if (evid == 0 || predictall)
-			yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
-
+		/* check record before advance */
 		/* observations */
 		if (evid == 0) {
 
-			/* predictions for observations should be finite */
-			if (isfinite(yhat) != 1)
-				fatal(logstream, "non-finite YHAT for ID %f time %f record %i\n", id, time, i);
-
-			/* prediction variance of observations should be finite and positive */
-			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
-			if (isfinite(yhatvar) != 1)
-				fatal(logstream, "non-finite YHATVAR for ID %f time %f record %i\n", id, time, i);
-
-			/* predictions with zero error are an error */
-			if (evid == 0 && yhatvar == 0.)
-				fatal(logstream, "zero YHATVAR for ID %f time %f record %i\n", id, time, i);
-
 			/* observation should be finite */
-			if (isfinite(dv) != 1)
-				fatal(logstream, "non-finite DV for ID %f time %f record %i\n", id, time, i);
+			if (!isfinite(dv))
+				fatal(logstream, "DV is not finite for observation for ID %f time %f record %i\n", id, time, i);
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
-			if (isfinite(amt) == 1 && amt != 0.)
+			if (isfinite(amt) && amt != 0.)
 				warning(logstream, "AMT is non-zero (%.16e) for observation event ID %f time %f record %i\n", amt, id, time, i);
 
 			let rate = RECORDINFO_RATE(recordinfo, ptr);
-			if (isfinite(rate) == 1 && rate != 0.)
+			if (isfinite(rate) && rate != 0.)
 				warning(logstream, "RATE is non-zero (%.16e) for observation event ID %f time %f record %i\n", rate, id, time, i);
 
 		/* dose or reset-and-dose event */
 		} else if (evid == 1 || evid == 4) {
+
+			/* compartment must be within the number of states */
+			let cmt = RECORDINFO_CMT_0offset(recordinfo, ptr);
+			if (cmt < 0 || cmt >= advanfuncs->nstate) {
+				let _cmt = RECORDINFO_CMT(recordinfo, ptr);
+				fatal(logstream, "CMT (%i) not within number of states (%i) for ID %f time %f record %i\n", _cmt, advanfuncs->nstate, id, time, i);
+			}
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
 			if (!isfinite(amt))
@@ -344,9 +318,9 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			if (rate < 0.)
 				fatal(logstream, "ID %f record %i: RATE less than zero\n", id, i);
 
-			if (isfinite(amt) != 1 || amt == 0.)
+			if (!isfinite(amt)|| amt == 0.)
 				warning(logstream, "AMT is missing (%.16e) assumed 0 for dose event ID %f time %f record %i\n", amt, id, time, i);
-			if (isfinite(rate) != 1)
+			if (!isfinite(rate))
 				warning(logstream, "RATE is missing (%.16e) assumed 0 for dose event ID %f time %f record %i\n", rate, id, time, i);
 
 			if (isfinite(dv) == 1 && dv != 0.)
@@ -356,20 +330,59 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		} else if (evid == 3) {
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
-			if (isfinite(amt) == 1 && amt != 0.)
+			if (isfinite(amt) && amt != 0.)
 				warning(logstream, "AMT is non-zero (%.16e) for reset event ID %f time %f record %i\n", amt, id, time, i);
 
 			let rate = RECORDINFO_RATE(recordinfo, ptr);
-			if (isfinite(rate) == 1 && rate != 0.)
+			if (isfinite(rate) && rate != 0.)
 				warning(logstream, "RATE is non-zero (%.16e) for reset event ID %f time %f record %i\n", rate, id, time, i);
 
-			if (isfinite(dv) == 1 && dv != 0.)
+			if (isfinite(dv) && dv != 0.)
 				warning(logstream, "non-zero DV (%.16e) for reset event ID %f time %f record %i\n", dv, id, time, i);
 
 		/* other event type */
 		} else {
-			if (isfinite(dv) == 1 && dv != 0.)
+			if (!isfinite(dv) && dv != 0.)
 				warning(logstream, "non-zero DV (%.16e) for non-observation for ID %f time %f record %i\n", dv, id, time, i);
+		}
+
+		/* state always should remain finite */
+		if (assure_state_finite(advan->state, advanfuncs->nstate) == 0) {
+			forcount(j, advanfuncs->nstate)
+				warning(logstream, "compartment %i state %.16e finite %i\n", j, advan->state[j], isfinite(advan->state[j]));
+			fatal(logstream, "non-finite state for ID %f time %f record %i, before advance\n", id, time, i);
+		}
+
+		/* advance to the record time */
+		let predictstate = advan_advance(advan, imodel, ptr, popparam);
+
+		/* state always should remain finite */
+		if (assure_state_finite(advan->state, advanfuncs->nstate) == 0) {
+			forcount(j, advanfuncs->nstate)
+				warning(logstream, "compartment %i state %.16e finite %i\n", j, advan->state[j], isfinite(advan->state[j]));
+			fatal(logstream, "non-finite state for ID %f time %f record %i, after advance\n", id, time, i);
+		}
+
+		var yhat = 0.;
+		if (evid == 0 || predictall)
+			yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
+
+		/* check record after advance */
+		/* observations */
+		if (evid == 0) {
+
+			/* predictions for observations should be finite */
+			if (!isfinite(yhat))
+				fatal(logstream, "non-finite YHAT for ID %f time %f record %i\n", id, time, i);
+
+			/* prediction variance of observations should be finite and positive */
+			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
+			if (!isfinite(yhatvar))
+				fatal(logstream, "non-finite YHATVAR for ID %f time %f record %i\n", id, time, i);
+
+			/* predictions with zero error are an error */
+			if (evid == 0 && yhatvar == 0.)
+				fatal(logstream, "zero YHATVAR for ID %f time %f record %i\n", id, time, i);
 		}
 
 		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);

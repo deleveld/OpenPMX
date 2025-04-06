@@ -101,7 +101,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	if (evid == 1 || evid == 4) {
 		let amt = RECORDINFO_AMT(recordinfo, record);
 		if (amt > 0.) {
-			let cmt = RECORDINFO_CMT(recordinfo, record);
+			let cmt = RECORDINFO_CMT_0offset(recordinfo, record);
 			let lagtime = advan->amtlag[cmt];
 			let start = RECORDINFO_TIME(recordinfo, record) + lagtime;
 			let rate = RECORDINFO_RATE(recordinfo, record);
@@ -266,6 +266,7 @@ void pmx_advan_state_init(const ADVANSTATE* const advanstate, const int cmt, con
 {
 	var advan = advanstate->advan;
 	if (advan->initcount == 0) {
+		printf("advan initcount %i time %f\n", advan->initcount, advan->time);
 		let advanfuncs = advan->advanfuncs;
 		let nstate = advanfuncs->nstate;
 		assert(cmt < nstate);

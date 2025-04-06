@@ -52,12 +52,10 @@ static void advancer_diffeqn_libgsl_info(const struct ADVANFUNCS* const advanfun
 {
 	let libgsl = (const ADVANTABLE_LIBGSL*)advanfuncs;
 
-	fprintf(f, "advan model: GNU Scientific Library ODE\n");
-	fprintf(f, "advan stepper: %s\n", libgsl->steptype_name);
-	fprintf(f, "advan nstate: %i\n", advanfuncs->nstate);
-	fprintf(f, "advan abstol: %g\n", libgsl->abstol);
-	fprintf(f, "advan reltol: %g\n", libgsl->reltol);
-	fprintf(f, "advan hstart: %g\n", libgsl->hstart);
+	fprintf(f, "advan model GNU Scientific Library ODE\n");
+	fprintf(f, "advan stepper %s\n", libgsl->steptype_name);
+	fprintf(f, "advan nstate %i\n", advanfuncs->nstate);
+	fprintf(f, "advan abstol %g reltol %g hstart %g\n", libgsl->abstol, libgsl->reltol, libgsl->hstart);
 }
 
 __attribute__ ((hot))

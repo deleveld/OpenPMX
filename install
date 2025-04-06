@@ -26,13 +26,15 @@ set -eu
 # general build flags are for Linux
 # some will be changed later depending on platform
 CC="gcc"
+RM="rm -vf"
 LIBNAME="openpmx"
 CFLAGS="-g -O2 -march=native -W -Wall -Wextra"
 CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -Wwrite-strings -Isrc"
-LFLAGS="-flto -static"
-###AR="gcc -shared -o lib/lib${LIBNAME}.so"
-AR="ar rcs lib/lib${LIBNAME}.a"
-RM="rm -vf"
+
+AR="gcc -shared -o lib/lib${LIBNAME}.so"
+LFLAGS="-flto"
+###AR="ar rcs lib/lib${LIBNAME}.a"
+###LFLAGS="-flto -static"
 
 # platform specific changes
 # linux 

@@ -42,9 +42,9 @@ static inline double get_hstep(const struct ADVANCONFIG* const advanconfig)
 
 static void advancer_diffeqn_info(const struct ADVANFUNCS* const advanfuncs, FILE* f)
 {
-	fprintf(f, "advan model: DES RK4 test solver\n");
-	fprintf(f, "advan nstate: %i\n", advanfuncs->nstate);
-	fprintf(f, "advan hstep: %g\n", get_hstep(advanfuncs->advanconfig));
+	fprintf(f, "advan model DES RK4 test solver\n");
+	fprintf(f, "advan nstate %i\n", advanfuncs->nstate);
+	fprintf(f, "advan hstep %g\n", get_hstep(advanfuncs->advanconfig));
 }
 
 __attribute__ ((hot))

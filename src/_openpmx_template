@@ -30,10 +30,11 @@ EXECFILE="${TEMP}/a.out"
 # translate control file to C code
 if [ "${FILE##*.}" != "c" ]; then
 	"${OPENPMXDIR}/bin/openpmxtran" "${FILE}"
+	FILE="${FILE}.c"
 fi
 
 # compile the C code
-(set -x; ${CC} ${CFLAGS} -I${OPENPMXDIR}/include -c "${FILE}.c" -o "${OBJFILE}")
+(set -x; ${CC} ${CFLAGS} -I${OPENPMXDIR}/include -c "${FILE}" -o "${OBJFILE}")
 
 # we have object files, so link now
 # echo "link \"${OBJFILE}\""
@@ -42,7 +43,7 @@ fi
 # execute
 # echo "execute \"${EXECFILE}\""
 if [ -f "${EXECFILE}" ]; then
-###	env LD_LIBRARY_PATH=${OPENPMXDIR}/lib:${LD_LIBRARY_PATH:-} "${EXECFILE}"
-	"${EXECFILE}"
+	env LD_LIBRARY_PATH=${OPENPMXDIR}/lib:${LD_LIBRARY_PATH:-} "${EXECFILE}"
+###	"${EXECFILE}"
 fi
 

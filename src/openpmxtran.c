@@ -1188,7 +1188,7 @@ char openpmxtran_template[] =
 "{\n"
 "	/* do any preprocessing defined in the $DATA code */\n"
 "	openpmxtran_data_preprocess();\n"
-"//	feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);\n"
+"	feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);\n"
 "\n"
 "/* begin OPENPMXTRAN_MAIN_CODE */\n"
 "${OPENPMXTRAN_MAIN_CODE}\n"

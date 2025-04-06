@@ -724,9 +724,8 @@ static void outfile_header(FILE* f2,
 	info(f2, "config %s %i\n", message, options->nthread);
 	info(f2, "config table offset %s\n", options->_offset1 ? "true" : "false");
 
-	info(f2, "data records %i used %i total %i removed\n", idata->ndata, advanfuncs->recordinfo.dataconfig->nrecords, advanfuncs->recordinfo.dataconfig->nrecords - idata->ndata);
-	info(f2, "data individuals %i\n", idata->nindivid);
-	info(f2, "data observations %i\n", idata->nobs);
+	info(f2, "data records %i used %i removed %i\n", advanfuncs->recordinfo.dataconfig->nrecords, idata->ndata, advanfuncs->recordinfo.dataconfig->nrecords - idata->ndata);
+	info(f2, "data individuals %i observations %i\n", idata->nindivid, idata->nobs);
 
 	advanfuncs->info(advanfuncs, stdout);
 	if (f2)
