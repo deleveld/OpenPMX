@@ -34,11 +34,11 @@ if [ "${FILE##*.}" != "c" ]; then
 fi
 
 # compile the C code
-(set -x; ${CC} ${CFLAGS} -I${OPENPMXDIR}/include -c "${FILE}" -o "${OBJFILE}")
+(${CC} ${CFLAGS} -I${OPENPMXDIR}/include -c "${FILE}" -o "${OBJFILE}")
 
 # we have object files, so link now
 # echo "link \"${OBJFILE}\""
-(set -x; ${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXDIR}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm)
+(${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXDIR}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm)
 
 # execute
 # echo "execute \"${EXECFILE}\""
