@@ -118,8 +118,8 @@ static double sample_min2ll_from_inverse(const double* const data,
 
 /* functions for Bae and Yim objective function Term 3 */
 static double sample_min2ll(const int nreta,
-					 const double reta[static nreta],
-					 const NONZERO* const nonzero)
+							const double reta[static nreta],
+							const NONZERO* const nonzero)
 {
 	assert(nreta == nonzero->n);
 	var term3 = 0.;
@@ -169,18 +169,14 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 	/* functions for Bae and Yim objective function Term 1 and Term 2 */
 	struct timespec t3;
 	clock_gettime(CLOCK_REALTIME, &t3);
-	double objfn_term1 = 0.;
-	double objfn_term2 = 0.;
-	individual_fasteval(ievaluate_args,
-						&objfn_term1, /* obs_lndet */
-						&objfn_term2); /* obs_min2ll */
+	let objfn_term1_term2 = individual_fasteval(ievaluate_args);
 	timespec_duration(&t3, stage1_params->eval_msec);
 	*(stage1_params->nfunc) += 1;
 
 	/* functions for Bae and Yim objective function Term 3 */
 	var term3 = sample_min2ll(nreta, reta, stage1_params->nonzero);
 
-	let iobjfn = objfn_term1 + objfn_term2 + term3;
+	let iobjfn = objfn_term1_term2 + term3;
 	return iobjfn;
 }
 
@@ -483,7 +479,7 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		let eivar = gsl_vector_get(eval, i);
 
 		/* weighting via SD */
-		if (0) {
+		if (1) {
 			let eisd1 = sqrt(eivar);						/* distance in positive direction */
 			let eisd2 = sqrt(eivar); 						/* distance in negative direction */
 			let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */

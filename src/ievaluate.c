@@ -75,9 +75,11 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
 			errarray[j] = below;
 			let ya2 = evaluate_yhat(imodel, predictstate, popparam, predict, errarray, predictvars);
 
+			/* preserve zero errarray across function calls so we dont have
+			 * to zero the entire errarray each time we call this */
 			errarray[j] = 0;
+			
 			var deriv = (ya1 - ya2) / (above - below);
-
 			yhatvar += (deriv*deriv) * sigma[j];
 		}
 	}
@@ -99,12 +101,11 @@ typedef struct {
 	double _imodel[OPENPMX_IMODEL_MAX];				/* will be cast to IMODEL */
 } ADVAN_MODEL_MEMORY;
 
+/* functions for Bae and Yim objective function Term 1 and Term 2 */
 /* This is the core function evaluating an individual predictions to calculate
  * the objective function. Speeding up this function is quite important. */
  __attribute__ ((hot))
-void individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args,
-						 double* const obs_lndet,
-						 double* const obs_min2ll)
+double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 {
 	let advanfuncs = ievaluate_args->advanfuncs;
 	let record = ievaluate_args->record;
@@ -124,8 +125,8 @@ void individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args,
 	let predict = advanconfig->predict;
 	let recordinfo = &advanfuncs->recordinfo;
 	let recordsize = recordinfo->dataconfig->recordfields.size;
-	var local_obs_min2ll = 0.;
-	var local_obs_lndet = 0.;
+	var obs_min2ll = 0.; /* separate sums to avoid loss of precision if magnitudes differ strongly */
+	var obs_lndet = 0.;
 	const RECORD* ptr = record;
 	forcount(i, nrecord) {
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
@@ -136,16 +137,16 @@ void individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args,
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 
 			let err = dv - yhat;
-			local_obs_min2ll += (err * err) / yhatvar;
+			obs_min2ll += (err * err) / yhatvar;
 
-			local_obs_lndet += log(yhatvar);
+			obs_lndet += log(yhatvar);
 		}
 		ptr = RECORD_INDEX(ptr, recordsize, 1);	
 	}
-	*obs_min2ll = local_obs_min2ll;
-	*obs_lndet = local_obs_lndet;
-		
+
 	advanfuncs->destruct(advan);
+
+	return obs_min2ll + obs_lndet;
 }
 
 /* This is a core function evaluating an individual by advancing over
@@ -215,7 +216,9 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 			if (YHATVAR)
 				YHATVAR[i] = yhatvar;
 
-			/* we dont really need to have the if here but its probably faster if its in */
+			/* we dont really need to have the check here if we are saving
+			 * the obs_min2ll or obs_lndet or not. It seems reasonable to think
+			 * that its faster not to calculate it if we dont need it */
 			let dv = RECORDINFO_DV(recordinfo, ptr);
 			if (obs_min2ll) {
 				let err = dv - yhat;
@@ -227,8 +230,8 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 				local_obs_lndet += lndet_term;
 			}
 		} else {
-			/* yhatvar must be set to zero for non-observations since these will be used to calculate the
-			 * individual covariance matrix */
+			/* yhatvar must be set to zero for non-observations since these
+			 * will be used to calculate the individual covariance matrix */
 			if (YHATVAR)
 				YHATVAR[i] = 0.;
 		}

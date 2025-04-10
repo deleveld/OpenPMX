@@ -18,7 +18,7 @@
 
 # default target is pthreads
 TARGET="${1:-pthread}"
-OPENPMXDIR=$(cd `dirname $0` && pwd)
+OPENPMXDIR=$(cd `dirname ${0}` && pwd)
 PLATFORM="$(uname -s)"
 
 set -eu
@@ -78,9 +78,9 @@ SOURCEFILES="openpmx.c
 			bobyqa/bobyqa.c"
 
 echo "OpenPMX: clean"
-${RM} "${OPENPMXDIR}/build/*"
-${RM} "${OPENPMXDIR}/bin/*"
-${RM} "${OPENPMXDIR}/lib/*"
+${RM} "${OPENPMXDIR}"/build/*
+${RM} "${OPENPMXDIR}"/bin/*
+${RM} "${OPENPMXDIR}"/lib/*
 ${RM} "${OPENPMXDIR}/openpmx"
 ${RM} "${OPENPMXDIR}/src/openpmx_compile_options.h"
 if [ "${TARGET}" = "clean" ]; then

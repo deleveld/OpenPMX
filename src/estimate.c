@@ -548,8 +548,8 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 	return done;
 }
 
+#if 0
 #include <gsl/gsl_spline.h>
-
 static void evaluate_gradient(STAGE2_PARAMS* params)
 {
 	/* http://www.holoborodko.com/pavel/numerical-methods/numerical-derivative/smooth-low-noise-differentiators/#noiserobust_2 */
@@ -643,6 +643,7 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 	
 	params->best.result.nfunc = params->nfunc;
 }
+#endif
 	
 static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 {

@@ -37,9 +37,7 @@ typedef struct {
 	FILE* logstream;
 } IEVALUATE_ARGS;
 
-void individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args,
-						 double* const obs_lndet,
-						 double* const obs_min2ll);
+double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args);
 void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 						 IMODEL* const imodel_saved,
 						 PREDICTVARS* const predictvars_saved,
