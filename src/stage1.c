@@ -146,7 +146,7 @@ static double sample_min2ll(const int nreta,
 typedef struct {
 	double* const testeta;
 	const NONZERO* const nonzero;
-	int* const nfunc;
+	int* const ineval;
 	const STAGE1CONFIG* const stage1;
 	const IEVALUATE_ARGS ievaluate_args;
 	double* const eval_msec;
@@ -171,7 +171,7 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 	clock_gettime(CLOCK_REALTIME, &t3);
 	let objfn_term1_term2 = individual_fasteval(ievaluate_args);
 	timespec_duration(&t3, stage1_params->eval_msec);
-	*(stage1_params->nfunc) += 1;
+	*(stage1_params->ineval) += 1;
 
 	/* functions for Bae and Yim objective function Term 3 */
 	var term3 = sample_min2ll(nreta, reta, stage1_params->nonzero);
@@ -326,7 +326,7 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 							f_plus_h, yhatvar_plus_h,	/* we need output */
 							0, 0);			/* dont need to calculate objfn */
 		timespec_duration(&t3, eval_msec);
-		*(params->nfunc) += 1;
+		*(params->ineval) += 1;
 
 		/* step eta backward */
 		let below = v - step;
@@ -340,7 +340,7 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 							f_minus_h, yhatvar_minus_h,	/* we need output */
 							0, 0);			/* dont need to calculate objfn */
 		timespec_duration(&t3, eval_msec);
-		*(params->nfunc) += 1;
+		*(params->ineval) += 1;
 
 		/* calculate derivatives, scaling by yhatvar */
 		const RECORD* ptr = record;
@@ -527,18 +527,18 @@ void stage1_thread(INDIVID* const individ,
 	individ->eta_min2ll = 0.;
 	individ->icov_lndet = 0.;
 	individ->iobjfn = DBL_MAX;
-	individ->stage1_nfunc = 0;
+	individ->ineval = 0;
 
 	/* do the evaluation in a test eta and copy back at the end */
 	/* this has to be done because we may unreduce the eta and there we
 		assume that it is OPENPMX_OMEGA_MAX wide, whereas in the INDIVID
 		it is only nomega wide. We just have to copy back and forth. */
-	int nfunc = 0;
+	int ineval = 0;
 	double testeta[OPENPMX_OMEGA_MAX] = { 0 };
 	let stage1_params = (const STAGE1_PARAMS) {
 		.testeta = testeta,
 		.nonzero = nonzero,
-		.nfunc = &nfunc,
+		.ineval = &ineval,
 		.stage1 = &options->estimate.stage1,
 		.ievaluate_args = {
 			.record = individ->record,
@@ -593,7 +593,7 @@ void stage1_thread(INDIVID* const individ,
 	timespec_duration(&t3, &individ->eval_msec);
 	individ->obs_min2ll = obs_min2ll;
 	individ->obs_lndet = obs_lndet;
-	++nfunc;
+	++ineval;
 
 	/* we cant do covariance matrix if we have no etas or observations */
 	if (nreta == 0 || individ->nobs == 0)
@@ -656,7 +656,8 @@ void stage1_thread(INDIVID* const individ,
 
 	gsl_matrix_free(reducedicov);
 
-	individ->stage1_nfunc = nfunc;
+	individ->ineval += ineval; /* set to zero at start of function */
+	individ->neval += ineval;
 	timespec_duration(&t1, &individ->stage1_msec);
 }
 

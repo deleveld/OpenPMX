@@ -73,11 +73,10 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 		/* initialise INDIVID for each individual. We have to do this in place
 		 * and then copy over for the const values, otherwise we are copy over a
 		 * read-only location. This is explicitly allowed in C to write over
-		 * const struct members if the memory has been mallocd. */
+		 * const struct members if the memory has been malloced. */
 		var temp = (INDIVID) {
 			.ID = thisid,
 			.record = RECORDINFO_INDEX(recordinfo, data, i),
-			.beginindex = i,
 			.nrecord = nrecord,
 			.nobs = nobsi,
 
@@ -102,7 +101,8 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 
 			.eval_msec = 1. + nrecord,		/* first guess as to evaluation time is the number of records */
 			.stage1_msec = 1. + nrecord,
-			.stage1_nfunc = 0,
+			.ineval = 0,
+			.neval = 0,
 		};
 		var iptr = &individ[n];
 		memcpy(iptr, &temp, sizeof(temp));
@@ -237,8 +237,9 @@ void table_phi_idata(const char* filename,
 	}
 	fprintf(f, OPENPMX_HEADER_FORMAT, "OBJ");
 	fprintf(f, OPENPMX_HEADER_FORMAT, "TEVAL");
-	fprintf(f, OPENPMX_HEADER_FORMAT, "TSTAGE1");
-	fprintf(f, OPENPMX_SFORMAT, "NFUNCSTAGE1");
+	fprintf(f, OPENPMX_HEADER_FORMAT, "ITEVAL");
+	fprintf(f, OPENPMX_SFORMAT, "INEVAL");
+	fprintf(f, OPENPMX_SFORMAT, "NEVAL");
 	fprintf(f, "\n");
 
 	forcount(k, idata->nindivid) {
@@ -266,10 +267,12 @@ void table_phi_idata(const char* filename,
 
 		let teval = individ->eval_msec;
 		let tstage1 = individ->stage1_msec;
-		let istage1 = individ->stage1_nfunc;
+		let ineval = individ->ineval;
+		let neval = individ->neval;
 		fprintf(f, OPENPMX_TABLE_FORMAT, teval);
 		fprintf(f, OPENPMX_TABLE_FORMAT, tstage1);
-		fprintf(f, OPENPMX_IFORMAT, istage1);
+		fprintf(f, OPENPMX_IFORMAT, ineval);
+		fprintf(f, OPENPMX_IFORMAT, neval);
 
 		fprintf(f, "\n");
 	}

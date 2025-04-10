@@ -80,7 +80,7 @@ ADVANFUNCS* pmx_advan_pred(const DATACONFIG* const dataconfig, const ADVANCONFIG
 
 		.advanconfig = advanconfig,
 		.recordinfo = recordinfo_init(dataconfig),
-		.nstate = 1,
+		.nstate = 0,
 	};
 
 	/* make binary copy so init can have const members */

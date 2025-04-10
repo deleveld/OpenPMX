@@ -111,12 +111,12 @@ static inline int RECORDINFO_CMT_0offset(const RECORDINFO* const recordinfo, con
 	return (recordinfo->_offset1) ? (ret - 1) : ret;
 }
 
-static inline int RECORDINFO_CMT(const RECORDINFO* const recordinfo, const RECORD* p)
+static inline double RECORDINFO_CMT(const RECORDINFO* const recordinfo, const RECORD* p)
 {
 	if (recordinfo->offsetCMT == -1)
 		return 0.;
 
-	return (int)(*(const double*)((const char*)p + recordinfo->offsetCMT));
+	return *(const double*)((const char*)p + recordinfo->offsetCMT);
 }
 
 static inline const RECORD* RECORDINFO_INDEX(const RECORDINFO* const recordinfo, const RECORD* p, const int i)

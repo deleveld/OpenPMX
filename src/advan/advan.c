@@ -66,6 +66,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	let advanconfig = advanfuncs->advanconfig;
 	let recordinfo = &advanfuncs->recordinfo;
 	var state = advan->state;
+	let nstate = advanfuncs->nstate;
 
 	/* reset the state on first start or on EVID==3 or EVID==4 events */
 	let evid = RECORDINFO_EVID(recordinfo, record);
@@ -77,8 +78,8 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			 * time we called. This seems to be somewhat elegant in the user code.
 			 * Since the model retains values from the previous record. 
 			 * memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size); */
- 
-			memset(state, 0, OPENPMX_STATE_MAX * sizeof(double));
+			if (nstate)
+				memset(state, 0, nstate * sizeof(double));
 			advan->time = RECORDINFO_TIME(recordinfo, record);
 			vector_resize(advan->infusions, 0);
 
@@ -266,7 +267,6 @@ void pmx_advan_state_init(const ADVANSTATE* const advanstate, const int cmt, con
 {
 	var advan = advanstate->advan;
 	if (advan->initcount == 0) {
-		printf("advan initcount %i time %f\n", advan->initcount, advan->time);
 		let advanfuncs = advan->advanfuncs;
 		let nstate = advanfuncs->nstate;
 		assert(cmt < nstate);

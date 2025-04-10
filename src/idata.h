@@ -28,7 +28,6 @@ extern "C" {
 typedef struct {
 	const double ID;
 	const RECORD* const record;	/* view into data in RECORDINFO */
-	const int beginindex;
 	const int nrecord;
 	const int nobs;
 
@@ -54,7 +53,8 @@ typedef struct {
 	/* execution time */
 	double eval_msec;
 	double stage1_msec;
-	int stage1_nfunc;
+	int ineval;
+	int neval;
 } INDIVID;
 
 typedef struct {

@@ -261,6 +261,7 @@ static int table_row(TABLE* const table)
 static double table_value(const TABLE* const table, const char* const name, const bool _offset1)
 {
 	let idata = table->idata;
+	let individ = &idata->individ[table->individ];
 	let advanfuncs = table->advanfuncs;
 
 	let recordinfo = &advanfuncs->recordinfo;
@@ -289,6 +290,12 @@ static double table_value(const TABLE* const table, const char* const name, cons
 		return table->pred;
 	if (strcmp(name, "OBJ") == 0)
 		return table->obj;
+	if (strcmp(name, "ineval") == 0 ||
+		strcmp(name, "INEVAL") == 0)
+		return individ->ineval;
+	if (strcmp(name, "neval") == 0 ||
+		strcmp(name, "NEVAL") == 0)
+		return individ->neval;
 	if (strcmp(name, "cwres") == 0 ||
 		strcmp(name, "CWRES") == 0) {
 		let dv = RECORDINFO_DV(recordinfo, table->record);
