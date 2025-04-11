@@ -67,7 +67,6 @@ static void idata_predict_yhat_thread(INDIVID* const individ,
 						0, 						/* dont write yhatvar */
 						0, 0);
 	individ->ineval += 1;
-	individ->neval += 1;
 	timespec_duration(&t3, &individ->eval_msec);
 }
 
@@ -106,7 +105,6 @@ static void idata_predict_pred_thread(INDIVID* const individ,
 						0, 				/* dont write yhatvar */
 						0, 0);
 	individ->ineval += 1;
-	individ->neval += 1;
 	timespec_duration(&t3, &individ->eval_msec);
 }
 

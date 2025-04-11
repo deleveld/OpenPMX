@@ -102,7 +102,6 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 			.eval_msec = 1. + nrecord,		/* first guess as to evaluation time is the number of records */
 			.stage1_msec = 1. + nrecord,
 			.ineval = 0,
-			.neval = 0,
 		};
 		var iptr = &individ[n];
 		memcpy(iptr, &temp, sizeof(temp));
@@ -144,6 +143,16 @@ void idata_destruct(IDATA* const idata)
 
 	/* now we can delete the individ array */
 	free(idata->individ);
+}
+
+int idata_ineval(const IDATA* const idata)
+{
+	int ineval = 0;
+	forcount(i, idata->nindivid) {
+		let individ = &idata->individ[i];
+		ineval += individ->ineval;
+	}
+	return ineval;
 }
 
 double* idata_alloc_simerr(const IDATA* const idata)
@@ -236,10 +245,10 @@ void table_phi_idata(const char* filename,
 		}
 	}
 	fprintf(f, OPENPMX_HEADER_FORMAT, "OBJ");
+	
 	fprintf(f, OPENPMX_HEADER_FORMAT, "TEVAL");
-	fprintf(f, OPENPMX_HEADER_FORMAT, "ITEVAL");
+	fprintf(f, OPENPMX_HEADER_FORMAT, "TSTAGE1");
 	fprintf(f, OPENPMX_SFORMAT, "INEVAL");
-	fprintf(f, OPENPMX_SFORMAT, "NEVAL");
 	fprintf(f, "\n");
 
 	forcount(k, idata->nindivid) {
@@ -268,11 +277,9 @@ void table_phi_idata(const char* filename,
 		let teval = individ->eval_msec;
 		let tstage1 = individ->stage1_msec;
 		let ineval = individ->ineval;
-		let neval = individ->neval;
 		fprintf(f, OPENPMX_TABLE_FORMAT, teval);
 		fprintf(f, OPENPMX_TABLE_FORMAT, tstage1);
 		fprintf(f, OPENPMX_IFORMAT, ineval);
-		fprintf(f, OPENPMX_IFORMAT, neval);
 
 		fprintf(f, "\n");
 	}

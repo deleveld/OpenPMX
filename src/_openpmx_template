@@ -29,21 +29,29 @@ EXECFILE="${TEMP}/a.out"
 
 # translate control file to C code
 if [ "${FILE##*.}" != "c" ]; then
-	"${OPENPMXDIR}/bin/openpmxtran" "${FILE}"
+	"${OPENPMXPATH}/bin/openpmxtran" "${FILE}"
 	FILE="${FILE}.c"
 fi
 
 # compile the C code
-(${CC} ${CFLAGS} -I${OPENPMXDIR}/include -c "${FILE}" -o "${OBJFILE}")
+(${CC} ${CFLAGS} -I${OPENPMXPATH}/include -c "${FILE}" -o "${OBJFILE}")
 
 # we have object files, so link now
 # echo "link \"${OBJFILE}\""
-(${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXDIR}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm)
+(${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm)
 
 # execute
 # echo "execute \"${EXECFILE}\""
 if [ -f "${EXECFILE}" ]; then
-	env LD_LIBRARY_PATH=${OPENPMXDIR}/lib:${LD_LIBRARY_PATH:-} "${EXECFILE}"
-###	"${EXECFILE}"
+	if [ "${LIBTYPE}" = "shared" ]; then
+		env LD_LIBRARY_PATH=${OPENPMXPATH}/lib:${LD_LIBRARY_PATH:-} "${EXECFILE}"
+	elif [ "${LIBTYPE}" = "static" ]; then
+		"${EXECFILE}"
+	else
+		echo "error: \"${LIBTYPE}\" must be static or shared"
+		exit 1
+	fi
+else
+	echo "error: no executable, something failed"
 fi
 

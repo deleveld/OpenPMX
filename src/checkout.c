@@ -54,7 +54,6 @@ static void idata_checkout_thread(INDIVID* const individ,
 	individual_checkout(&ievaluate_args);
 
 	individ->ineval += 1;
-	individ->neval += 1;
 	timespec_duration(&t3, &individ->eval_msec);
 }
 

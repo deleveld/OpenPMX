@@ -16,12 +16,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-# default target is pthreads
 TARGET="${1:-pthread}"
-OPENPMXDIR=$(cd `dirname ${0}` && pwd)
-PLATFORM="$(uname -s)"
+LIBTYPE="${2:-shared}"
+UNAME="$(uname -s)"
+PLATFORM="${3:-${UNAME}}"
+OPENPMXPATH=$(cd `dirname ${0}` && pwd)
 
 set -eu
+
+echo "install ${TARGET} ${LIBTYPE} ${PLATFORM}"
+echo "path ${OPENPMXPATH}"
 
 # general build flags are for Linux
 # some will be changed later depending on platform
@@ -31,20 +35,15 @@ LIBNAME="openpmx"
 CFLAGS="-g -O2 -march=native -W -Wall -Wextra"
 CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -Wwrite-strings -Isrc"
 
-AR="gcc -shared -o lib/lib${LIBNAME}.so"
-LFLAGS="-flto"
-###AR="ar rcs lib/lib${LIBNAME}.a"
-###LFLAGS="-flto -static"
-
 # platform specific changes
-# linux 
 if [ "${PLATFORM}" = "Linux" ]; then
 	CLIBFLAGS="${CLIBFLAGS} -fPIC"
-# mingw64 
 elif [[ "${PLATFORM}" =~ MINGW64_NT-* ]]; then
 	CFLAGS="${CFLAGS} -I/mingw64/include"
-	LFLAGS="${LFLAGS} -L\"${OPENPMXDIR}/lib\" -L/mingw64/lib"
-	AR="ar rcs lib/lib${LIBNAME}.a"
+	LFLAGS="${LFLAGS} -L\"${OPENPMXPATH}/lib\" -L/mingw64/lib"
+	if [ "${LIBTYPE}" != "static" ]; then
+		echo "error: mingw64 platform requires static"
+	fi
 fi
 
 # openpmx source files
@@ -77,73 +76,91 @@ SOURCEFILES="openpmx.c
 			utils/various.c
 			bobyqa/bobyqa.c"
 
-echo "OpenPMX: clean"
-${RM} "${OPENPMXDIR}"/build/*
-${RM} "${OPENPMXDIR}"/bin/*
-${RM} "${OPENPMXDIR}"/lib/*
-${RM} "${OPENPMXDIR}/openpmx"
-${RM} "${OPENPMXDIR}/src/openpmx_compile_options.h"
+echo "clean"
+${RM} "${OPENPMXPATH}"/build/*
+${RM} "${OPENPMXPATH}"/bin/*
+${RM} "${OPENPMXPATH}"/lib/*
+${RM} "${OPENPMXPATH}/openpmx"
+${RM} "${OPENPMXPATH}/src/openpmx_compile_options.h"
 if [ "${TARGET}" = "clean" ]; then
 	exit 0
 fi
 
+# shared or static library
+if [ "${LIBTYPE}" = "shared" ]; then
+	echo "build ${LIBTYPE} library"
+	AR="gcc -shared -o lib/lib${LIBNAME}.so"
+	LFLAGS="-flto"
+elif [ "${LIBTYPE}" = "static" ]; then
+	echo "build ${LIBTYPE} library"
+	AR="ar rcs lib/lib${LIBNAME}.a"
+	LFLAGS="-flto -static"
+else
+	echo "error: install: \"${LIBTYPE}\" must be static or shared"
+	exit 1
+fi
+
 # install flag for OpenMP target
+echo "write compile options"
 if [ "${TARGET}" = "openmp" ]; then
-	echo "OpenPMX build: OpenMP"
 	CFLAGS="${CFLAGS} -fopenmp"
 	LFLAGS="${LFLAGS} -fopenmp -lgomp"
-	echo '#define OPENPMX_PARALLEL_OPENMP' >"${OPENPMXDIR}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_PARALLEL_OPENMP' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # install flag for pthreads target
 elif [ "${TARGET}" = "pthread" ]; then
-	echo "build: pthread"
 	CFLAGS="${CFLAGS} -pthread"
 	LFLAGS="${LFLAGS} -pthread"
-	echo '#define OPENPMX_PARALLEL_PTHREADS' >"${OPENPMXDIR}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_PARALLEL_PTHREADS' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # install flag for sanitize target
 elif [ "${TARGET}" = "sanitize" ]; then
-	echo "build: pthread/sanitize"
 	CFLAGS="${CFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
 	LFLAGS="${LFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
-	echo '#define OPENPMX_PARALLEL_PTHREADS' >"${OPENPMXDIR}/src/openpmx_compile_options.h"
-	echo '#define OPENPMX_SANATIZE' >>"${OPENPMXDIR}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_PARALLEL_PTHREADS' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_SANATIZE' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # install flags for single threaded
 elif [ "${TARGET}" = "singlethread" ]; then
-	echo "build: singlethread"
-	echo '#define OPENPMX_PARALLEL_SINGLETHREAD' >"${OPENPMXDIR}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_PARALLEL_SINGLETHREAD' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # unknown install flag
 else
-	echo "error: install: Target \""${TARGET}"\" not recognized"
+	echo "error: install: target \""${TARGET}"\" not recognized"
 	exit 1
 fi
 
 # build openpmxtran
-(cd "${OPENPMXDIR}"; set -x; ${CC} ${CFLAGS} "src/openpmxtran.c" -o "bin/openpmxtran" ${LFLAGS} -lm)
+echo "compile openpmxtran"
+(cd "${OPENPMXPATH}"; ${CC} ${CFLAGS} "src/openpmxtran.c" -o "bin/openpmxtran" ${LFLAGS} -lm)
 
 # compile the source files to object files and make library
 OBJECTFILES=
 for FILE in ${SOURCEFILES}
 do
+	echo "compile ${FILE}"
 	BASE=$(basename ${FILE})
 	OBJFILE="${BASE%.*}.o"
-	(cd "${OPENPMXDIR}"; set -x; ${CC} ${CFLAGS} ${CLIBFLAGS} -Iinclude -c "src/${FILE}" -o "build/${OBJFILE}")
+	(cd "${OPENPMXPATH}"; ${CC} ${CFLAGS} ${CLIBFLAGS} -Iinclude -c "src/${FILE}" -o "build/${OBJFILE}")
 	OBJECTFILES="${OBJECTFILES} build/${OBJFILE}"
 done
-(cd "${OPENPMXDIR}"; set -x; ${AR} ${OBJECTFILES})
+echo "build library"
+(cd "${OPENPMXPATH}"; ${AR} ${OBJECTFILES})
 
 # write the build script with the correct path
-echo "#!/bin/sh"							>"${OPENPMXDIR}/openpmx"
-echo "########################################################################"	>>"${OPENPMXDIR}/openpmx"
-echo "# OpenPMX build options"				>>"${OPENPMXDIR}/openpmx"
-echo "CC=${CC}"								>>"${OPENPMXDIR}/openpmx"
-echo "CFLAGS=\"${CFLAGS}\""					>>"${OPENPMXDIR}/openpmx"
-echo "LFLAGS=\"${LFLAGS}\""					>>"${OPENPMXDIR}/openpmx"
-echo "OPENPMXDIR=\"${OPENPMXDIR}\""			>>"${OPENPMXDIR}/openpmx"
-echo ""										>>"${OPENPMXDIR}/openpmx"
-cat "${OPENPMXDIR}/src/_openpmx_template"	>>"${OPENPMXDIR}/openpmx"
-chmod a+x "${OPENPMXDIR}/openpmx"
+echo "write openpmx script"
+echo "#!/bin/sh"							>"${OPENPMXPATH}/openpmx"
+echo "########################################################################"	>>"${OPENPMXPATH}/openpmx"
+echo "# OpenPMX build options"				>>"${OPENPMXPATH}/openpmx"
+echo "CC=${CC}"								>>"${OPENPMXPATH}/openpmx"
+echo "CFLAGS=\"${CFLAGS}\""					>>"${OPENPMXPATH}/openpmx"
+echo "LFLAGS=\"${LFLAGS}\""					>>"${OPENPMXPATH}/openpmx"
+echo "OPENPMXPATH=\"${OPENPMXPATH}\""		>>"${OPENPMXPATH}/openpmx"
+echo "LIBTYPE=\"${LIBTYPE}\"	"			>>"${OPENPMXPATH}/openpmx"
+echo ""										>>"${OPENPMXPATH}/openpmx"
+cat "${OPENPMXPATH}/src/_openpmx_template"	>>"${OPENPMXPATH}/openpmx"
+chmod a+x "${OPENPMXPATH}/openpmx"
 
-echo "OpenPMX installed to \"${OPENPMXDIR}\""
+echo "success"
+echo "install ${TARGET} ${LIBTYPE} ${PLATFORM}"
+echo "path ${OPENPMXPATH}"

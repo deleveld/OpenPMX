@@ -54,7 +54,6 @@ typedef struct {
 	double eval_msec;
 	double stage1_msec;
 	int ineval;
-	int neval;
 } INDIVID;
 
 typedef struct {
@@ -89,6 +88,8 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 					  const int imodel_size,
 					  const int predictvars_size);
 void idata_destruct(IDATA* const idata);
+
+int idata_ineval(const IDATA* const idata);
 
 double* idata_alloc_simerr(const IDATA* const idata);
 void idata_free_simerr(const IDATA* const idata);

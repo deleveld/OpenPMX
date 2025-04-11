@@ -173,7 +173,7 @@ typedef struct {
 		OBJFN_CURRENT,
 		OBJFN_FINAL,
 	} type;
-	int nfunc;
+	int neval;
 } PMXRESULT;
 
 /*---------------------------------------------------------------------*/
@@ -186,6 +186,7 @@ typedef struct {
 	bool _offset1;
 	bool details;
 	bool verbose;
+	bool progress;
 
 	/* the problem structure to analyse */
 	const DATACONFIG data;

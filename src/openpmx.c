@@ -191,7 +191,7 @@ void pmx_copy_popparams(OPENPMX* dest, const OPENPMX* const src)
 
 	dest->result = (PMXRESULT) { .objfn = DBL_MAX,
 								 .type = OBJFN_INVALID,
-								 .nfunc = 0 };
+								 .neval = 0 };
 }
 
 void pmx_cleanup(OPENPMX* pmx)

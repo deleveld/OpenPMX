@@ -66,7 +66,6 @@ static void simulate_with_error_thread(INDIVID* const individ,
 						individ->pred,
 						individ->isimerr);
 	individ->ineval += 1;
-	individ->neval += 1;
 	timespec_duration(&t3, &individ->eval_msec);
 }
 

@@ -27,7 +27,7 @@ $THETA
 	{          0.1,	      1,		            5,	 ESTIMATE },
 	{          0.1,	      1,		            5,	 ESTIMATE },
 	{          0.1,	     0.5,		            5,	 ESTIMATE },
-$OMEGA(0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+$OMEGA(0.1, 0.1, 0, 0.1, 0.1, 0)
 $SIGMA(0.1)
 $MAIN
 	estimate(.optim.maxeval=5000);

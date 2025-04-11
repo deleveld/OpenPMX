@@ -34,6 +34,7 @@ typedef struct {
 	const bool _offset1;
 	bool details;
 	bool verbose;
+	bool progress;
 	ESTIMCONFIG estimate;
 	SIMCONFIG simulate;
 } OPTIONS;

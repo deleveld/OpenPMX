@@ -26,5 +26,5 @@ $MAIN
 //	predict_pred();
 	table("ID BWT", .name="covariates", .firstonly=true);
 	table("ID TIME evid DV yhat yhatvar cwres PRED IPRED", .name="pred");
-	table("ID neval ineval", .firstonly=true);
+	table("ID ineval", .firstonly=true);
 

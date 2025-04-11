@@ -281,21 +281,22 @@ static double table_value(const TABLE* const table, const char* const name, cons
 		return DATA_FIELD(table->predictvars, predictvarsoffset);
 
 	if (strcmp(name, "yhat") == 0 ||
+		strcmp(name, "YHAT") == 0 ||
+		strcmp(name, "y") == 0 ||
 		strcmp(name, "Y") == 0)
 		return table->yhat;
-	if (strcmp(name, "yhatvar") == 0)
+	if (strcmp(name, "yhatvar") == 0 ||
+		strcmp(name, "YHATVAR") == 0)
 		return table->yhatvar;
 	if (strcmp(name, "PRED") == 0 ||
 		strcmp(name, "pred") == 0)
 		return table->pred;
-	if (strcmp(name, "OBJ") == 0)
+	if (strcmp(name, "obj") == 0 ||
+		strcmp(name, "OBJ") == 0)
 		return table->obj;
 	if (strcmp(name, "ineval") == 0 ||
 		strcmp(name, "INEVAL") == 0)
 		return individ->ineval;
-	if (strcmp(name, "neval") == 0 ||
-		strcmp(name, "NEVAL") == 0)
-		return individ->neval;
 	if (strcmp(name, "cwres") == 0 ||
 		strcmp(name, "CWRES") == 0) {
 		let dv = RECORDINFO_DV(recordinfo, table->record);

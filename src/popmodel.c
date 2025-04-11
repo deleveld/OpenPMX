@@ -202,7 +202,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 	/* initial results are invalid */
 	ret.result = (PMXRESULT) { .objfn = DBL_MAX,
 							   .type = OBJFN_INVALID,
-							   .nfunc = 0 };
+							   .neval = 0 };
 
 	return ret;
 }
@@ -233,13 +233,14 @@ void extfile_header(FILE * f,
 		}
 	}
 	fprintf(f, OPENPMX_HEADER_FORMAT, "OBJ");
+	fprintf(f, OPENPMX_SFORMAT, "INEVAL");
 	fprintf(f, "\n");
 	fflush(f);
 }
 
-void extfile_append(FILE* f, const POPMODEL* const popmodel)
+void extfile_append(FILE* f, const POPMODEL* const popmodel, const int ineval)
 {
-	let iter = popmodel->result.nfunc;
+	let iter = popmodel->result.neval;
 	fprintf(f, OPENPMX_IFORMAT, iter);
 
 	let ntheta = popmodel->ntheta;
@@ -255,28 +256,25 @@ void extfile_append(FILE* f, const POPMODEL* const popmodel)
 			fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->omega[i][j]);
 
 	fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->result.objfn);
+	fprintf(f, OPENPMX_IFORMAT, ineval);
 	fprintf(f, "\n");
 	fflush(f);
 }
 
-void extfile_trailer(FILE* f, const POPMODEL* const popmodel)
+void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const int ineval)
 {
 	fprintf(f, OPENPMX_IFORMAT, -1000000000);
 	let ntheta = popmodel->ntheta;
 	forcount(i, ntheta)
 		fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->theta[i]);
-
 	let nsigma = popmodel->nsigma;
 	forcount(i, nsigma)
 		fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->sigma[i]);
-
 	forcount(i, popmodel->nomega)
 		forcount(j, i+1)
 			fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->omega[i][j]);
-
-	/* objfn */
-	fprintf(f, "  ");
 	fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->result.objfn);
+	fprintf(f, OPENPMX_IFORMAT, ineval);
 	fprintf(f, "\n");
 
 	fprintf(f, OPENPMX_IFORMAT, -1000000006);
@@ -290,10 +288,8 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel)
 	forcount(i, popmodel->nomega)
 		forcount(j, i+1)
 			fprintf(f, OPENPMX_TABLE_FORMAT, (double)popmodel->omegafixed[i][j]);
-
-	/* objfn */
-	fprintf(f, "  ");
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_IFORMAT, 0);
 	fprintf(f, "\n");
 
 	/* NON-STANDARD!!! DIFFERENT THAN NONMEM
@@ -306,8 +302,8 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel)
 	forcount(i, popmodel->nomega)
 		forcount(j, i+1)
 			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, "  ");
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_IFORMAT, 0);
 	fprintf(f, "\n");
 
 	fprintf(f, OPENPMX_IFORMAT, -2000000002);
@@ -318,8 +314,8 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel)
 	forcount(i, popmodel->nomega)
 		forcount(j, i+1)
 			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, "  ");
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_IFORMAT, 0);
 	fprintf(f, "\n");
 	fflush(f);
 }
@@ -330,8 +326,8 @@ static void info_iteration(FILE* f1,
 						   const char* suffix)
 {
 	let _objfn = popmodel->result.objfn;
-	let nfunc = popmodel->result.nfunc;
-	info(f1, "time %.3f nfunc %i objfn %.6f", runtime_s, nfunc, _objfn);
+	let neval = popmodel->result.neval;
+	info(f1, "time %.3f neval %i objfn %.6f", runtime_s, neval, _objfn);
 	if (suffix)
 		info(f1, "%s", suffix);
 	info(f1, "\n");
@@ -358,7 +354,7 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 		popmodel->result.type == OBJFN_FINAL) {
 		if (timestamp != DBL_MAX)
 			info(f2, "time %.3f ", timestamp);
-		info(f2, "nfunc %i ", popmodel->result.nfunc);
+		info(f2, "neval %i ", popmodel->result.neval);
 		info(f2, "objfn %.6f\n", popmodel->result.objfn);
 	}
 
@@ -468,6 +464,7 @@ void popmodel_initcode(FILE* f2, const POPMODEL* const popmodel)
 
 void popmodel_eval_information(const POPMODEL* const popmodel,
 							   const double runtime_s,
+							   const int neval,
 							   const bool details,
 							   FILE* outstream,
 							   FILE* extstream,
@@ -479,7 +476,7 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 	info_iteration(outstream, runtime_s, popmodel, suffix);
 
 	if (extstream) 
-		extfile_append(extstream, popmodel);
+		extfile_append(extstream, popmodel, neval);
 }
 
 

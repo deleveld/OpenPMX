@@ -168,7 +168,7 @@ typedef struct {
 	ENCODE test;
 	const OPTIONS* const options;
 
-	int nfunc;
+	int neval;
 	POPMODEL best;
 	double* besteta;
 	const int neta;
@@ -210,11 +210,15 @@ static void update_best_imodel(const STAGE2_PARAMS* const params,
 		improved_model = popmodel;
 	if (improved_model) {
 		let runtime_s = get_timestamp(params);
+		let ineval = idata_ineval(idata);
+		var outstream = (options->progress) ? (params->outstream) : 0;
+		var extstream = (options->progress) ? (params->extstream) : 0;
 		popmodel_eval_information(improved_model,
 								  runtime_s,
+								  ineval,
 								  options->details || options->verbose,
-								  params->outstream,
-								  params->extstream,
+								  outstream,
+								  extstream,
 								  0);
 	}
 }
@@ -242,7 +246,7 @@ static void encode_evaluate(ENCODE* const test,
 	popmodel->result = (PMXRESULT) {
 		.objfn = objfn(idata, omegainfo),
 		.type = OBJFN_CURRENT,
-		.nfunc = 0 };
+		.neval = 0 };
 }
 
 static double focei_stage2_evaluate_population_objfn(const long int _xlength,
@@ -261,8 +265,8 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 	let popmodel = &params->test.popmodel;
 	reset_eta(idata, params->besteta);
 	encode_evaluate(&params->test, idata, advanfuncs, options);
-	params->nfunc += 1;
-	popmodel->result.nfunc = params->nfunc;
+	params->neval += 1;
+	popmodel->result.neval = params->neval;
 
 	/* update best imodel and inform the user if we improve */
 	update_best_imodel(params, &params->best);
@@ -404,7 +408,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 			status = gsl_multimin_test_gradient(grad, step_final);
 			if (status !=  GSL_CONTINUE)
 				break;
-			if (params->nfunc >=  maxeval) 
+			if (params->neval >=  maxeval) 
 				break;
 		}
 		gsl_multimin_fdfminimizer_free(s);
@@ -441,7 +445,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 		info(params->outstream, "initial BOBYQA error code %i\n", retcode);
 
 	var timestamp = get_timestamp(params);
-	info(params->outstream, "time %.3f nfunc %i objfn %f\n", timestamp, params->nfunc, best->result.objfn);
+	info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
 	lastobjfn = best->result.objfn;
 
 	if (step_final < step_refine) {
@@ -451,7 +455,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 			forcount(i, n)
 				initial[i] = 0.;
 
-			neval = maxeval - params->nfunc;
+			neval = maxeval - params->neval;
 			rhobeg = step_refine;
 			rhoend = step_final;
 			info(params->outstream, "optim rho %g %g\n", rhobeg, rhoend);
@@ -465,7 +469,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 
 			dobjfn = best->result.objfn - lastobjfn;
 			var timestamp = get_timestamp(params);
-			info(params->outstream, "time %.3f nfunc %i objfn %f\n", timestamp, params->nfunc, best->result.objfn);
+			info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
 			lastobjfn = best->result.objfn;
 		}
 		while (dobjfn < -1.*fabs(options->estimate.optim.dobjfn));
@@ -484,6 +488,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 
 static void print_model(STAGE2_PARAMS* params)
 {
+	let idata = params->idata;
 	let popmodel = &params->test.popmodel;
 	let options = params->options;
 
@@ -492,11 +497,15 @@ static void print_model(STAGE2_PARAMS* params)
 //		sprintf(message, " objfn %f", popmodel->result.objfn);
 
 	let runtime_s = get_timestamp(params);
+	let ineval = idata_ineval(idata);
+	var outstream = (options->progress) ? (params->outstream) : 0;
+	var extstream = (options->progress) ? (params->extstream) : 0;
 	popmodel_eval_information(popmodel,
 							  runtime_s,
+							  ineval,
 							  options->details || options->verbose,
-							  params->outstream,
-							  params->extstream,
+							  outstream,
+							  extstream,
 							  0);
 }
 
@@ -512,18 +521,18 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 
 	/* very first evaluation */
 	encode_evaluate(&params->test, idata, advanfuncs, options);
-	params->nfunc += 1;
+	params->neval += 1;
 	var timestamp = get_timestamp(params);
-	info(params->outstream, "time %.3f nfunc %i objfn %f\n", timestamp, params->nfunc, popmodel->result.objfn);
+	info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, popmodel->result.objfn);
 
 	var done = false;
 	var niter = 0;
 	while (!done) {
 		let lastobjfn = popmodel->result.objfn;
 		encode_evaluate(&params->test, idata, advanfuncs, options);
-		params->nfunc += 1;
+		params->neval += 1;
 		++niter;
-		popmodel->result.nfunc = params->nfunc;
+		popmodel->result.neval = params->neval;
 
 		print_model(params);
 
@@ -540,7 +549,7 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 	}
 	info(params->outstream, "stabilize iter %i\n", niter);
 	timestamp = get_timestamp(params);
-	info(params->outstream, "time %.3f nfunc %i objfn %f\n", timestamp, params->nfunc, popmodel->result.objfn);
+	info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, popmodel->result.objfn);
 
 	var firstindivid = &idata->individ[0];
 	memcpy(params->besteta, firstindivid->eta, idata->nindivid * idata->nomega * sizeof(double));
@@ -580,9 +589,9 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 		encode_update(test, x);
 		reset_eta(idata, params->besteta); 
 		encode_evaluate(test, idata, advanfuncs, options);
-		popmodel->result.nfunc = params->nfunc;
-		params->nfunc += 1;
-		popmodel->result.nfunc = params->nfunc;
+		popmodel->result.neval = params->neval;
+		params->neval += 1;
+		popmodel->result.neval = params->neval;
 		let fm2 = popmodel->result.objfn;
 		print_model(params);
 		xa[0] = x[k];
@@ -593,8 +602,8 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 		encode_update(test, x);
 		reset_eta(idata, params->besteta); 
 		encode_evaluate(test, idata, advanfuncs, options);
-		params->nfunc += 1;
-		popmodel->result.nfunc = params->nfunc;
+		params->neval += 1;
+		popmodel->result.neval = params->neval;
 		let fm1 = popmodel->result.objfn;
 		print_model(params);
 		xa[1] = x[k];
@@ -608,8 +617,8 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 		encode_update(test, x);
 		reset_eta(idata, params->besteta); 
 		encode_evaluate(test, idata, advanfuncs, options);
-		params->nfunc += 1;
-		popmodel->result.nfunc = params->nfunc;
+		params->neval += 1;
+		popmodel->result.neval = params->neval;
 		let fp1 = popmodel->result.objfn;
 		print_model(params);
 		xa[3] = x[k];
@@ -620,8 +629,8 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 		encode_update(test, x);
 		reset_eta(idata, params->besteta); 
 		encode_evaluate(test, idata, advanfuncs, options);
-		params->nfunc += 1;
-		popmodel->result.nfunc = params->nfunc;
+		params->neval += 1;
+		popmodel->result.neval = params->neval;
 		let fp2 = popmodel->result.objfn;
 		print_model(params);
 		xa[4] = x[k];
@@ -641,7 +650,7 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 	}
 	/* TODO : add warnings here for decreases in objfn and zero gradient and second deriv */
 	
-	params->best.result.nfunc = params->nfunc;
+	params->best.result.neval = params->neval;
 }
 #endif
 	
@@ -668,7 +677,7 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 	/* this is the first evaluation, the encode_offset at the best model is
 	 * already done. We may have to evaluate several times for a stable objfn */
 	/* after the iterations, we save the besteta which we use to start with later */
-	params->nfunc = 0; 
+	params->neval = 0; 
 	if (!stabilize_model(params))
 		warning(outstream, "initial evaluation not stable\n");
 
@@ -682,7 +691,7 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 	if (maxeval > 1) {
 		focei(params); /* TODO: this should be renamed I think */
 		params->best.result.type = OBJFN_FINAL;
-		params->best.result.nfunc = params->nfunc;
+		params->best.result.neval = params->neval;
 
 		/* at end we encode the best so far */
 		encode_offset(&params->test, &params->best);
@@ -780,7 +789,7 @@ static STAGE2_PARAMS stage2_params(const char* filename,
 		.advanfuncs = advanfuncs,
 		.test = encode_init(popmodel),
 		.options = options,
-		.nfunc = 0,
+		.neval = 0,
 		.best = *popmodel,
 		.besteta = 0,
 		.neta = neta,
@@ -854,8 +863,10 @@ static void estimate_popmodel(const char* filename,
 	/* update results in tables */
 	if (filename) {
 		table_phi_idata(filename, idata, _offset1);
-		if (params.extstream)
-			extfile_trailer(params.extstream, &params.best);
+		if (params.extstream) {
+			let ineval = idata_ineval(idata);
+			extfile_trailer(params.extstream, &params.best, ineval);
+		}
 		if (options->estimate.stage1.icov_resample)
 			table_icov_resample_idata(filename, idata, _offset1);
 	}
