@@ -206,17 +206,17 @@ static void update_best_imodel(const STAGE2_PARAMS* const params,
 	}
 
 	/* update the user */
-	if (options->verbose)
+	if (options->estimate.verbose)
 		improved_model = popmodel;
 	if (improved_model) {
 		let runtime_s = get_timestamp(params);
 		let ineval = idata_ineval(idata, false);
-		var outstream = (options->progress) ? (params->outstream) : 0;
-		var extstream = (options->progress) ? (params->extstream) : 0;
+		var outstream = (options->estimate.progress) ? (params->outstream) : 0;
+		var extstream = (options->estimate.progress) ? (params->extstream) : 0;
 		popmodel_eval_information(improved_model,
 								  runtime_s,
 								  ineval,
-								  options->details || options->verbose,
+								  options->estimate.details || options->estimate.verbose,
 								  outstream,
 								  extstream,
 								  0);
@@ -498,12 +498,12 @@ static void print_model(STAGE2_PARAMS* params)
 
 	let runtime_s = get_timestamp(params);
 	let ineval = idata_ineval(idata, false);
-	var outstream = (options->progress) ? (params->outstream) : 0;
-	var extstream = (options->progress) ? (params->extstream) : 0;
+	var outstream = (options->estimate.progress) ? (params->outstream) : 0;
+	var extstream = (options->estimate.progress) ? (params->extstream) : 0;
 	popmodel_eval_information(popmodel,
 							  runtime_s,
 							  ineval,
-							  options->details || options->verbose,
+							  options->estimate.details || options->estimate.verbose,
 							  outstream,
 							  extstream,
 							  0);
