@@ -145,16 +145,6 @@ void idata_destruct(IDATA* const idata)
 	free(idata->individ);
 }
 
-int idata_ineval(const IDATA* const idata)
-{
-	int ineval = 0;
-	forcount(i, idata->nindivid) {
-		let individ = &idata->individ[i];
-		ineval += individ->ineval;
-	}
-	return ineval;
-}
-
 double* idata_alloc_simerr(const IDATA* const idata)
 {
 	let individ = idata->individ;
@@ -217,6 +207,19 @@ void idata_free_icovresample(const IDATA* const idata)
 	}
 	free(icovsample);
 	free(icovweight);
+}
+
+int idata_ineval(const IDATA* const idata, const bool reset)
+{
+	let individ = idata->individ;
+	let nindivid = idata->nindivid;
+	var ineval = 0;
+	forcount(i, nindivid) {
+		ineval = individ[i].ineval;
+		if (reset)
+			individ[i].ineval = 0;
+	}
+	return ineval;
 }
 
 void table_phi_idata(const char* filename,

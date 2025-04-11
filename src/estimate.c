@@ -210,7 +210,7 @@ static void update_best_imodel(const STAGE2_PARAMS* const params,
 		improved_model = popmodel;
 	if (improved_model) {
 		let runtime_s = get_timestamp(params);
-		let ineval = idata_ineval(idata);
+		let ineval = idata_ineval(idata, false);
 		var outstream = (options->progress) ? (params->outstream) : 0;
 		var extstream = (options->progress) ? (params->extstream) : 0;
 		popmodel_eval_information(improved_model,
@@ -497,7 +497,7 @@ static void print_model(STAGE2_PARAMS* params)
 //		sprintf(message, " objfn %f", popmodel->result.objfn);
 
 	let runtime_s = get_timestamp(params);
-	let ineval = idata_ineval(idata);
+	let ineval = idata_ineval(idata, false);
 	var outstream = (options->progress) ? (params->outstream) : 0;
 	var extstream = (options->progress) ? (params->extstream) : 0;
 	popmodel_eval_information(popmodel,
@@ -743,26 +743,6 @@ static void outfile_header(FILE* f2,
 
 	if (outfile_type == OUTFILE_HEADER_RESAMPLE)
 		info(f2, "resample seed %i\n", options->simulate.seed);
-
-/*
-	if (outfile_type == OUTFILE_HEADER_EVALUATE ||
-		outfile_type == OUTFILE_HEADER_ESTIMATE) {
-		let stage1 = &options->estimate.stage1;
-		info(f2, "stage1 gradient step %g\n", stage1->gradient_step);
-		info(f2, "stage1 step initial %g\n", stage1->step_initial);
-		info(f2, "stage1 step refine %g\n", stage1->step_refine);
-		info(f2, "stage1 stop final %g\n", stage1->step_final);
-		info(f2, "stage1 omit icov resample %s\n", stage1->no_icov_resample ? "true" : "false");
-		info(f2, "stage1 max evaluations %i\n", stage1->maxeval);
-	}
-	if (outfile_type == OUTFILE_HEADER_ESTIMATE) {
-		let optim = &options->estimate.optim;
-		info(f2, "optim step initial %g\n", optim->step_initial);
-		info(f2, "optim step refine %g\n", optim->step_refine);
-		info(f2, "optim step final %g\n", optim->step_final);
-		info(f2, "optim max evaluations %i\n", optim->maxeval);
-	}
-*/
 }
 
 static STAGE2_PARAMS stage2_params(const char* filename,
@@ -848,6 +828,7 @@ static void estimate_popmodel(const char* filename,
 		info(params.outstream, "optim %s\n", message);
 
 	/* do the checkout */
+	idata_ineval(idata, true);
 	idata_checkout(idata, advanfuncs, popmodel, options, params.outstream);
 
 	/* actually do the stage 2 estimation */
@@ -857,14 +838,12 @@ static void estimate_popmodel(const char* filename,
 	/* update results to screen and log */
 	let timestamp = get_timestamp(&params);
 	popmodel_information(params.outstream, popmodel, timestamp);
-//	if (params.outstream)
-//		popmodel_initcode(params.outstream, popmodel);
 
 	/* update results in tables */
 	if (filename) {
 		table_phi_idata(filename, idata, _offset1);
 		if (params.extstream) {
-			let ineval = idata_ineval(idata);
+			let ineval = idata_ineval(idata, false);
 			extfile_trailer(params.extstream, &params.best, ineval);
 		}
 		if (options->estimate.stage1.icov_resample)

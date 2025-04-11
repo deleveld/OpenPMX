@@ -27,8 +27,7 @@ set -eu
 echo "install ${TARGET} ${LIBTYPE} ${PLATFORM}"
 echo "path ${OPENPMXPATH}"
 
-# general build flags are for Linux
-# some will be changed later depending on platform
+# general build flags 
 CC="gcc"
 RM="rm -vf"
 LIBNAME="openpmx"
@@ -46,7 +45,6 @@ elif [[ "${PLATFORM}" =~ MINGW64_NT-* ]]; then
 	fi
 fi
 
-# openpmx source files
 SOURCEFILES="openpmx.c
 			ievaluate.c
 			predict.c
