@@ -681,9 +681,9 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 	if (!stabilize_model(params))
 		warning(outstream, "initial evaluation not stable\n");
 
-	/* we dont really need this since we dont change popmodel or best since starting
-	 * best = *popmodel;
-	 * encode_offset(&params->test, best); */
+	/* make sure best has the objfn of what we just stabilized */
+	params->best = params->test.popmodel;
+	encode_offset(&params->test, &params->best); /* this probably does nothing */
 
 	/* call the underlying advan to optimize and find the best imodel */
 	let maxeval = options->estimate.optim.maxeval;
@@ -695,8 +695,6 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 
 		/* at end we encode the best so far */
 		encode_offset(&params->test, &params->best);
-//		if (!stabilize_model(params))
-//			warning(outstream, "final evaluation not stable\n");
 	}
 
 	/* posthoc evaluation of derivates */
@@ -809,7 +807,7 @@ static void estimate_popmodel(const char* filename,
 	const char* message = "Evaluate only";
 	var outfile_type = OUTFILE_HEADER_EVALUATE;
 	let maxeval = options->estimate.optim.maxeval;
-	popmodel->result.type = OBJFN_INITIAL;
+	popmodel->result.type = OBJFN_CURRENT;
 	if (maxeval > 1) {
 		message = focei(0);
 		outfile_type = OUTFILE_HEADER_ESTIMATE;
@@ -866,7 +864,6 @@ void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	}
 
 	var popmodel = popmodel_init(pmx);
-	popmodel.result.type = OBJFN_INITIAL;
 
 	estimate_popmodel(pmx->filename,
 					  &pstate->idata,
@@ -890,7 +887,6 @@ void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 	options.estimate.optim.maxeval = 1;
 
 	var popmodel = popmodel_init(pmx);
-	popmodel.result.type = OBJFN_INITIAL;
 
 	estimate_popmodel(pmx->filename,
 					  &pstate->idata,
@@ -916,7 +912,6 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	options.estimate.optim.step_final = 0.01;
 
 	var popmodel = popmodel_init(pmx);
-	popmodel.result.type = OBJFN_INITIAL;
 
 	estimate_popmodel(pmx->filename,
 					  &pstate->idata,

@@ -167,9 +167,7 @@ typedef struct {
 	double objfn;
 	enum {
 		OBJFN_INVALID = 0,
-		OBJFN_PREDICT,
 		OBJFN_EVALUATE,
-		OBJFN_INITIAL,
 		OBJFN_CURRENT,
 		OBJFN_FINAL,
 	} type;

@@ -135,7 +135,6 @@ void pmx_predict(OPENPMX* pmx)
 
 	var options = options_init(pmx);
 	var popmodel = popmodel_init(pmx);
-	popmodel.result.type = OBJFN_PREDICT;
 
 	idata_predict_yhat(&pstate->idata,
 						  pstate->advanfuncs,
@@ -150,7 +149,6 @@ void pmx_predict_pred(OPENPMX* pmx)
 
 	var options = options_init(pmx);
 	var popmodel = popmodel_init(pmx);
-	popmodel.result.type = OBJFN_PREDICT;
 
 	idata_predict_pred(&pstate->idata,
 						  pstate->advanfuncs,

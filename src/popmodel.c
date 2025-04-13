@@ -340,9 +340,7 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 		case OBJFN_INVALID:		message = "invalid";		break;
 		case OBJFN_CURRENT:		message = "current";		break;
 		case OBJFN_FINAL:		message = "final";		break;
-		case OBJFN_PREDICT:		message = "predict";		break;
 		case OBJFN_EVALUATE:	message = "evaluate";	break;
-		case OBJFN_INITIAL:		message = "initial";		break;
 		default:
 			assert(0);
 	}
