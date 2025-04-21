@@ -89,6 +89,13 @@ The PK analysis example is:
 - Implement more analytic models from Abuhelwa AY, Foster DJ, Upton RN. ADVAN-style analytical solutions for common pharmacokinetic models. J Pharmacol Toxicol Methods 2015; 73: 42-8
 - Consider using the LDLT decomposition to encode the population model parameters for omega.
 - does icov_resample allow for better performance? Maybe need to re-run at mean of weighted distribution?
+- After first stage1 optimization we could use the covariance matrix and its eigenvalue
+	decomposition to make a preconditioner which could probably improve efficiency and
+	convergence.
+- After the first estimation part we can do a gradient calculation to make a preconditioner
+	to use on subsequent more accurate (smaller rho) estimations. This could improve
+	efficiency.
+- Can Libgsl be replaced by LAPACK? It has a more permissive license.
 
 # Philosophy
 - Do one thing and do it well.
