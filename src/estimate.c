@@ -842,7 +842,7 @@ static void estimate_popmodel(const char* filename,
 		table_phi_idata(filename, idata, _offset1);
 		if (params.extstream) {
 			let ineval = idata_ineval(idata, false);
-			extfile_trailer(params.extstream, &params.best, ineval);
+			extfile_trailer(params.extstream, &params.best, timestamp, ineval);
 		}
 		if (options->estimate.stage1.icov_resample)
 			table_icov_resample_idata(filename, idata, _offset1);

@@ -233,12 +233,13 @@ void extfile_header(FILE * f,
 		}
 	}
 	fprintf(f, OPENPMX_HEADER_FORMAT, "OBJ");
+	fprintf(f, OPENPMX_SFORMAT, "RUNTIME");
 	fprintf(f, OPENPMX_SFORMAT, "INEVAL");
 	fprintf(f, "\n");
 	fflush(f);
 }
 
-void extfile_append(FILE* f, const POPMODEL* const popmodel, const int ineval)
+void extfile_append(FILE* f, const POPMODEL* const popmodel, const double runtime_s, const int ineval)
 {
 	let iter = popmodel->result.neval;
 	fprintf(f, OPENPMX_IFORMAT, iter);
@@ -256,12 +257,13 @@ void extfile_append(FILE* f, const POPMODEL* const popmodel, const int ineval)
 			fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->omega[i][j]);
 
 	fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->result.objfn);
+	fprintf(f, OPENPMX_TABLE_FORMAT, runtime_s);
 	fprintf(f, OPENPMX_IFORMAT, ineval);
 	fprintf(f, "\n");
 	fflush(f);
 }
 
-void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const int ineval)
+void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runtime_s, const int ineval)
 {
 	fprintf(f, OPENPMX_IFORMAT, -1000000000);
 	let ntheta = popmodel->ntheta;
@@ -275,6 +277,7 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const int ineval)
 			fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->omega[i][j]);
 	fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->result.objfn);
 	fprintf(f, OPENPMX_IFORMAT, ineval);
+	fprintf(f, OPENPMX_TABLE_FORMAT, runtime_s);
 	fprintf(f, "\n");
 
 	fprintf(f, OPENPMX_IFORMAT, -1000000006);
@@ -288,6 +291,7 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const int ineval)
 	forcount(i, popmodel->nomega)
 		forcount(j, i+1)
 			fprintf(f, OPENPMX_TABLE_FORMAT, (double)popmodel->omegafixed[i][j]);
+	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, OPENPMX_IFORMAT, 0);
 	fprintf(f, "\n");
@@ -303,6 +307,7 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const int ineval)
 		forcount(j, i+1)
 			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, OPENPMX_IFORMAT, 0);
 	fprintf(f, "\n");
 
@@ -314,6 +319,7 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const int ineval)
 	forcount(i, popmodel->nomega)
 		forcount(j, i+1)
 			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, OPENPMX_IFORMAT, 0);
 	fprintf(f, "\n");
@@ -474,7 +480,7 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 	info_iteration(outstream, runtime_s, popmodel, suffix);
 
 	if (extstream) 
-		extfile_append(extstream, popmodel, neval);
+		extfile_append(extstream, popmodel, runtime_s, neval);
 }
 
 
