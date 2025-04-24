@@ -28,8 +28,6 @@
 #include "utils/c22.h"
 #include "utils/various.h"
 
-#include "openpmx_compile_options.h"
-
 POPMODEL popmodel_init(const OPENPMX* const pmx)
 {
 	let theta = pmx->theta;

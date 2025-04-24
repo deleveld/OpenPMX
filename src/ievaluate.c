@@ -28,8 +28,6 @@
 #include "dataconfig/recordinfo.h"
 #include "utils/c22.h"
 
-#include "openpmx_compile_options.h"
-
 /* NOTE: these functions must be thread safe on the level of an individual */
 
 __attribute__ ((hot))

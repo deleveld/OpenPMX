@@ -34,8 +34,6 @@
 #include <gsl/gsl_blas.h>
 #include <gsl/gsl_eigen.h>
 
-#include "openpmx_compile_options.h"
-
 /*--------------------------------------------------------------------*/
 /* different optimizers */
 #define OPTIMIZER_INNER_BOBYQA

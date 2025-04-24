@@ -15,20 +15,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <assert.h>
 
 #include "omegainfo.h"
 #include "linalg.h"
-#include "print.h"
 #include "utils/c22.h"
 
 #include <gsl/gsl_linalg.h>
-#include <gsl/gsl_blas.h>
-
-#include "openpmx_compile_options.h"
 
 void reduced_omega_init(gsl_matrix* matrix,
 						const double omega[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX],
@@ -71,16 +64,6 @@ void omegainfo_update_inverse_lndet(OMEGAINFO* const omegainfo,
 		let lndet = matrix_lndet_from_cholesky(&cholesky.matrix);
 		omegainfo->omega_nonzero_lndet = lndet;
 
-		/* test for errors */
-		if (!isfinite(lndet)) {
-			fprintf(stderr, "log(det(OMEGA)) failed\nomega:\n");
-			forcount(i, n) {
-				forcount(j, n) 
-					fprintf(stderr, "\t%g", omega[i][j]);
-				fprintf(stderr, "\n");
-			}
-			assert(isfinite(lndet));
-		}
 	} else {
 		omegainfo->omega_nonzero_lndet = 0.;
 		gsl_matrix_set_zero(&cholesky.matrix);

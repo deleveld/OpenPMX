@@ -31,8 +31,6 @@
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_blas.h>
 
-#include "openpmx_compile_options.h"
-
 static void simulate_with_error_thread(INDIVID* const individ,
 									   const ADVANFUNCS* const advanfuncs,
 									   const POPMODEL* const popmodel,

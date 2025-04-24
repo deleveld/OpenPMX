@@ -26,8 +26,6 @@
 #include "utils/c22.h"
 #include "utils/various.h"
 
-#include "openpmx_compile_options.h"
-
 /* NOTE: this function must be thread safe on the level of an individual */
 static void idata_checkout_thread(INDIVID* const individ,
 								  const ADVANFUNCS* const advanfuncs,

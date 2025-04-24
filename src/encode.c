@@ -15,9 +15,6 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <assert.h>
 #include <math.h>
 #include <float.h>
@@ -28,8 +25,6 @@
 #include "utils/c22.h"
 
 #include <gsl/gsl_blas.h>
-
-#include "openpmx_compile_options.h"
 
 #define ESTIMATE_SD_NOT_VAR
 

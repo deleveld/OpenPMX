@@ -26,8 +26,6 @@
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_blas.h>
 
-#include "openpmx_compile_options.h"
-
 int cholesky_decomposition(gsl_matrix* matrix, const char* matrixname)
 {
 	/* TODO: finish this */

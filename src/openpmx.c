@@ -26,8 +26,6 @@
 #include "advan/advan.h"
 #include "openpmx_internal.h"
 
-#include "openpmx_compile_options.h"
-
 STAGE1CONFIG stage1config_default(const STAGE1CONFIG* const stage1)
 {
 	STAGE1CONFIG ret = { 0 };

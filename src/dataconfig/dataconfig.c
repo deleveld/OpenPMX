@@ -19,6 +19,7 @@
 #include <string.h>
 
 #include "openpmx.h"
+#include "dataconfig.h"
 #include "../utils/c22.h"
 
 int structinfo_find_offset(const char* name, const STRUCTINFO* const structinfo)

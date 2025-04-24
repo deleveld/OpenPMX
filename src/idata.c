@@ -27,8 +27,6 @@
 #include "utils/c22.h"
 #include "utils/various.h"
 
-#include "openpmx_compile_options.h"
-
 IDATA idata_construct(const RECORDINFO* const recordinfo,
 					  const int ntheta,
 					  const int nomega,

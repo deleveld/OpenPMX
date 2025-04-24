@@ -19,8 +19,6 @@
 #include "c22.h"
 #include "various.h"
 
-#include "openpmx_compile_options.h"
-
 FILE* results_fopen(const char* name, const char* ext, const char* mode)
 {
 	let nchars = strlen(name) + strlen(ext) + 1;

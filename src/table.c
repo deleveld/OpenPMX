@@ -33,8 +33,6 @@
 #include "utils/vector.h"
 #include "utils/various.h"
 
-#include "openpmx_compile_options.h"
-
 static void strip_firstlast_space(char* s)
 {
 	let len = strlen(s);
