@@ -23,6 +23,7 @@
 #include <limits.h>
 
 #include "openpmx.h"
+#include "githash.h"
 #include "omegainfo.h"
 #include "ievaluate.h"
 #include "encode.h"
@@ -718,7 +719,7 @@ static void outfile_header(FILE* f2,
 	assert(idata);
 	assert(options);
 	
-	info(f2, "$OUTFILE\nOpenPMX %i.%i.%i\n", OPENPMX_VERSION_MAJOR, OPENPMX_VERSION_MINOR, OPENPMX_VERSION_RELEASE);
+	info(f2, "$OUTFILE\nOpenPMX %i.%i.%i %s\n", OPENPMX_VERSION_MAJOR, OPENPMX_VERSION_MINOR, OPENPMX_VERSION_RELEASE, OPENPMX_GITHASH);
 
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 	char message[] = "pthread";
