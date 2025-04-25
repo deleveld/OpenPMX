@@ -116,7 +116,7 @@ int main(void)
 		.sigma = { 1, 1 },
 	};
 
-	pmx_estimate(&openpmx, &(ESTIMCONFIG) { 0 });
+	pmx_estimate(&openpmx, &(ESTIMCONFIG) { });
 	pmx_cleanup(&openpmx);
 
 	return EXIT_SUCCESS;

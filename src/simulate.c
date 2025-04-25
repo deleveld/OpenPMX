@@ -42,7 +42,7 @@ static void simulate_with_error_thread(INDIVID* const individ,
 	(void) options;
 	
 	let nomega = popmodel->nomega;
-	double etacopy[OPENPMX_OMEGA_MAX] = { 0 };
+	double etacopy[OPENPMX_OMEGA_MAX] = { };
 	memcpy(etacopy, individ->eta, nomega * sizeof(double));
 
 	let ievaluate_args = (IEVALUATE_ARGS) {
@@ -166,7 +166,7 @@ static void idata_predict_dv(IDATA* const idata,
 	/* simulation writes into pred (with error) and yhat (without error) */
 	/* TODO: we have to not write non-DV objects in simulation. You mean predict?
 	 * Im not sure I understand anymore */
-	SCATTEROPTIONS scatteroptions = { 0 };
+	SCATTEROPTIONS scatteroptions = { };
 	scatter_threads(idata, advanfuncs, popmodel, 0, options, &scatteroptions, simulate_with_error_thread);
 
 	/* make sure data is writable */

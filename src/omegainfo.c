@@ -75,7 +75,7 @@ OMEGAINFO omegainfo_init(const int nomega,
 						 const double omega[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX],
 						 const int omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX])
 {
-	OMEGAINFO ret = { 0 };
+	OMEGAINFO ret = { };
 	ret.omega_nonzero_lndet = 0.;
 	ret.nonzero.n = 0;
 	ret.nonfixed.n = 0;

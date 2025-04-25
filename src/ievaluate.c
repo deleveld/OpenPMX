@@ -127,7 +127,7 @@ double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { 0 };
+	ADVAN_MODEL_MEMORY advanmem = { };
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 
@@ -185,7 +185,7 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { 0 };
+	ADVAN_MODEL_MEMORY advanmem = { };
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 
@@ -269,7 +269,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { 0 };
+	ADVAN_MODEL_MEMORY advanmem = { };
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 	assert((int)sizeof(advanmem._predictvars) >= advanfuncs->advanconfig->predictfields.size);
@@ -422,7 +422,7 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { 0 }; /* errarray isnt used here, we use the one from the simulation */
+	ADVAN_MODEL_MEMORY advanmem = { }; /* errarray isnt used here, we use the one from the simulation */
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 

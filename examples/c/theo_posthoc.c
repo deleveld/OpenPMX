@@ -135,7 +135,7 @@ int main(void)
 	};
 
 	let advanfuncs = advanfuncs_alloc(&openpmx.data, &openpmx.advan);
-	let popmodel = popmodel_init(openpmx.theta, openpmx.omega, openpmx.sigma);
+	let popmodel = popmodel_init(&openpmx);
 	var idata = idata_construct(&advanfuncs->recordinfo,
 								 popmodel.ntheta,
 								 popmodel.nomega,
@@ -148,10 +148,10 @@ int main(void)
 	let omegainfo = omegainfo_init(popmodel.nomega,
 								   popmodel.omega,
 								   popmodel.omegafixed);
-	let o = (OPTIONS){ 0 };
+	let o = (OPTIONS){ };
 	let options = options_default(&o);
 
-	let scatteroptions = (SCATTEROPTIONS){ 0 };
+	let scatteroptions = (SCATTEROPTIONS){ };
 
 	stage1_thread(idata.individ,
 				  advanfuncs,

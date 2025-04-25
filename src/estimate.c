@@ -239,7 +239,7 @@ static void encode_evaluate(ENCODE* const test,
 	var popmodel = &test->popmodel;
 	let omegainfo = &test->omegainfo;
 	let nonzero = &omegainfo->nonzero;
-	SCATTEROPTIONS scatteroptions = { 0 };
+	SCATTEROPTIONS scatteroptions = { };
 	scatteroptions.stage1_order = true;
 	scatter_threads(idata, advanfuncs, popmodel, nonzero, options, &scatteroptions, stage1_thread);
 
@@ -577,9 +577,9 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 	var step2 = params->options->estimate.optim.step_initial;
 	var step1 = params->options->estimate.optim.step_refine;
 	forcount(k, n) {
-		double x[OPENPMX_THETA_MAX + OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX + OPENPMX_SIGMA_MAX] = { 0 };
-		double xa[5] = { 0 };
-		double ya[5] = { 0 };
+		double x[OPENPMX_THETA_MAX + OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX + OPENPMX_SIGMA_MAX] = { };
+		double xa[5] = { };
+		double ya[5] = { };
 		xa[2] = 0.;
 		ya[2] = 0.;
 
@@ -771,7 +771,7 @@ static STAGE2_PARAMS stage2_params(const char* filename,
 		.best = *popmodel,
 		.besteta = 0,
 		.neta = neta,
-		.begin = { 0 }, 							/* set after initialization */
+		.begin = { }, 							/* set after initialization */
 		.outstream = outstream,
 		.extstream = extstream,
 		.filename = filename,

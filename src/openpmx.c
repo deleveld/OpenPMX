@@ -28,7 +28,7 @@
 
 STAGE1CONFIG stage1config_default(const STAGE1CONFIG* const stage1)
 {
-	STAGE1CONFIG ret = { 0 };
+	STAGE1CONFIG ret = { };
 	if (stage1)
 		ret = *stage1;
 
@@ -51,7 +51,7 @@ STAGE1CONFIG stage1config_default(const STAGE1CONFIG* const stage1)
 
 ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate)
 {
-	ESTIMCONFIG ret = { 0 };
+	ESTIMCONFIG ret = { };
 	if (estimate)
 		ret = *estimate;
 
@@ -74,7 +74,7 @@ ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate)
 
 SIMCONFIG simconfig_default(const SIMCONFIG* const simulate)
 {
-	SIMCONFIG ret = { 0 };
+	SIMCONFIG ret = { };
 	if (simulate)
 		ret = *simulate;
 

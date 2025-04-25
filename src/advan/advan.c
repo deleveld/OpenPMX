@@ -149,7 +149,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		if (intervalstop > currenttime) {
 
 			/* collect the infusion rates between now and the intervalstop */
-			double totalrates[OPENPMX_STATE_MAX] = { 0 };
+			double totalrates[OPENPMX_STATE_MAX] = { };
 			forvector(i, advan->infusions) {
 				let v = &advan->infusions.data[i];
 				if (v->start <= currenttime && v->end >= currenttime && v->rate > 0.) {

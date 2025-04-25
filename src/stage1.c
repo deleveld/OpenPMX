@@ -104,7 +104,7 @@ static double sample_min2ll_from_inverse(const double* const data,
 //	var lik = 0.;
 //	gsl_blas_ddot(&x.vector, &y.vector, &lik);
 //	return lik;
-	double sum = { 0 };
+	double sum = { };
 	forcount(i, n) {
 		let x = gsl_vector_get(&x.vector, i);
 		let y = gsl_vector_get(&y.vector, i);
@@ -296,7 +296,7 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 	let record = ievaluate_args->record;
 	let recordinfo = &advanfuncs->recordinfo;
 
-	double xx[OPENPMX_OMEGA_MAX] = { 0 };
+	double xx[OPENPMX_OMEGA_MAX] = { };
 	forcount(j, nreta) {
 		memcpy(xx, reta, nreta * sizeof(double));
 		let v = reta[j];
@@ -398,7 +398,7 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 
 	/* make sure we can evaluate at a test point without changing the
 	 * predictions of the individual */
-	double testreta[OPENPMX_OMEGA_MAX] = { 0 };
+	double testreta[OPENPMX_OMEGA_MAX] = { };
 	let stage1 = stage1_params->stage1;
 	forcount(i, nreta) {
 		/* magnitude of step is the square root of eigenvalue */
@@ -477,7 +477,7 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		let eivar = gsl_vector_get(eval, i);
 
 		/* weighting via SD */
-		if (1) {
+		if (0) {
 			let eisd1 = sqrt(eivar);						/* distance in positive direction */
 			let eisd2 = sqrt(eivar); 						/* distance in negative direction */
 			let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
@@ -531,7 +531,7 @@ void stage1_thread(INDIVID* const individ,
 		assume that it is OPENPMX_OMEGA_MAX wide, whereas in the INDIVID
 		it is only nomega wide. We just have to copy back and forth. */
 	int stage1_ineval = 0;
-	double testeta[OPENPMX_OMEGA_MAX] = { 0 };
+	double testeta[OPENPMX_OMEGA_MAX] = { };
 	let stage1_params = (const STAGE1_PARAMS) {
 		.testeta = testeta,
 		.nonzero = nonzero,
@@ -546,7 +546,7 @@ void stage1_thread(INDIVID* const individ,
 		},
 		.eval_msec = &individ->eval_msec,
 	};
-	double reta[OPENPMX_OMEGA_MAX] = { 0 };
+	double reta[OPENPMX_OMEGA_MAX] = { };
 
 	/* if no etas or observations, we cant do anything */
 	/* we dont have anything to popmodel we just set all etas are zero

@@ -63,7 +63,7 @@ static struct {
 	int nrunning;
 	pthread_mutex_t mutex;
 	pthread_cond_t cond;
-} tpool = { 0 };
+} tpool = { };
 
 static struct {
 	INDIVID** individs;		/* individuals that need processing */

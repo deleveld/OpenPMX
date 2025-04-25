@@ -135,7 +135,7 @@ static TABLE table_open(const IDATA* const idata,
 		.tableconfig = tableconfig,
 		.filename = "",
 
-		.zeroerr = { 0 },
+		.zeroerr = { },
 
 		.printrow = 0,
 		.individ = 0,

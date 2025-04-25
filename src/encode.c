@@ -75,7 +75,7 @@ ENCODE encode_init(const POPMODEL* const popmodel)
 		.popmodel = temp_popmodel,
 		.omegainfo = temp_omegainfo,
 		.nparam = n,
-		.offset = { 0 },
+		.offset = { },
 		.has_offsets = false,
 	};
 }

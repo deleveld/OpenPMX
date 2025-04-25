@@ -41,7 +41,7 @@ static void idata_predict_yhat_thread(INDIVID* const individ,
 	(void)nonzero;
 	(void)options;
 
-	double etaarray[OPENPMX_OMEGA_MAX] = { 0 };
+	double etaarray[OPENPMX_OMEGA_MAX] = { };
 	memcpy(etaarray, individ->eta, popmodel->nomega * sizeof(double));
 
 	let ievaluate_args = (IEVALUATE_ARGS) {
@@ -82,7 +82,7 @@ static void idata_predict_pred_thread(INDIVID* const individ,
 	(void)options;
 
 	/* zero eta for pred */
-	double etaarray[OPENPMX_OMEGA_MAX] = { 0 };
+	double etaarray[OPENPMX_OMEGA_MAX] = { };
 
 	let ievaluate_args = (IEVALUATE_ARGS) {
 		.record = individ->record,
@@ -112,7 +112,7 @@ static void idata_predict_yhat(const IDATA* const idata,
 							   const OPTIONS* const options)
 {
 	/* fill in yhat, imodel, and  predictvars */
-	SCATTEROPTIONS scatteroptions = { 0 };
+	SCATTEROPTIONS scatteroptions = { };
 	scatter_threads(idata, advanfuncs, popmodel, 0, options, &scatteroptions, idata_predict_yhat_thread);
 }
 
@@ -122,7 +122,7 @@ static void idata_predict_pred(const IDATA* const idata,
 							   const OPTIONS* const options)
 {
 	/* fill in pred */
-	SCATTEROPTIONS scatteroptions = { 0 };
+	SCATTEROPTIONS scatteroptions = { };
 	scatter_threads(idata, advanfuncs, popmodel, 0, options, &scatteroptions, idata_predict_pred_thread);
 }
 
@@ -135,9 +135,9 @@ void pmx_predict(OPENPMX* pmx)
 	var popmodel = popmodel_init(pmx);
 
 	idata_predict_yhat(&pstate->idata,
-						  pstate->advanfuncs,
-						  &popmodel,
-						  &options);
+					  pstate->advanfuncs,
+					  &popmodel,
+					  &options);
 }
 
 void pmx_predict_pred(OPENPMX* pmx)

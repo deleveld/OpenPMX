@@ -34,7 +34,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 	let omegablocks = pmx->omega;
 	let sigma = pmx->sigma;
 	
-	POPMODEL ret = { 0 };
+	POPMODEL ret = { };
 	ret.ntheta = 0;
 	ret.nblock = 0;
 	ret.nomega = 0;

@@ -41,7 +41,7 @@ static void idata_checkout_thread(INDIVID* const individ,
 	clock_gettime(CLOCK_REALTIME, &t3);
 
 	/* checkout is at ETA at 0 */
-	double eta[OPENPMX_OMEGA_MAX] = { 0 };
+	double eta[OPENPMX_OMEGA_MAX] = { };
 	let ievaluate_args = (IEVALUATE_ARGS) {
 		.record = individ->record,
 		.nrecord = individ->nrecord,
@@ -63,7 +63,7 @@ void idata_checkout(const IDATA* const idata,
 {
 	info(logstream, "checkout begin\n");
 
-	SCATTEROPTIONS scatteroptions = { 0 };
+	SCATTEROPTIONS scatteroptions = { };
 	scatteroptions.checkout_errors = true;
 	scatteroptions.logstream = logstream;
 	scatter_threads(idata, advanfuncs, popmodel, 0, options, &scatteroptions, idata_checkout_thread);

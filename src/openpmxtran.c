@@ -77,7 +77,7 @@ static void string_appendf(STRING* v, const char* format, ... )
 static STRING string_allocf(const char* format, ... )
 {
     va_list args1;
-	STRING ret = { 0 };
+	STRING ret = { };
 
 	va_start(args1, format);
 	string_appendfv(&ret, format, args1);
@@ -575,7 +575,7 @@ static void parse_omegasameblock(PARSERESULT* res, char* p)
 	strip_comments(p, "//", "\n", '\n');
 	strip_firstlast_space(p);
 
-	string_appendf(&res->omega_init, "\t\t{ OMEGA_SAME, %s, { 0 } },", p);
+	string_appendf(&res->omega_init, "\t\t{ OMEGA_SAME, %s, { } },", p);
 }
 
 static void parse_sigma(PARSERESULT* res, char* p)
@@ -632,7 +632,7 @@ int main(int argc, char* argv[])
 	assert(argc == 2);
 	const char* grfilename = argv[1];
 
-	PARSERESULT res = { 0 };
+	PARSERESULT res = { };
 
 	/* read in GR file */
 	fprintf(stdout, "read \"%s\"\n", grfilename);
