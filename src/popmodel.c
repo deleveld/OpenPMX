@@ -274,8 +274,8 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runti
 		forcount(j, i+1)
 			fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->omega[i][j]);
 	fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->result.objfn);
-	fprintf(f, OPENPMX_IFORMAT, ineval);
 	fprintf(f, OPENPMX_TABLE_FORMAT, runtime_s);
+	fprintf(f, OPENPMX_IFORMAT, ineval);
 	fprintf(f, "\n");
 
 	fprintf(f, OPENPMX_IFORMAT, -1000000006);

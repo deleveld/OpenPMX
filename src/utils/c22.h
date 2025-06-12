@@ -49,7 +49,7 @@ char(&countof_helper(T(&)[N]))[N];
 #endif
 
 /* looping */
-#define forcount(index, count) for (int index = 0, size ## __LINE__ = count; index < size ## __LINE__; ++index)
+#define forcount(index, count) for (int index=0, size ## __LINE__ = count; index < size ## __LINE__; ++index)
 #define forarray(index, array) forcount(index, countof(array))
 
 /* typesafe malloc and calloc */

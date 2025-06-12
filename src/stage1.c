@@ -477,7 +477,7 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		let eivar = gsl_vector_get(eval, i);
 
 		/* weighting via SD */
-		if (0) {
+		if (1) {
 			let eisd1 = sqrt(eivar);						/* distance in positive direction */
 			let eisd2 = sqrt(eivar); 						/* distance in negative direction */
 			let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
@@ -639,7 +639,7 @@ void stage1_thread(INDIVID* const individ,
 			warning(0, "icov resample lndet is not finite, ignoring\n");
 	}
 
-		/* We use icov for determining the step size when doing the icov calculation
+	/* We use icov for determining the step size when doing the icov calculation
 	   via gradients in stage1_reducedicov so we cant skip this */
 	let rowcol = nonzero->rowcol;
 	forcount(i, nreta) {

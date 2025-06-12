@@ -58,7 +58,7 @@ static void string_appendfv(STRING* v, const char* format, va_list args1)
 	/* reserve some space including zero terminator and do print at the old end */
 	let oldsize = vector_size(*v);
     vector_resize(*v, oldsize + nchars + 1);
-	char* oldend = &v->data[oldsize];
+	char* oldend = &v->rawptr[oldsize];
     vsnprintf(oldend, nchars + 1, format, args1);
 
     assert(vector_last(*v) == 0);	/* make sure we are terminated */
@@ -168,7 +168,8 @@ static void strip_comments(char *s, const char* ca, const char* cb, const char r
 static char* read_file(const char* filename)
 {
 	var s = fopen(filename, "r");
-	assert(s);
+	if (!s) 
+		fatal("could not read control file \"%s\"", filename);
 
 	/* https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c */
 	char* buffer = NULL;
@@ -197,8 +198,8 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 {
 	fprintf(stdout, "data \"%s\"\n", datafile);
 	var stream = fopen(datafile, "r");
-	if (!stream)
-		fatal("could not open data");
+	if (!stream) 
+		fatal("could not read data file \"%s\"", datafile);
 
 	/* https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c */
 	char* buffer = NULL;
@@ -295,7 +296,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 	string_append(config, "\t\t\t.size = sizeof(RECORD),\n");
 	string_append(config, "\t\t\t.field = {\n");
 	forvector(i, *fieldnames)
-		string_appendf(config, "\t\t\t\t{ .name=\"%s\", .offset=offsetof(RECORD, %s) },\n", fieldnames->data[i], fieldnames->data[i]);
+		string_appendf(config, "\t\t\t\t{ .name=\"%s\", .offset=offsetof(RECORD, %s) },\n", fieldnames->ptr[i], fieldnames->ptr[i]);
 	string_append(config, "\t\t\t},\n");
 	string_append(config, "\t\t},\n");
 	string_append(config, "\t},");
@@ -337,7 +338,7 @@ static void parserresult_free(PARSERESULT* res)
 	vector_free(res->data_preprocess_code);
 	vector_free(res->dataconfig);
 	forvector(i, res->record_field_names)
-		free(res->record_field_names.data[i]);
+		free(vector_elem(res->record_field_names, i));
 	vector_free(res->record_field_names);
 
 	vector_free(res->advan_init);
@@ -345,12 +346,12 @@ static void parserresult_free(PARSERESULT* res)
 	vector_free(res->imodel_diffeqn_code);
 
 	forvector(i, res->imodel_field_names)
-		free(res->imodel_field_names.data[i]);
+		free(vector_elem(res->imodel_field_names, i));
 	vector_free(res->imodel_field_names);
 	vector_free(res->imodel_fields_code);
 
 	forvector(i, res->predict_field_names)
-		free(res->predict_field_names.data[i]);
+		free(vector_elem(res->predict_field_names, i));
 	vector_free(res->predict_field_names);
 	vector_free(res->predict_fields_code);
 
@@ -718,34 +719,34 @@ extern char openpmxtran_template[];
 
 		int i;
 		if (match_recordname(begin, "${OPENPMXTRAN_DEFAULT_FILENAME}\n", &i, false)) {
-			string_appendf(&res.output, "\"%s\"\n", res.filename.data);
+			string_appendf(&res.output, "\"%s\"\n", res.filename.ptr);
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_DATA_ARRAY}\n", &i, false)) {
-			string_appendf(&res.output, "%s\n", res.data.data);
+			string_appendf(&res.output, "%s\n", res.data.ptr);
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_DATA_CONFIG}\n", &i, false)) {
-			string_appendf(&res.output, "%s\n", res.dataconfig.data);
+			string_appendf(&res.output, "%s\n", res.dataconfig.ptr);
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_IMODEL_FIELDS_DECLARE}\n", &i, false)) {
 			forvector(i, res.imodel_field_names) {
-				let s = res.imodel_field_names.data[i];
+				let s = res.imodel_field_names.ptr[i];
 				string_appendf(&res.output, "\tdouble %s;\n", s);
 			}
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_IMODEL_FIELDS_DECLARE_AND_SET}\n", &i, false)) {
 			forvector(i, res.imodel_field_names) {
-				let s = res.imodel_field_names.data[i];
+				let s = res.imodel_field_names.ptr[i];
 				string_appendf(&res.output, "\tdouble %s = _imodel->%s;\n", s, s);
 			}
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_RECORD_FIELDS_DEFINE}\n", &i, false)) {
 			forvector(i, res.record_field_names) {
-				let s = res.record_field_names.data[i];
+				let s = res.record_field_names.ptr[i];
 				string_appendf(&res.output, "\tconst double %s = _record->%s;\n", s, s);
 				string_appendf(&res.output, "\t(void)%s;\n", s);
 			}
@@ -753,14 +754,14 @@ extern char openpmxtran_template[];
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_RECORD_FIELDS_WRITABLE_DEFINE}\n", &i, false)) {
 			forvector(i, res.record_field_names) {
-				let s = res.record_field_names.data[i];
+				let s = res.record_field_names.ptr[i];
 				string_appendf(&res.output, "\tdouble %s = _record->%s;\n", s, s);
 			}
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_DATA_PREPROCESS_CODE}\n", &i, false)) {
 			if (vector_size(res.data_preprocess_code))
-				string_appendf(&res.output, "%s\n", res.data_preprocess_code.data);
+				string_appendf(&res.output, "%s\n", res.data_preprocess_code.ptr);
 			else
 				string_appendf(&res.output, "	/* no data preprocess */\n");
 
@@ -768,39 +769,39 @@ extern char openpmxtran_template[];
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_RECORD_FIELDS_WRITEBACK}\n", &i, false)) {
 			forvector(i, res.record_field_names) {
-				let s = res.record_field_names.data[i];
+				let s = res.record_field_names.ptr[i];
 				string_appendf(&res.output, "\t_record->%s = %s;\n", s, s);
 			}
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_IMODEL_FIELDS_DECLARE}\n", &i, false)) {
 			forvector(i, res.imodel_field_names) {
-				let s = res.imodel_field_names.data[i];
+				let s = res.imodel_field_names.ptr[i];
 				string_appendf(&res.output, "\tdouble %s;\n", s);
 			}
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_IMODEL_FIELDS_CODE}\n", &i, false)) {
-			string_appendf(&res.output, "\t%s\n", res.imodel_fields_code.data);
+			string_appendf(&res.output, "\t%s\n", res.imodel_fields_code.ptr);
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_IMODEL_FIELDS_SET}\n", &i, false)) {
 			forvector(i, res.imodel_field_names) {
-				let s = res.imodel_field_names.data[i];
-				string_appendf(&res.output, "\t_imodel-> %s = %s;\n", s, s);
+				let s = res.imodel_field_names.ptr[i];
+				string_appendf(&res.output, "\t_imodel->%s = %s;\n", s, s);
 			}
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_IMODEL_FIELDS_DECLARE}\n", &i, false)) {
 			forvector(i, res.imodel_field_names) {
-				let s = res.imodel_field_names.data[i];
+				let s = res.imodel_field_names.ptr[i];
 				string_appendf(&res.output, "\tdouble %s;\n", s);
 			}
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_IMODEL_FIELDS_DEFINE}\n", &i, false)) {
 			forvector(i, res.imodel_field_names) {
-				let s = res.imodel_field_names.data[i];
+				let s = res.imodel_field_names.ptr[i];
 				string_appendf(&res.output, "\tconst double %s = _imodel->%s;\n", s, s);
 				string_appendf(&res.output, "\t(void)%s;\n", s);
 			}
@@ -808,7 +809,7 @@ extern char openpmxtran_template[];
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_PREDPARAMS_FIELDS_DECLARE}\n", &i, false)) {
 			forvector(i, res.predict_field_names) {
-				let s = res.predict_field_names.data[i];
+				let s = res.predict_field_names.ptr[i];
 				string_appendf(&res.output, "\tdouble %s;\n", s);
 			}
 			string_append(&res.output, begin + i);
@@ -817,7 +818,7 @@ extern char openpmxtran_template[];
 			if (vector_size(res.imodel_diffeqn_code)) {
 				if (res.needs_diffeqn == false)
 					fatal("This $ADVAN does not require $DIFFEQN");
-				string_appendf(&res.output, "\t%s\n", res.imodel_diffeqn_code.data);
+				string_appendf(&res.output, "\t%s\n", res.imodel_diffeqn_code.ptr);
 			} else
 				string_appendf(&res.output, "\t(void)_dadt;\n\t/* no $DIFFEQN code*/\n\texit(EXIT_FAILURE);\n");
 
@@ -825,50 +826,50 @@ extern char openpmxtran_template[];
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_PREDICT_CODE}\n", &i, false)) {
 			string_append(&res.output, res.predict_state_maybe_unused);
-			string_appendf(&res.output, "\t%s\n", res.predict_fields_code.data);
+			string_appendf(&res.output, "\t%s\n", res.predict_fields_code.ptr);
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_PREDPARAMS_FIELDS_SET}\n", &i, false)) {
 			forvector(i, res.predict_field_names) {
-				let s = res.predict_field_names.data[i];
-				string_appendf(&res.output, "\t_predparams-> %s = %s;\n", s, s);
+				let s = res.predict_field_names.ptr[i];
+				string_appendf(&res.output, "\t_predparams->%s = %s;\n", s, s);
 			}
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_ADVAN_INIT}\n", &i, false)) {
 			string_appendf(&res.output, "\t\t.method = %s,\n", res.advan_method);
-			string_appendf(&res.output, "\t\t%s\n", res.advan_init.data);
+			string_appendf(&res.output, "\t\t%s\n", res.advan_init.ptr);
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_IMODEL_FIELDINFO}\n", &i, false)) {
 			forvector(i, res.imodel_field_names) {
-				let s = res.imodel_field_names.data[i];
+				let s = res.imodel_field_names.ptr[i];
 				string_appendf(&res.output, "\t\t\t\t{ .name=\"%s\", .offset = offsetof(IMODEL, %s) },\n", s, s);
 			}
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_PREDPARAMS_FIELDINFO}\n", &i, false)) {
 			forvector(i, res.predict_field_names) {
-				let s = res.predict_field_names.data[i];
+				let s = res.predict_field_names.ptr[i];
 				string_appendf(&res.output, "\t\t\t\t{ .name=\"%s\", .offset = offsetof(PREDICTVARS, %s) },\n", s, s);
 			}
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_THETA_INIT}\n", &i, false)) {
 			if (vector_size(res.theta_init)) 
-				string_appendf(&res.output, "\t%s\n", res.theta_init.data);
+				string_appendf(&res.output, "\t%s\n", res.theta_init.ptr);
 			string_append(&res.output, begin + i);
 		} else if (match_recordname(begin, "${OPENPMXTRAN_OMEGA_INIT}\n", &i, false)) {
 			if (vector_size(res.omega_init)) 
-				string_appendf(&res.output, "\t%s\n", res.omega_init.data);
+				string_appendf(&res.output, "\t%s\n", res.omega_init.ptr);
 			string_append(&res.output, begin + i);
 		} else if (match_recordname(begin, "${OPENPMXTRAN_SIGMA_INIT}\n", &i, false)) {
 			if (vector_size(res.sigma_init)) 
-				string_appendf(&res.output, "\t%s\n", res.sigma_init.data);
+				string_appendf(&res.output, "\t%s\n", res.sigma_init.ptr);
 			string_append(&res.output, begin + i);
 		
 		} else if (match_recordname(begin, "${OPENPMXTRAN_MAIN_CODE}\n", &i, false)) {
-			string_appendf(&res.output, "\t%s\n", res.analysis_code.data);
+			string_appendf(&res.output, "\t%s\n", res.analysis_code.ptr);
 			string_append(&res.output, begin + i);
 
 		} else
@@ -880,11 +881,11 @@ extern char openpmxtran_template[];
 	}
 
 	/* write output file */
-	STRING outputfile = string_allocf("%s.c", res.filename.data);
-	fprintf(stdout, "write \"%s\"\n", outputfile.data);
-	var f = fopen(outputfile.data, "w");
+	STRING outputfile = string_allocf("%s.c", res.filename.ptr);
+	fprintf(stdout, "write \"%s\"\n", outputfile.ptr);
+	var f = fopen(outputfile.ptr, "w");
 	assert(f);
-	fputs(res.output.data, f);
+	fputs(res.output.ptr, f);
 	fclose(f);
 	vector_free(outputfile);
 

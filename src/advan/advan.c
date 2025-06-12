@@ -37,8 +37,7 @@ void advan_base_construct(ADVAN* advan, const ADVANFUNCS* advanfuncs)
 	/* this allows running without any allocations. TODO: There should be a warning
 	 * if more there an unexpected number of overlapping infusions. Right now vector_reserve()
 	 * would assert() */
-//	vector_reserve(advan->infusions, OPENPMX_SIMULINFUSION_MAX);
-	vector_init_buffer(advan->infusions, advan->_infusions_buffer, OPENPMX_SIMULINFUSION_MAX);
+	vector_reserve(advan->infusions, OPENPMX_SIMULINFUSION_MAX);
 }
 
 void advan_base_destruct(ADVAN* advan)
@@ -127,7 +126,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 
 		/* remove infusions that are in the past */
 		forvector(i, advan->infusions) {
-			let v = &advan->infusions.data[i];
+			let v = &advan->infusions.ptr[i];
 			if (v->end <= currenttime && v->rate > 0.) {
 				vector_remove(advan->infusions, i, 1);
 				--i;
@@ -138,7 +137,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		let recordtime = RECORDINFO_TIME(recordinfo, record);
 		double intervalstop = recordtime;
 		forvector(i, advan->infusions) {
-			let v = &advan->infusions.data[i];
+			let v = &advan->infusions.ptr[i];
 			if (v->end < intervalstop)
 				intervalstop = v->end;
 			if (v->start > currenttime && v->start < intervalstop)
@@ -151,7 +150,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			/* collect the infusion rates between now and the intervalstop */
 			double totalrates[OPENPMX_STATE_MAX] = { };
 			forvector(i, advan->infusions) {
-				let v = &advan->infusions.data[i];
+				let v = &advan->infusions.ptr[i];
 				if (v->start <= currenttime && v->end >= currenttime && v->rate > 0.) {
 					let cmt = v->cmt;
 					let rate = v->rate;
@@ -169,7 +168,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		bool need_reset_now = false;
 		bool need_init_now = false;
 		forvector(i, advan->infusions) {
-			let v = &advan->infusions.data[i];
+			let v = &advan->infusions.ptr[i];
 			if (v->start == currenttime && v->rate == 0.) {
 				assert(v->start == v->end);
 				let record_cmt = v->cmt;
@@ -247,7 +246,7 @@ void pmx_advan_inittime(const ADVANSTATE* const advanstate, const double t)
 	/* if its already on the list then ignore */
 	bool found_already = false;
 	forvector(i, advan->infusions) {
-		let v = &advan->infusions.data[i];
+		let v = &advan->infusions.ptr[i];
 		if (v->cmt == -1. && v->start == t && v->end == t)
 			found_already = true;
 	}

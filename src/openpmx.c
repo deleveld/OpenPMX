@@ -44,8 +44,6 @@ STAGE1CONFIG stage1config_default(const STAGE1CONFIG* const stage1)
 	if (ret.maxeval == 0)
 		ret.maxeval = 1000;
 
-/*	ret.icov_resample = false; this should not be here, zero(false) is the default */
-
 	return ret;
 }
 
@@ -58,16 +56,16 @@ ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate)
 	ret.stage1 = stage1config_default(&ret.stage1);
 
 	let v = pow(DBL_EPSILON, 1./3.);
-	if (ret.optim.step_initial == 0.)
-		ret.optim.step_initial = 0.2;
-	if (ret.optim.step_refine == 0.)
-		ret.optim.step_refine = 0.05;
-	if (ret.optim.step_final == 0.)
-		ret.optim.step_final = v * 10.;
-	if (ret.optim.maxeval == 0)
-		ret.optim.maxeval = 10000;
-	if (ret.optim.dobjfn == 0.)
-		ret.optim.dobjfn = 1.e-3;
+	if (ret.step_initial == 0.)
+		ret.step_initial = 0.2;
+	if (ret.step_refine == 0.)
+		ret.step_refine = 0.05;
+	if (ret.step_final == 0.)
+		ret.step_final = v * 10.;
+	if (ret.maxeval == 0)
+		ret.maxeval = 10000;
+	if (ret.dobjfn == 0.)
+		ret.dobjfn = 1.e-3;
 
 	return ret;
 }
@@ -154,7 +152,7 @@ static PMXSTATE* pmxstate_alloc(const OPENPMX* const pmx)
 
 void pmxstate_ensure(OPENPMX* const pmx)
 {
-	if (pmx->state == 0)
+	if (!pmx->state)
 		pmx->state = pmxstate_alloc(pmx);
 }
 
@@ -169,6 +167,14 @@ static void pmxstate_free(PMXSTATE* pstate)
 		gsl_rng_free(pstate->rng);
 
 	free(pstate);
+}
+
+const PREDICTVARS* pmx_predictvars(OPENPMX* const pmx)
+{
+	if (!pmx->state)
+		return 0;
+	assert(pmx->state->idata.individ[0].predictvars);
+	return pmx->state->idata.individ[0].predictvars;
 }
 
 OPENPMX pmx_copy(const OPENPMX* const pmx)

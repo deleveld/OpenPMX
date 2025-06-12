@@ -31,7 +31,6 @@
 #include "advan/advan.h"
 #include "utils/c22.h"
 #include "utils/vector.h"
-#include "utils/various.h"
 
 static void strip_firstlast_space(char* s)
 {
@@ -61,8 +60,6 @@ typedef struct {
 	const ADVANFUNCS* advanfuncs;
 	const POPMODEL popmodel;
 	const TABLECONFIG* tableconfig;
-	char filename[PATH_MAX];
-	char ext[NAME_MAX];
 
 	const double zeroerr[OPENPMX_SIGMA_MAX];
 
@@ -98,7 +95,7 @@ static TABLE table_open(const IDATA* const idata,
 						const TABLECONFIG* const tableconfig)
 {
 	const char* filename = 0;
-	char ext[PATH_MAX] = "";
+	char ext[NAME_MAX] = "";
 
 	/* determine the file to open */
 	if (tableconfig) {
@@ -112,7 +109,9 @@ static TABLE table_open(const IDATA* const idata,
 		/* with name, you prepend the control file name */
 		} else if (tableconfig->name) {
 			filename = pmx_filename;
-			sprintf(ext, ".%s" OPENPMX_TABLEFILE, tableconfig->name);
+			if (!filename)
+				filename = "";
+			sprintf(ext, "%s", tableconfig->name);
 		}
 	}
 
@@ -120,12 +119,16 @@ static TABLE table_open(const IDATA* const idata,
 	if (!filename) {
 		*tablenum += 1;
 		filename = pmx_filename;
-		sprintf(ext, ".table.%i" OPENPMX_TABLEFILE, *tablenum);
+		sprintf(ext, "table.%i" OPENPMX_TABLEFILE, *tablenum);
 	}
 
-	FILE* stream = stdout;
-	if (filename)
-		stream = results_fopen(filename, ext, "w");
+	char fname[PATH_MAX + NAME_MAX] = "";
+	if (filename && filename[0]) { /* if its either 0 or "" we dont use it */
+		strcpy(fname, filename);
+		strcat(fname, ".");
+	}
+	strcat(fname, ext);
+	var stream = fopen(fname, "w");
 	assert(stream);
 
 	var ret = (TABLE) {
@@ -133,7 +136,6 @@ static TABLE table_open(const IDATA* const idata,
 		.advanfuncs = advanfuncs,
 		.popmodel = *popmodel,
 		.tableconfig = tableconfig,
-		.filename = "",
 
 		.zeroerr = { },
 
@@ -153,9 +155,6 @@ static TABLE table_open(const IDATA* const idata,
 		.yhat = 0,
 		.err = 0,
 	};
-	/* save the full filename and ext */
-	strcpy(ret.filename, filename);
-	strcpy(ret.ext, ext);
 	
 	/* parse fields string and write the header */
 	/* we have to tokenize a copy of the fields */
@@ -384,7 +383,7 @@ void pmx_table(OPENPMX* pmx,
 	/* write out fields */
 	while (table_row(&table)) {
 		forvector(i, table.fieldnames) {
-			let name = table.fieldnames.data[i];
+			let name = table.fieldnames.ptr[i];
 			let val = table_value(&table, name, pmx->_offset1);
 			fprintf(f, OPENPMX_TABLE_FORMAT, val);
 		}

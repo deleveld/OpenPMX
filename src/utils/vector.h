@@ -35,49 +35,49 @@ extern "C" {
 #define VECTOR(type)                                                   \
 	union {                                                            \
 		VECTOR_DATA _vector;                                           \
-		type* data;                                                    \
+		const type* const ptr;                                         \
+		type* rawptr;                                                  \
 	}
 
-#define vector_alloc(mxvect) 		{  }
-#define vector_init_buffer(mxvect, _a, _b)                             \
-do {                                                                   \
-	(mxvect)._vector = (VECTOR_DATA) { ._data=&((_a)[0]), ._size = 0, ._capacity=-abs(_b), };\
-} while (0)
+#define vector_alloc(_mxvect) 		{  }
+#define vector_free(_mxvect) 		_vector_free(&(_mxvect)._vector);
 
-#define vector_free(mxvect) _vector_free(&(mxvect)._vector);
+#define vector_size(_mxvect)		((const int)((_mxvect)._vector._size))
+#define vector_capacity(_mxvect)	((const int)abs((_mxvect)._vector._capacity))
 
-#define vector_size(mxvect)			((const int)((mxvect)._vector._size))
-#define vector_capacity(mxvect)		((const int)abs((mxvect)._vector._capacity))
+#define vector_elem(_mxvect, ...)	((_mxvect).rawptr[__VA_ARGS__])
 
-#define vector_at(mxvect, ...)		((mxvect).data[__VA_ARGS__])
+#define vector_first(_mxvect)	 	((_mxvect).ptr[0])
+#define vector_last(_mxvect) 		((_mxvect).ptr[vector_size(_mxvect)-1])
 
-#define vector_first(mxvect)	 	((mxvect).data[0])
-#define vector_last(mxvect) 		((mxvect).data[vector_size(mxvect)-1])
+#define vector_resize(_mxvect, _n)	_vector_resize(&(_mxvect)._vector, (_n), sizeof((_mxvect).ptr[0]))
+#define vector_reserve(_mxvect, _n)	_vector_reserve(&(_mxvect)._vector, (_n), sizeof((_mxvect).ptr[0]))
 
-#define vector_resize(mxvect, n)	_vector_resize(&(mxvect)._vector, (n), sizeof((mxvect).data[0]))
-#define vector_reserve(mxvect, n)	_vector_reserve(&(mxvect)._vector, (n), sizeof((mxvect).data[0]))
-
-#define vector_append(mxvect, ...)                                     \
+#define vector_append(_mxvect, ...)                                    \
 	do {                                                               \
-		const int mx__n = vector_size(mxvect);                         \
-		vector_resize(mxvect, mx__n + 1);                              \
-		(mxvect).data[mx__n] = (__VA_ARGS__);                          \
+		typeof(&(_mxvect)) _mxvectptr = &(_mxvect);                    \
+		const int mx__n = vector_size(*_mxvectptr);                    \
+		vector_resize(*_mxvectptr, mx__n + 1);                         \
+		vector_elem(*_mxvectptr, mx__n) = (__VA_ARGS__);               \
 	} while (0)
 
-#define vector_appendn(mxvect, _dat, _n)                               \
+#define vector_appendn(_mxvect, _dat, _n)                              \
 	do {                                                               \
-		const int mx__n = vector_size(mxvect);                         \
-		vector_resize(mxvect, mx__n + (int)_n);                        \
-		for (int mx__i=0; mx__i<(int)_n; ++mx__i)                      \
-			(mxvect).data[mx__n + mx__i] = (_dat)[mx__i];              \
+		typeof(&(_mxvect)) _mxvectptr = &(_mxvect);                    \
+		typeof(_dat) _datptr = (_dat);                                 \
+		const int _datn = (int)(_n);                                   \
+		const int _oldn = vector_size(*_mxvectptr);                    \
+		vector_resize(*_mxvectptr, _oldn + _datn);                     \
+		for (int _i=0; _i<_datn; _i++)                                 \
+			vector_elem(*_mxvectptr, _oldn + _i) = _datptr[_i];        \
 	} while (0)
 
-#define vector_remove(mxvect, ind, n) _vector_remove(&(mxvect)._vector, (ind), (n), (int)sizeof((mxvect).data[0]))
+#define vector_remove(_mxvect, _ind, _n) _vector_remove(&(_mxvect)._vector, (_ind), (_n), (int)sizeof((_mxvect).ptr[0]))
 
-#define vector_remove_first(mxvect) vector_remove(mxvect, 0, 1)
-#define vector_remove_last(mxvect) vector_resize(mxvect, vector_size(mxvect) - 1)
+#define vector_remove_first(_mxvect) vector_remove(_mxvect, 0, 1)
+#define vector_remove_last(_mxvect) vector_resize(_mxvect, vector_size(_mxvect) - 1)
 
-#define forvector(index, mxvect) for(int index=0; index < vector_size(mxvect); index++)
+#define forvector(_index, _mxvect) for(int _index=0; _index < vector_size(_mxvect); _index++)
 
 	void _vector_free(VECTOR_DATA * vect);
 	void _vector_resize(VECTOR_DATA * vect, const int newsize, const size_t sizeofdata);

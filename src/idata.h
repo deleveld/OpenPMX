@@ -44,6 +44,7 @@ typedef struct {
 	double* icovweight;
 	double* isimerr;	/* only for simulation */
 
+	/* objective function */
 	double obs_min2ll;
 	double obs_lndet;
 	double eta_min2ll;

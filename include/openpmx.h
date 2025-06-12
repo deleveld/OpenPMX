@@ -208,6 +208,7 @@ typedef struct {
 	} omega[OPENPMX_OMEGABLOCK_MAX];
 	double sigma[OPENPMX_SIGMA_MAX];
 
+	/* output */
 	PMXRESULT result;
 
 	/* internal use */
@@ -216,16 +217,30 @@ typedef struct {
 
 void pmx_cleanup(OPENPMX* openpmx);
 
-void pmx_predict(OPENPMX* openpmx);
-void pmx_predict_pred(OPENPMX* openpmx);
-
 OPENPMX pmx_copy(const OPENPMX* const openpmx);
 void pmx_copy_popparams(OPENPMX* dest, const OPENPMX* const src);
 
 /*---------------------------------------------------------------------*/
-/* estimation and simulation */
+/* prediction */
 /*---------------------------------------------------------------------*/
-/* for stage 1 (posthoc) estimation */
+void pmx_predict(OPENPMX* openpmx);
+void pmx_predict_pred(OPENPMX* openpmx);
+const IMODEL* pmx_imodel(OPENPMX* const pmx);
+const PREDICTVARS* pmx_predictvars(OPENPMX* const pmx);
+
+/*---------------------------------------------------------------------*/
+/* simulation */
+/*---------------------------------------------------------------------*/
+typedef struct {
+	unsigned long seed;
+} SIMCONFIG;
+
+void pmx_resample(OPENPMX* pmx, const SIMCONFIG* const simconfig);
+void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig);
+
+/*---------------------------------------------------------------------*/
+/* evaluation */
+/*---------------------------------------------------------------------*/
 typedef struct {
 	double gradient_step;
 	double step_initial;
@@ -236,35 +251,27 @@ typedef struct {
 	bool icov_resample;
 } STAGE1CONFIG;
 
-/* for OBJFN minimization */
+void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const evalconfig);
+
+/*---------------------------------------------------------------------*/
+/* estimation */
+/*---------------------------------------------------------------------*/
 typedef struct {
+	STAGE1CONFIG stage1;
+
 	double step_initial;
 	double step_refine;
 	double step_final;
 	int maxeval;
 	double dobjfn;
-} OPTIMCONFIG;
 
-/* for simulations */
-typedef struct {
-	unsigned long seed;
-} SIMCONFIG;
-
-/* for estimation */
-typedef struct {
-	STAGE1CONFIG stage1;
-	OPTIMCONFIG optim;
 	bool details;
 	bool verbose;
 	bool progress;
 } ESTIMCONFIG;
 
-void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const evalconfig);
 void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimconfig);
 void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimconfig);
-
-void pmx_resample(OPENPMX* pmx, const SIMCONFIG* const simconfig);
-void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig);
 
 /*---------------------------------------------------------------------*/
 /* tables */

@@ -133,7 +133,7 @@ static double objfn(const IDATA* const idata,
 		let term1 = individ->obs_lndet;
 		let term2 = individ->obs_min2ll;
 		let term3 = individ->eta_min2ll;
-		double term4 = omegainfo->omega_nonzero_lndet;
+		var term4 = omegainfo->omega_nonzero_lndet;
  		let term5 = individ->icov_lndet;
 		if (individ->nobs == 0) {
 			assert(term1 == 0.);
@@ -297,7 +297,7 @@ static double foce_stage2_f(const gsl_vector* const v, void* const params)
 static void foce_stage2_df(const gsl_vector * const x, void* const _params, gsl_vector* const J)
 {
 	let params = (const STAGE2_PARAMS *) _params;
-	let step_size = params->options->estimate.optim.step_initial;
+	let step_size = params->options->estimate.step_initial;
 	let n = params->test.nparam;
 	var xx = gsl_vector_alloc(n);
 
@@ -346,10 +346,10 @@ static const char* focei(STAGE2_PARAMS* const params)
 		lower[i] = -DBL_MAX;
 		upper[i] = DBL_MAX;
 	}
-	let maxeval = options->estimate.optim.maxeval;
-	let step_initial = options->estimate.optim.step_initial;
-	let step_refine = options->estimate.optim.step_refine;
-	let step_final = options->estimate.optim.step_final;
+	let maxeval = options->estimate.maxeval;
+	let step_initial = options->estimate.step_initial;
+	let step_refine = options->estimate.step_refine;
+	let step_final = options->estimate.step_final;
 
 #ifdef OPTIMIZER_OUTER_GSL_NELDERMEAD
 	/* Initialize method and iterate */
@@ -415,7 +415,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 		gsl_multimin_fdfminimizer_free(s);
 
 		let objfn = params->best.result.objfn;
-		if (prevobjfn - objfn < fabs(options->estimate.optim.dobjfn))
+		if (prevobjfn - objfn < fabs(options->estimate.dobjfn))
 			break;
 		prevobjfn = objfn;
 	}
@@ -473,7 +473,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 			info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
 			lastobjfn = best->result.objfn;
 		}
-		while (dobjfn < -1.*fabs(options->estimate.optim.dobjfn));
+		while (dobjfn < -1.*fabs(options->estimate.dobjfn));
 	}
 	info(params->outstream, "optim rho %g\n", rhoend);
 
@@ -575,8 +575,8 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 
 	let f0 = params->best.result.objfn;
 
-	var step2 = params->options->estimate.optim.step_initial;
-	var step1 = params->options->estimate.optim.step_refine;
+	var step2 = params->options->estimate.step_initial;
+	var step1 = params->options->estimate.step_refine;
 	forcount(k, n) {
 		double x[OPENPMX_THETA_MAX + OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX + OPENPMX_SIGMA_MAX] = { };
 		double xa[5] = { };
@@ -687,7 +687,7 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 	encode_offset(&params->test, &params->best); /* this probably does nothing */
 
 	/* call the underlying advan to optimize and find the best imodel */
-	let maxeval = options->estimate.optim.maxeval;
+	let maxeval = options->estimate.maxeval;
 	params->best.result.type = OBJFN_EVALUATE;
 	if (maxeval > 1) {
 		focei(params); /* TODO: this should be renamed I think */
@@ -807,7 +807,7 @@ static void estimate_popmodel(const char* filename,
 {
 	const char* message = "Evaluate only";
 	var outfile_type = OUTFILE_HEADER_EVALUATE;
-	let maxeval = options->estimate.optim.maxeval;
+	let maxeval = options->estimate.maxeval;
 	popmodel->result.type = OBJFN_CURRENT;
 	if (maxeval > 1) {
 		message = focei(0);
@@ -885,7 +885,7 @@ void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 		options.estimate.stage1 = stage1config_default(stage1);
 		*stage1 = options.estimate.stage1;
 	}
-	options.estimate.optim.maxeval = 1;
+	options.estimate.maxeval = 1;
 
 	var popmodel = popmodel_init(pmx);
 
@@ -908,9 +908,9 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 		options.estimate = estimconfig_default(estimate);
 		*estimate = options.estimate;
 	}
-	options.estimate.optim.step_initial = 1.;
-	options.estimate.optim.step_refine = 0.1;
-	options.estimate.optim.step_final = 0.01;
+	options.estimate.step_initial = 1.;
+	options.estimate.step_refine = 0.1;
+	options.estimate.step_final = 0.01;
 
 	var popmodel = popmodel_init(pmx);
 

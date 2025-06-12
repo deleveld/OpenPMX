@@ -160,12 +160,13 @@ static void idata_predict_dv(IDATA* const idata,
 							const POPMODEL* popmodel,
 							const OPTIONS* const options)
 {
-	/* if error has not been resampled yet, then use zero for error */
+	/* make sure error has been allocated. If error has not been resampled yet,
+	 * then the initial value (zero) will be used */
 	idata_alloc_simerr(idata);
 
 	/* simulation writes into pred (with error) and yhat (without error) */
-	/* TODO: we have to not write non-DV objects in simulation. You mean predict?
-	 * Im not sure I understand anymore */
+	/* TODO: we have to not write non-DV objects in simulation. You mean PREDICTVARS?
+	 * why not? */
 	SCATTEROPTIONS scatteroptions = { };
 	scatter_threads(idata, advanfuncs, popmodel, 0, options, &scatteroptions, simulate_with_error_thread);
 
