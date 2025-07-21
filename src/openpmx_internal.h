@@ -31,7 +31,6 @@ extern "C" {
 
 typedef struct {
 	int nthread;
-	const bool _offset1;
 	ESTIMCONFIG estimate;
 	SIMCONFIG simulate;
 } OPTIONS;

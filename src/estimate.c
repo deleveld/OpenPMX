@@ -731,10 +731,10 @@ static void outfile_header(FILE* f2,
 #error no parallel processing advan defined
 #endif
 	info(f2, "config %s %i\n", message, options->nthread);
-	info(f2, "config table offset %s\n", options->_offset1 ? "true" : "false");
 
 	info(f2, "data records %i used %i removed %i\n", advanfuncs->recordinfo.dataconfig->nrecords, idata->ndata, advanfuncs->recordinfo.dataconfig->nrecords - idata->ndata);
 	info(f2, "data individuals %i observations %i\n", idata->nindivid, idata->nobs);
+	info(f2, "data table offset %s\n", advanfuncs->recordinfo.dataconfig->_offset1 ? "true" : "false");
 
 	advanfuncs->info(advanfuncs, stdout);
 	if (f2)
@@ -820,7 +820,7 @@ static void estimate_popmodel(const char* filename,
 	/* do some logging */
 	/* start extfile and other headers, rest will be saved during iterations */
 	outfile_header(params.outstream, advanfuncs, idata, options, outfile_type);
-	var _offset1 = options->_offset1;
+	var _offset1 = advanfuncs->recordinfo.dataconfig->_offset1;
 	if (params.extstream) 
 		extfile_header(params.extstream, &params.best, _offset1);
 	if (maxeval > 1)

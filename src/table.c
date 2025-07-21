@@ -384,7 +384,7 @@ void pmx_table(OPENPMX* pmx,
 	while (table_row(&table)) {
 		forvector(i, table.fieldnames) {
 			let name = table.fieldnames.ptr[i];
-			let val = table_value(&table, name, pmx->_offset1);
+			let val = table_value(&table, name, pmx->data._offset1);
 			fprintf(f, OPENPMX_TABLE_FORMAT, val);
 		}
 		fputc('\n', f);

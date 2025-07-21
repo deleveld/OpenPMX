@@ -1082,7 +1082,6 @@ char openpmxtran_template[] =
 "static OPENPMX openpmx = (OPENPMX) {\n"
 "	.filename = OPENPMXTRAN_DEFAULT_FILENAME,\n"
 "	.nthread = 0,\n"
-"	._offset1 = true,\n"
 "	.data = \n"
 "/* begin OPENPMXTRAN_DATA_CONFIG */\n"
 "${OPENPMXTRAN_DATA_CONFIG}\n"

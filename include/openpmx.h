@@ -181,7 +181,6 @@ typedef struct {
 	/* options and config */
 	const char* filename;
 	int nthread;
-	bool _offset1;
 
 	/* the problem structure to analyse */
 	const DATACONFIG data;
