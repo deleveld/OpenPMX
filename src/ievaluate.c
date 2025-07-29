@@ -106,6 +106,14 @@ static bool check_state(const double* const a, const int n, FILE* logstream, con
 	return false;
 }
 
+/* For how this is used see PAGE poster:
+ * A comparison of methods for handling of data below the limit of quantification in NONMEM VI */
+#include <gsl/gsl_cdf.h>
+static inline double phi(const double x)
+{
+	return gsl_cdf_ugaussian_P(x);
+}
+
 typedef struct {
 	double errarray[OPENPMX_SIGMA_MAX];
 	double _predictvars[OPENPMX_PREDICTVARS_MAX];	/* will be cast to PREDICTVARS */
@@ -136,6 +144,7 @@ double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 	let predict = advanconfig->predict;
 	let recordinfo = &advanfuncs->recordinfo;
 	let recordsize = recordinfo->dataconfig->recordfields.size;
+	let no_dvlow_present = recordinfo->offsetDVLOW == -1;
 	var obs_min2ll = 0.; /* separate sums to avoid loss of precision if magnitudes differ strongly */
 	var obs_lndet = 0.;
 	const RECORD* ptr = record;
@@ -147,9 +156,14 @@ double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 			let yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 
-			let err = dv - yhat;
-			obs_min2ll += (err * err) / yhatvar;
-
+			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
+			if (dvlow == 0.) {
+				let err = dv - yhat;
+				obs_min2ll += (err * err) / yhatvar;
+			} else {
+				let err = dvlow - yhat;
+				obs_min2ll += -2. * log(phi(err / sqrt(yhatvar)));
+			}
 			obs_lndet += log(yhatvar);
 		}
 		ptr = RECORD_INDEX(ptr, recordsize, 1);	
@@ -173,8 +187,8 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 						 double* const istate,
 						 double* const YHAT,
 						 double* const YHATVAR,
-						 double* const obs_lndet,
-						 double* const obs_min2ll)
+						 double* const ret_obs_lndet,
+						 double* const ret_obs_min2ll)
 {
 	let advanfuncs = ievaluate_args->advanfuncs;
 	let record = ievaluate_args->record;
@@ -195,10 +209,11 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	let predictall = advanconfig->predictall;
 	let nstate = advanfuncs->nstate;
 	let recordinfo = &advanfuncs->recordinfo;
+	let no_dvlow_present = recordinfo->offsetDVLOW == -1;
 	let imodel_size = advanconfig->imodelfields.size;
 	let predictvars_size = advanconfig->predictfields.size;
-	var local_obs_min2ll = 0.;
-	var local_obs_lndet = 0.;
+	var obs_min2ll = 0.;
+	var obs_lndet = 0.;
 	const RECORD* ptr = record;
 	forcount(i, nrecord) {
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
@@ -230,15 +245,20 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 			/* we dont really need to have the check here if we are saving
 			 * the obs_min2ll or obs_lndet or not. It seems reasonable to think
 			 * that its faster not to calculate it if we dont need it */
-			let dv = RECORDINFO_DV(recordinfo, ptr);
-			if (obs_min2ll) {
-				let err = dv - yhat;
-				let min2ll_term = (err * err) / yhatvar;
-				local_obs_min2ll += min2ll_term;
+			if (ret_obs_min2ll) {
+				let dv = RECORDINFO_DV(recordinfo, ptr);
+				let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
+				if (dvlow == 0.) {
+					let err = dv - yhat;
+					obs_min2ll += (err * err) / yhatvar;
+				} else {
+					let err = dvlow - yhat;
+					obs_min2ll += -2. * log(phi(err / sqrt(yhatvar)));
+				}
 			}
-			if (obs_lndet) {
+			if (ret_obs_lndet) {
 				let lndet_term = log(yhatvar);
-				local_obs_lndet += lndet_term;
+				obs_lndet += lndet_term;
 			}
 		} else {
 			/* yhatvar must be set to zero for non-observations since these
@@ -248,10 +268,10 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 		}
 		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
 	}
-	if (obs_min2ll)
-		*obs_min2ll = local_obs_min2ll;
-	if (obs_lndet) 
-		*obs_lndet = local_obs_lndet;
+	if (ret_obs_min2ll)
+		*ret_obs_min2ll = obs_min2ll;
+	if (ret_obs_lndet) 
+		*ret_obs_lndet = obs_lndet;
 		
 	advanfuncs->destruct(advan);
 }
@@ -281,6 +301,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	let predict = advanconfig->predict;
 	let predictall = advanconfig->predictall;
 	let recordinfo = &advanfuncs->recordinfo;
+	let no_dvlow_present = recordinfo->offsetDVLOW == -1;
 	const RECORD* ptr = record;
 	let id = RECORDINFO_ID(recordinfo, ptr);
 	if (id != floor(id))
@@ -307,6 +328,8 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		/* check record before advance */
 		/* observations */
 		if (evid == 0) {
+			if (dv == 0.)
+				warning(logstream, "DV zero for observation: ID %f time %f record %i\n", id, time, i);
 
 			/* observation should be finite */
 			if (!isfinite(dv))
@@ -352,19 +375,26 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
 			if (isfinite(amt) && amt != 0.)
-				warning(logstream, "AMT non-zero (%f) for reset event ID %f time %f record %i\n", amt, id, time, i);
+				warning(logstream, "AMT non-zero (%f) for reset: ID %f time %f record %i\n", amt, id, time, i);
 
 			let rate = RECORDINFO_RATE(recordinfo, ptr);
 			if (isfinite(rate) && rate != 0.)
-				warning(logstream, "RATE non-zero (%f) for reset event ID %f time %f record %i\n", rate, id, time, i);
+				warning(logstream, "RATE non-zero (%f) for reset: ID %f time %f record %i\n", rate, id, time, i);
 
 			if (isfinite(dv) && dv != 0.)
-				warning(logstream, "DV non-zero (%f) for reset event ID %f time %f record %i\n", dv, id, time, i);
+				warning(logstream, "DV non-zero (%f) for reset: ID %f time %f record %i\n", dv, id, time, i);
 
 		/* other event type */
 		} else {
 			if (!isfinite(dv) && dv != 0.)
-				warning(logstream, "non-zero DV (%f) for non-observation for ID %f time %f record %i\n", dv, id, time, i);
+				warning(logstream, "non-zero DV (%f) for non-observation: ID %f time %f record %i\n", dv, id, time, i);
+		}
+
+		/* dvlow implies observation */
+		if (evid != 0) {
+			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
+			if (dvlow != 0.) 
+				fatal(logstream, "DVLOW (%f) present for non-observation: ID %f record %i\n", dvlow, id, i);
 		}
 
 		/* state always should remain finite */

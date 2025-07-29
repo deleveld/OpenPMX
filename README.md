@@ -81,6 +81,8 @@ The PK analysis example is:
 - Douglas Eleveld (deleveld@dds.nl) Initial release. 
 
 # Wish-list / TODO
+- Some code for LLQ has been added via data coloum DVLLQ. IF exists and non-zero then objective function term is added
+	the -2LL that the prediction will be lower than the DV
 - During checkout, calculate paramater gradients to identify paramaters that may be numerically unidentifiable
 - Make estimation of categorical variables possible.
 - Post-estimation evaluation of the objective function in the spirit of NONMEM and $COV. Possibly the gradient can be calculated at the final estimate and the first and second derivatives calculated using splines. It is also possible to transform this back into the scale of the user paramaters?

@@ -26,7 +26,12 @@
 
 #include <gsl/gsl_blas.h>
 
-#define ESTIMATE_SD_NOT_VAR
+//#define ESTIMATE_SD_NOT_VAR
+
+//#define ENCODE_SPECIAL
+#define ENCODE_ATANH
+//#define ENCODE_LINEAR
+//#define ENCODE_NONMEM
 
 static int encode_nparam(const POPMODEL* const popmodel,
 						 const OMEGAINFO* const omegainfo)
@@ -80,11 +85,34 @@ ENCODE encode_init(const POPMODEL* const popmodel)
 	};
 }
 
-#define ENCODE_ATANH
-//#define ENCODE_LINEAR
+#ifdef ENCODE_SPECIAL
+static inline double backward(const double x)
+{
+	double v = x / 2.;
+	double f = v;
+	if (v > 0.9)
+		f = 0.9 + 0.1*tanh(10.*v - 9.);
+	if (v < -0.9)
+		f = -0.9 - 0.1*tanh(-10.*v - 9.);
+	return f;
+}
+
+static inline double forward(const double v)
+{
+	double f = v;
+	if (v > 0.9)
+		f = 0.9 - 0.1 * atanh(9. - 10.*v);
+	if (v < -0.9)
+		f = -0.9 + 0.1 * atanh(10.*v + 9.);
+	return f * 2.;
+}
+#endif
 
 static double theta_transform(const double value, const double lower, const double upper)
 {
+#ifdef ENCODE_SPECIAL
+	return forward(2. * (value - lower) / (upper - lower) - 1.);
+#endif
 #ifdef ENCODE_ATANH
 	return atanh(2. * (value - lower) / (upper - lower) - 1.);
 #endif
@@ -95,22 +123,28 @@ static double theta_transform(const double value, const double lower, const doub
 		return 1.;
 	return 2. * (value - lower) / (upper - lower) - 1.;
 #endif
+#ifdef ENCODE_NONMEM
 // Same as NONMEM
-//	return log(value - lower) - log(upper - value);
+	return log(value - lower) - log(upper - value);
+#endif
 }
 
 static double theta_untransform(const double f, const double lower, const double upper)
 {
+#ifdef ENCODE_SPECIAL
+	return lower + (backward(f) + 1.) * (upper - lower) / 2.;
+#endif
 #ifdef ENCODE_ATANH
 	return lower + (tanh(f) + 1.) * (upper - lower) / 2.;
 #endif
 #ifdef ENCODE_LINEAR
 	return lower + (f + 1.) * (upper - lower) / 2.;
 #endif
-
+#ifdef ENCODE_NONMEM
 // Same as NONMEM
 // https://www.wolframalpha.com/input?i2d=true&i=solve+for+x%3B+w+%3D+log%5C%2840%29x-l%5C%2841%29-log%5C%2840%29u-x%5C%2841%29
-//	return (lower + upper * exp(f)) / (exp(f) + 1.);
+	return (lower + upper * exp(f)) / (exp(f) + 1.);
+#endif
 }
 
 /* scale the matrix to have the same diagonal as the reference

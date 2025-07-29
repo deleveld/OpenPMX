@@ -73,8 +73,8 @@ typedef struct {
 	ADVAN* advan;
 	
 	/* info about the record being processed */
-	const double statetime;
 	const RECORD* const record;
+	const double statetime;
 	const double* const state;
 } ADVANSTATE;
 

@@ -37,6 +37,7 @@ typedef struct {
 	const int offsetAMT;
 	const int offsetRATE;
 	const int offsetCMT;
+	const int offsetDVLOW;
 	const bool _offset1;
 	const int ndata;
 	const int nindivid;
@@ -117,6 +118,14 @@ static inline double RECORDINFO_CMT(const RECORDINFO* const recordinfo, const RE
 		return 0.;
 
 	return *(const double*)((const char*)p + recordinfo->offsetCMT);
+}
+
+static inline double RECORDINFO_DVLOW(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	if (recordinfo->offsetDVLOW == -1)
+		return 0.;
+
+	return *(const double*)((const char*)p + recordinfo->offsetDVLOW);
 }
 
 static inline const RECORD* RECORDINFO_INDEX(const RECORDINFO* const recordinfo, const RECORD* p, const int i)

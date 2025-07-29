@@ -33,19 +33,20 @@ RECORDINFO recordinfo_init(const DATACONFIG* const dataconfig)
 	 * of individuals and observations in the data.
 	 * This is done in this indirect somewhat awkward way so that the RECORDINFO struct can have const members */
 	RECORDINFO temp = (RECORDINFO) {
-		.dataconfig = dataconfig,
-		.offsetID 	= structinfo_find_offset("ID", recordfields),
-		.offsetTIME = structinfo_find_offset("TIME", recordfields),
-		.offsetDV	= structinfo_find_offset("DV", recordfields),
-		.offsetEVID = structinfo_find_offset("EVID", recordfields),
-		.offsetMDV 	= structinfo_find_offset("MDV", recordfields),
-		.offsetAMT 	= structinfo_find_offset("AMT", recordfields),
-		.offsetRATE = structinfo_find_offset("RATE", recordfields),
-		.offsetCMT 	= structinfo_find_offset("CMT", recordfields),
-		._offset1 = dataconfig->_offset1,
-		.ndata = 0,
-		.nindivid = 0,
-		.nobs = 0,
+		.dataconfig 	= dataconfig,
+		.offsetID 		= structinfo_find_offset("ID", recordfields),
+		.offsetTIME		= structinfo_find_offset("TIME", recordfields),
+		.offsetDV		= structinfo_find_offset("DV", recordfields),
+		.offsetEVID		= structinfo_find_offset("EVID", recordfields),
+		.offsetMDV		= structinfo_find_offset("MDV", recordfields),
+		.offsetAMT		= structinfo_find_offset("AMT", recordfields),
+		.offsetRATE		= structinfo_find_offset("RATE", recordfields),
+		.offsetCMT		= structinfo_find_offset("CMT", recordfields),
+		.offsetDVLOW	= structinfo_find_offset("DVLOW", recordfields),
+		._offset1		= dataconfig->_offset1,
+		.ndata			= 0,
+		.nindivid		= 0,
+		.nobs			= 0,
 	};
 
 	/* count the number of individuals and observations using the incompletely constructed RECORDINFO */
@@ -82,6 +83,7 @@ RECORDINFO recordinfo_init(const DATACONFIG* const dataconfig)
 		.offsetAMT 	= temp.offsetAMT,
 		.offsetRATE = temp.offsetRATE,
 		.offsetCMT 	= temp.offsetCMT,
+		.offsetDVLOW = temp.offsetDVLOW,
 		._offset1 = temp._offset1,
 		.ndata = nusuable,
 		.nindivid = nindivid,

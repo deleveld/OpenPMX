@@ -20,7 +20,7 @@ TARGET="${1:-pthread}"
 LIBTYPE="${2:-shared}"
 UNAME="$(uname -s)"
 PLATFORM="${3:-${UNAME}}"
-OPENPMXPATH=$(cd `dirname ${0}` && pwd)
+OPENPMXPATH=$(cd "$(dirname "${0}")" && pwd)
 
 set -eu
 
@@ -124,7 +124,7 @@ elif [ "${TARGET}" = "singlethread" ]; then
 
 # unknown install flag
 else
-	echo "error: install: target \""${TARGET}"\" not recognized"
+	echo "error: install: target \"${TARGET}\" not recognized"
 	exit 1
 fi
 
@@ -137,7 +137,7 @@ OBJECTFILES=
 for FILE in ${SOURCEFILES}
 do
 	echo "compile ${FILE}"
-	BASE=$(basename ${FILE})
+	BASE=$(basename "${FILE}")
 	OBJFILE="${BASE%.*}.o"
 	(cd "${OPENPMXPATH}"; ${CC} ${CFLAGS} ${CLIBFLAGS} -Iinclude -c "src/${FILE}" -o "build/${OBJFILE}")
 	OBJECTFILES="${OBJECTFILES} build/${OBJFILE}"

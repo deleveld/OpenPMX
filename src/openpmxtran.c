@@ -400,6 +400,9 @@ static void parse_data(PARSERESULT* res, char* p)
 
 	strip_firstlast_space(endvars + 1);
 	string_append(&res->data_preprocess_code, endvars + 1);
+
+	if (vector_size(res->data_preprocess_code) != 0) 
+		fatal("data preprocess should probably be removed\n");
 }
 
 static void parse_advan_init(PARSERESULT* res, char* p)
@@ -968,7 +971,9 @@ char openpmxtran_template[] =
 "#undef ALAG\n"
 "#undef BIOAVAIL\n"
 "#undef STATETIME\n"
+"#undef INITCOUNT\n"
 "#undef INITTIME\n"
+"#undef A_0\n"
 "\n"
 "	/* set IMODEL fields */\n"
 "${OPENPMXTRAN_IMODEL_FIELDS_SET}\n"

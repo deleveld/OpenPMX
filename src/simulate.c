@@ -154,7 +154,7 @@ static void idata_resample_eta(IDATA* const idata,
 /* after idata_predict_dv then DV in thet dataset is replaced by observation
  * simulation with noise. pred is set to zero and yhat is the observation
  * without noise. If the error has not been resampled yet by calling
- * idata_resample_err then the error will be zero*/
+ * idata_resample_err then the error will be zero */
 static void idata_predict_dv(IDATA* const idata,
 							const ADVANFUNCS* const advanfuncs,
 							const POPMODEL* popmodel,
@@ -181,7 +181,6 @@ static void idata_predict_dv(IDATA* const idata,
 		fatal(0, "writeable data does not match readable data\n");
 
 	var offsetDV = recordinfo->offsetDV;
-	var ptrdv = (double*)((char*)writeable + offsetDV);
 	let pred = idata->individ[0].pred;
 
 	/* write back from pred (obs *with* noise) into DV
@@ -189,8 +188,9 @@ static void idata_predict_dv(IDATA* const idata,
 	let ndata = recordinfo->ndata;
 	var recordsize = dataconfig->recordfields.size;
 	forcount(i, ndata) {
+		var ptr = (double*)((char*)writeable + recordsize * i);
+		var ptrdv = (double*)((char*)ptr + offsetDV);
 		*ptrdv = pred[i];
-		ptrdv = (double*)((char*)ptrdv + recordsize);
 		pred[i] = 0.;
 	}
 }
@@ -222,6 +222,7 @@ void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig)
 	assert(pstate->rng);
 
 	idata_resample(&pstate->idata, &popmodel, pstate->rng);
+
 	idata_predict_dv(&pstate->idata, pstate->advanfuncs, &popmodel, &options);
 }
 

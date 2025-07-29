@@ -104,7 +104,7 @@ static double sample_min2ll_from_inverse(const double* const data,
 //	var lik = 0.;
 //	gsl_blas_ddot(&x.vector, &y.vector, &lik);
 //	return lik;
-	double sum = { };
+	double sum = 0.;
 	forcount(i, n) {
 		let x = gsl_vector_get(&x.vector, i);
 		let y = gsl_vector_get(&y.vector, i);
@@ -385,7 +385,6 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 	var eval = gsl_vector_alloc(nreta);
 	var evec = gsl_matrix_alloc(nreta, nreta);
 	var w = gsl_eigen_symmv_alloc(nreta);
-	var retavals = mallocvar(double, (nreta * 2) * nreta);
 	gsl_matrix_memcpy(ework, reducedicov);
 	gsl_eigen_symmv(ework, eval, evec, w);
 
@@ -410,7 +409,6 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		forcount(j, nreta) {
 			let v = gsl_matrix_get(evec, j, i); /* eigevnectors are coloumns */
 			testreta[j] = reta[j] + stepsize * v;
-			retavals[(i * 2) * nreta + j] = testreta[j];
 		}
 		var etaval_iobjfn = stage1_evaluate_individual_iobjfn(nreta, testreta, (void*)stage1_params);
 		var delta = etaval_iobjfn - base_iobjfn;
@@ -426,7 +424,6 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		forcount(j, nreta) {
 			let v = gsl_matrix_get(evec, j, i); /* eigevnectors are coloumns */
 			testreta[j] = reta[j] - stepsize * v;
-			retavals[(i * 2 + 1) * nreta + j] = testreta[j];
 		}
 		etaval_iobjfn = stage1_evaluate_individual_iobjfn(nreta, testreta, (void*)stage1_params);
 		delta = etaval_iobjfn - base_iobjfn;
@@ -477,7 +474,7 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		let eivar = gsl_vector_get(eval, i);
 
 		/* weighting via SD */
-		if (1) {
+		if (0) {
 			let eisd1 = sqrt(eivar);						/* distance in positive direction */
 			let eisd2 = sqrt(eivar); 						/* distance in negative direction */
 			let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
@@ -491,7 +488,6 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 	}
 	let icov_lndet = -1. * sumlogeval; /* we get lndet from inverse, so we have -1 here */
 
-	free(retavals);
 	gsl_eigen_symmv_free(w);
 	gsl_vector_free(eval);
 	gsl_matrix_free(evec);
