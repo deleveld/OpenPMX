@@ -30,7 +30,7 @@ $THETA
 $OMEGA(0.1, 0.1, 0, 0.1, 0.1, 0)
 $SIGMA(0.1)
 $MAIN
-	estimate(.optim.maxeval=5000);
+	estimate(.maxeval=5000);
 	predict_pred();
 //	table("ID,AGE,WT,HT,M1F2", .name="covariates");
 //	table("ID,TIME,DV,IPRED,PRED,yhat,yhatvar", .name="pred");

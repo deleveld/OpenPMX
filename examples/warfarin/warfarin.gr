@@ -2,6 +2,8 @@ $DATA("warfarin.csv")
 	rate = 0;
 	if (dvid == 2.)
 		remove = true;
+	if (mdv == 1 && isnan(dv))
+		remove = true;
 $ADVAN(onecomp_depot)
 $IMODEL(V, CL, KA)
 	V = THETA(1) * exp(ETA(1));
