@@ -1,0 +1,7 @@
+#!/bin/sh
+set -ex
+./install
+(cd examples/schnider; ../../openpmx schnider.gr)
+(cd examples/schnider; ../../openpmx schnider_diffeqn.gr)
+(cd examples/theo; ../../openpmx theo.gr)
+(cd examples/warfarin; ../../openpmx warfarin.gr)
