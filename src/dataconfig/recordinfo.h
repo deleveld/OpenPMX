@@ -71,36 +71,38 @@ static inline double RECORDINFO_DV(const RECORDINFO* const recordinfo, const REC
 	return *(const double*)((const char*)p + recordinfo->offsetDV);
 }
 
-static inline int RECORDINFO_MDV(const RECORDINFO* const recordinfo, const RECORD* p)
-{
-	if (recordinfo->offsetMDV == -1) {
-		return (isnan(RECORDINFO_DV(recordinfo, p)) ? 1 : 0);
-	} else
-		return (int)(*(const double*)((const char*)p + recordinfo->offsetMDV));
-}
-
-static inline int RECORDINFO_EVID(const RECORDINFO* const recordinfo, const RECORD* p)
-{
-	if (recordinfo->offsetEVID == -1)
-		return (RECORDINFO_MDV(recordinfo, p) != 0 ? 1 : 0);
-	else
-		return (int)(*(const double*)((const char*)p + recordinfo->offsetEVID));
-}
-
 static inline double RECORDINFO_AMT(const RECORDINFO* const recordinfo, const RECORD* p)
 {
-	if (recordinfo->offsetAMT == -1)
-		return 0.;
-	else
+	if (recordinfo->offsetAMT != -1)
 		return *(const double*)((const char*)p + recordinfo->offsetAMT);
+	return 0.;
 }
 
 static inline double RECORDINFO_RATE(const RECORDINFO* const recordinfo, const RECORD* p)
 {
-	if (recordinfo->offsetRATE == -1)
-		return 0.;
-	else
+	if (recordinfo->offsetRATE != -1)
 		return *(const double*)((const char*)p + recordinfo->offsetRATE);
+	return 0.;
+}
+
+static inline int RECORDINFO_MDV(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	if (recordinfo->offsetMDV != -1)
+		return (int)(*(const double*)((const char*)p + recordinfo->offsetMDV));
+	if (isnan(RECORDINFO_DV(recordinfo, p)))
+		return 1;
+	return 0;
+}
+
+static inline int RECORDINFO_EVID(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	if (recordinfo->offsetEVID != -1) 
+		return (int)(*(const double*)((const char*)p + recordinfo->offsetEVID));
+	if (RECORDINFO_MDV(recordinfo, p) == 0)
+		return 0;
+	if (RECORDINFO_AMT(recordinfo, p) != 0.)
+		return 1;
+	return 2;
 }
 
 static inline int RECORDINFO_CMT_0offset(const RECORDINFO* const recordinfo, const RECORD* p)

@@ -86,20 +86,20 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
 
 static bool check_state(const double* const a, const int n, FILE* logstream, const bool _offset1)
 {
-	let offset_index = _offset1 ? 1 : 0;
+	let record_offset = _offset1 ? 1 : 0;
 
 	/* all state should be finite */
 	int i;
 	for (i=0; i<n; i++) {
 		if (!isfinite(a[i])) {
-			warning(logstream, "compartment %i state %f not finite\n", i + offset_index, a[i]);
+			warning(logstream, "compartment %i state %f not finite\n", i + record_offset, a[i]);
 			return true;
 		}
 	}
 	/* outside the used state should be NAN because we set that */
 	for (i=n; i<OPENPMX_STATE_MAX; i++) {
 		if (isfinite(a[i])) {
-			warning(logstream, "compartment %i state %f should be NAN\n", i + offset_index, a[i]);
+			warning(logstream, "compartment %i state %f should be NAN\n", i + record_offset, a[i]);
 			return true;
 		}
 	}
@@ -307,18 +307,19 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	if (id != floor(id))
 		warning(logstream, "ID (%f) should probably be an integer\n", id);
 	let _offset1 = recordinfo->_offset1;
-	forcount(i, nrecord) {
+	let record_offset = _offset1 ? 1 : 0;
+forcount(i, nrecord) {
 		let evid = RECORDINFO_EVID(recordinfo, ptr);
 		let time = RECORDINFO_TIME(recordinfo, ptr);
 		let dv = RECORDINFO_DV(recordinfo, ptr);
 
 		let cmt = RECORDINFO_CMT(recordinfo, ptr);
 		if (cmt != floor(cmt))
-			warning(logstream, "CMT (%f) should probably be an integer: ID %f time %f record %i\n", cmt, id, time, i);
+			warning(logstream, "CMT (%f) should probably be an integer: ID %f time %f record %i\n", cmt, id, time, i + record_offset);
 
 		/* time must increase except for reset events */
 		if (time < lasttime && evid != 3 && evid != 4)
-			fatal(logstream, "TIME not monotonic: ID %f time %f record %i previous %f\n", id, time, i, lasttime);
+			fatal(logstream, "TIME not monotonic: ID %f time %f record %i previous %f\n", id, time, i + record_offset, lasttime);
 		lasttime = time;
 
 		/* state should not be accessed outside of its limits */
@@ -329,19 +330,19 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		/* observations */
 		if (evid == 0) {
 			if (dv == 0.)
-				warning(logstream, "DV zero for observation: ID %f time %f record %i\n", id, time, i);
+				warning(logstream, "DV zero for observation: ID %f time %f record %i\n", id, time, i + record_offset);
 
 			/* observation should be finite */
 			if (!isfinite(dv))
-				fatal(logstream, "DV not finite for observation: ID %f time %f record %i\n", id, time, i);
+				fatal(logstream, "DV not finite for observation: ID %f time %f record %i\n", id, time, i + record_offset);
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
 			if (isfinite(amt) && amt != 0.)
-				warning(logstream, "AMT non-zero (%f) for observation: ID %f time %f record %i\n", amt, id, time, i);
+				warning(logstream, "AMT non-zero (%f) for observation: ID %f time %f record %i\n", amt, id, time, i + record_offset);
 
 			let rate = RECORDINFO_RATE(recordinfo, ptr);
 			if (isfinite(rate) && rate != 0.)
-				warning(logstream, "RATE non-zero (%f) for observation: ID %f time %f record %i\n", rate, id, time, i);
+				warning(logstream, "RATE non-zero (%f) for observation: ID %f time %f record %i\n", rate, id, time, i + record_offset);
 
 		/* dose or reset-and-dose event */
 		} else if (evid == 1 || evid == 4) {
@@ -350,63 +351,63 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			let cmt = RECORDINFO_CMT_0offset(recordinfo, ptr);
 			if (cmt < 0 || cmt >= advanfuncs->nstate) {
 				let _cmt = RECORDINFO_CMT(recordinfo, ptr);
-				fatal(logstream, "CMT (%i) not within number of states (%i): ID %f time %f record %i\n", _cmt, advanfuncs->nstate, id, time, i);
+				fatal(logstream, "CMT (%i) not within number of states (%i): ID %f time %f record %i\n", _cmt, advanfuncs->nstate, id, time, i + record_offset);
 			}
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
 			if (!isfinite(amt))
-				fatal(logstream, "AMT not finite (%f): ID %f time %f record %i\n", amt, id, time, i);
+				fatal(logstream, "AMT not finite (%f): ID %f time %f record %i\n", amt, id, time, i + record_offset);
 			if (amt <= 0.)
-				fatal(logstream, "AMT less than or equal to zero (%f): ID %f time %f record %i \n", amt, id, time, i);
+				fatal(logstream, "AMT less than or equal to zero (%f): ID %f time %f record %i \n", amt, id, time, i + record_offset);
 			let rate = RECORDINFO_RATE(recordinfo, ptr);
 			if (rate < 0.)
-				fatal(logstream, "RATE less than zero (%f): ID %f record %i\n", rate, id, i);
+				fatal(logstream, "RATE less than zero (%f): ID %f record %i\n", rate, id, i + record_offset);
 
 			if (!isfinite(amt)|| amt == 0.)
-				warning(logstream, "AMT missing (%f) assumed 0 for dose: ID %f time %f record %i\n", amt, id, time, i);
+				warning(logstream, "AMT missing (%f) assumed 0 for dose: ID %f time %f record %i\n", amt, id, time, i + record_offset);
 			if (!isfinite(rate))
-				warning(logstream, "RATE missing (%f) assumed 0 for dose: ID %f time %f record %i\n", rate, id, time, i);
+				warning(logstream, "RATE missing (%f) assumed 0 for dose: ID %f time %f record %i\n", rate, id, time, i + record_offset);
 
 			if (isfinite(dv) == 1 && dv != 0.)
-				warning(logstream, "DV non-zero (%f) for dose: ID %f time %f record %i\n", dv, id, time, i);
+				warning(logstream, "DV non-zero (%f) for dose: ID %f time %f record %i\n", dv, id, time, i + record_offset);
 
 		/* reset event */
 		} else if (evid == 3) {
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
 			if (isfinite(amt) && amt != 0.)
-				warning(logstream, "AMT non-zero (%f) for reset: ID %f time %f record %i\n", amt, id, time, i);
+				warning(logstream, "AMT non-zero (%f) for reset: ID %f time %f record %i\n", amt, id, time, i + record_offset);
 
 			let rate = RECORDINFO_RATE(recordinfo, ptr);
 			if (isfinite(rate) && rate != 0.)
-				warning(logstream, "RATE non-zero (%f) for reset: ID %f time %f record %i\n", rate, id, time, i);
+				warning(logstream, "RATE non-zero (%f) for reset: ID %f time %f record %i\n", rate, id, time, i + record_offset);
 
 			if (isfinite(dv) && dv != 0.)
-				warning(logstream, "DV non-zero (%f) for reset: ID %f time %f record %i\n", dv, id, time, i);
+				warning(logstream, "DV non-zero (%f) for reset: ID %f time %f record %i\n", dv, id, time, i + record_offset);
 
 		/* other event type */
 		} else {
 			if (!isfinite(dv) && dv != 0.)
-				warning(logstream, "non-zero DV (%f) for non-observation: ID %f time %f record %i\n", dv, id, time, i);
+				warning(logstream, "non-zero DV (%f) for non-observation: ID %f time %f record %i\n", dv, id, time, i + record_offset);
 		}
 
 		/* dvlow implies observation */
 		if (evid != 0) {
 			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
 			if (dvlow != 0.) 
-				fatal(logstream, "DVLOW (%f) present for non-observation: ID %f record %i\n", dvlow, id, i);
+				fatal(logstream, "DVLOW (%f) present for non-observation: ID %f record %i\n", dvlow, id, i + record_offset);
 		}
 
 		/* state always should remain finite */
 		if (check_state(advan->state, advanfuncs->nstate, logstream, _offset1)) 
-			fatal(logstream, "non-finite state before advance: ID %f time %f record %i\n", id, time, i);
+			fatal(logstream, "non-finite state before advance: ID %f time %f record %i\n", id, time, i + record_offset);
 
 		/* advance to the record time */
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
 
 		/* state always should remain finite */
 		if (check_state(advan->state, advanfuncs->nstate, logstream, _offset1)) 
-			fatal(logstream, "non-finite state after advance: ID %f time %f record %i\n", id, time, i);
+			fatal(logstream, "non-finite state after advance: ID %f time %f record %i\n", id, time, i + record_offset);
 
 		var yhat = 0.;
 		if (evid == 0 || predictall)
@@ -418,16 +419,16 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 
 			/* predictions for observations should be finite */
 			if (!isfinite(yhat))
-				fatal(logstream, "YHAT non-finite: ID %f time %f record %i\n", id, time, i);
+				fatal(logstream, "YHAT non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
 
 			/* prediction variance of observations should be finite and positive */
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 			if (!isfinite(yhatvar))
-				fatal(logstream, "YHATVAR non-finite: ID %f time %f record %i\n", id, time, i);
+				fatal(logstream, "YHATVAR non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
 
 			/* predictions with zero error are an error */
 			if (evid == 0 && yhatvar == 0.)
-				fatal(logstream, "YHATVAR zero (%f): ID %f time %f record %i\n", yhatvar, id, time, i);
+				fatal(logstream, "YHATVAR zero (%f): ID %f time %f record %i\n", yhatvar, id, time, i + record_offset);
 		}
 
 		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
