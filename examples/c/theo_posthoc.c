@@ -1,7 +1,7 @@
 /*
  * Theophylline oral from Bae and Yim from TCP 2016
  * compile and run with:
- * gcc -W -Wall -Wextra -O2 theo.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out
+ * gcc -W -Wall -Wextra -O2 theo_posthoc.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out
 */
 
 #include <stdlib.h>
@@ -68,7 +68,6 @@ static double imodel_predict(const IMODEL* const _imodel,
 extern RECORD data[11]; /* forward declaration */
 
 /* include sources directly instead of linking to library */
-#define GRONMEM_PARALLEL_SINGLETHREAD
 #include "dataconfig/dataconfig.c"
 #include "dataconfig/recordinfo.c"
 #include "advan/advan.c"
@@ -137,12 +136,12 @@ int main(void)
 	let advanfuncs = advanfuncs_alloc(&openpmx.data, &openpmx.advan);
 	let popmodel = popmodel_init(&openpmx);
 	var idata = idata_construct(&advanfuncs->recordinfo,
-								 popmodel.ntheta,
-								 popmodel.nomega,
-								 popmodel.nsigma,
-								 advanfuncs->nstate,
-								 advanfuncs->advanconfig->imodelfields.size,
-								 advanfuncs->advanconfig->predictfields.size);
+								popmodel.ntheta,
+								popmodel.nomega,
+								popmodel.nsigma,
+								advanfuncs->nstate,
+								advanfuncs->advanconfig->imodelfields.size,
+								advanfuncs->advanconfig->predictfields.size);
 	idata_alloc_icovresample(&idata);
 
 	let omegainfo = omegainfo_init(popmodel.nomega,
@@ -151,14 +150,12 @@ int main(void)
 	let o = (OPTIONS){ };
 	let options = options_default(&o);
 
-	let scatteroptions = (SCATTEROPTIONS){ };
-
 	stage1_thread(idata.individ,
 				  advanfuncs,
 				  &popmodel,
 				  &omegainfo.nonzero,
 				  &options,
-				  &scatteroptions);
+				  0 /*scatteroptions*/);
 
 	idata_predict_pred_thread(idata.individ,
 				  advanfuncs,
@@ -169,6 +166,13 @@ int main(void)
 
 	forcount(i, idata.nindivid) {
 		let individ = &idata.individ[i];
+		let imodel = &individ->imodel[i];
+
+		printf("ID %f\n", individ->ID);
+		printf("V %f\n", imodel->V);
+		printf("K %f\n", imodel->K);
+		printf("KA %f\n", imodel->KA);
+	
 		forcount(n, individ->nrecord) {
 			let record = &individ->record[n];
 			let ipred = individ->yhat[n];
@@ -184,7 +188,7 @@ int main(void)
 }
 
 RECORD data[11] = {
-	{	1,	4.02,	0.,	.74,	79.6,	},
+	{	1,	4.02,	0.,	.74,	179.6,	},
 	{	1,	0.,	0.25,	2.84,	0.,	},
 	{	1,	0.,	0.57,	6.57,	0.,	},
 	{	1,	0.,	1.12,	10.5,	0.,	},

@@ -92,7 +92,7 @@ static bool check_state(const double* const a, const int n, FILE* logstream, con
 	int i;
 	for (i=0; i<n; i++) {
 		if (!isfinite(a[i])) {
-			warning(logstream, "compartment %i state %f not finite\n", i + record_offset, a[i]);
+			warning(logstream, "compartment %i state %f is not finite\n", i + record_offset, a[i]);
 			return true;
 		}
 	}
@@ -150,25 +150,24 @@ double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 	const RECORD* ptr = record;
 	forcount(i, nrecord) {
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
-		let evid = RECORDINFO_EVID(recordinfo, ptr);
-		if (evid == 0) {
-			let dv = RECORDINFO_DV(recordinfo, ptr);
+		if (RECORDINFO_EVID(recordinfo, ptr) == 0) {
 			let yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
 
 			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
 			if (dvlow == 0.) {
+				let dv = RECORDINFO_DV(recordinfo, ptr);
 				let err = dv - yhat;
 				obs_min2ll += (err * err) / yhatvar;
+				obs_lndet += log(yhatvar);
 			} else {
 				let err = dvlow - yhat;
 				obs_min2ll += -2. * log(phi(err / sqrt(yhatvar)));
+				/* obs_lndet += 0.; This term does not take part I think. FIXME */
 			}
-			obs_lndet += log(yhatvar);
 		}
 		ptr = RECORD_INDEX(ptr, recordsize, 1);	
 	}
-
 	advanfuncs->destruct(advan);
 
 	return obs_min2ll + obs_lndet;
@@ -242,23 +241,15 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 			if (YHATVAR)
 				YHATVAR[i] = yhatvar;
 
-			/* we dont really need to have the check here if we are saving
-			 * the obs_min2ll or obs_lndet or not. It seems reasonable to think
-			 * that its faster not to calculate it if we dont need it */
-			if (ret_obs_min2ll) {
-				let dv = RECORDINFO_DV(recordinfo, ptr);
-				let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
-				if (dvlow == 0.) {
-					let err = dv - yhat;
-					obs_min2ll += (err * err) / yhatvar;
-				} else {
-					let err = dvlow - yhat;
-					obs_min2ll += -2. * log(phi(err / sqrt(yhatvar)));
-				}
-			}
-			if (ret_obs_lndet) {
-				let lndet_term = log(yhatvar);
-				obs_lndet += lndet_term;
+			let dv = RECORDINFO_DV(recordinfo, ptr);
+			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
+			if (dvlow == 0.) {
+				let err = dv - yhat;
+				obs_min2ll += (err * err) / yhatvar;
+				obs_lndet += log(yhatvar);
+			} else {
+				let err = dvlow - yhat;
+				obs_min2ll += -2. * log(phi(err / sqrt(yhatvar)));
 			}
 		} else {
 			/* yhatvar must be set to zero for non-observations since these
@@ -268,12 +259,12 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 		}
 		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
 	}
+	advanfuncs->destruct(advan);
+
 	if (ret_obs_min2ll)
 		*ret_obs_min2ll = obs_min2ll;
 	if (ret_obs_lndet) 
 		*ret_obs_lndet = obs_lndet;
-		
-	advanfuncs->destruct(advan);
 }
 
 void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
@@ -308,10 +299,10 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		warning(logstream, "ID (%f) should probably be an integer\n", id);
 	let _offset1 = recordinfo->_offset1;
 	let record_offset = _offset1 ? 1 : 0;
-forcount(i, nrecord) {
-		let evid = RECORDINFO_EVID(recordinfo, ptr);
+	forcount(i, nrecord) {
 		let time = RECORDINFO_TIME(recordinfo, ptr);
 		let dv = RECORDINFO_DV(recordinfo, ptr);
+		let evid = RECORDINFO_EVID(recordinfo, ptr);
 
 		let cmt = RECORDINFO_CMT(recordinfo, ptr);
 		if (cmt != floor(cmt))
@@ -405,21 +396,22 @@ forcount(i, nrecord) {
 		/* advance to the record time */
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
 
+		/* now check record after advance */
+
 		/* state always should remain finite */
 		if (check_state(advan->state, advanfuncs->nstate, logstream, _offset1)) 
 			fatal(logstream, "non-finite state after advance: ID %f time %f record %i\n", id, time, i + record_offset);
 
+		/* predictions should be finite */
 		var yhat = 0.;
-		if (evid == 0 || predictall)
+		if (evid == 0 || predictall) {
 			yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
-
-		/* check record after advance */
-		/* observations */
-		if (evid == 0) {
-
-			/* predictions for observations should be finite */
 			if (!isfinite(yhat))
 				fatal(logstream, "YHAT non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
+		}
+
+		/* observations */
+		if (evid == 0) {
 
 			/* prediction variance of observations should be finite and positive */
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
@@ -500,5 +492,4 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
 	}
 	advanfuncs->destruct(advan);
-
 }

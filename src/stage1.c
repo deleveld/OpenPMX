@@ -25,7 +25,7 @@
 #include "nonzero.h"
 #include "linalg.h"
 #include "print.h"
-#include "scatter.h"
+//#include "scatter.h"
 #include "advan/advan.h"
 #include "utils/c22.h"
 #include "utils/various.h"
@@ -538,7 +538,7 @@ void stage1_thread(INDIVID* const individ,
 			.nrecord = individ->nrecord,
 			.advanfuncs = advanfuncs,
 			.popparam = popparam_init(popmodel, advanfuncs, testeta),
-			.logstream = scatteroptions->logstream,
+			.logstream = scatteroptions ? scatteroptions->logstream  : 0,
 		},
 		.eval_msec = &individ->eval_msec,
 	};

@@ -123,7 +123,6 @@ int main(void)
 }
 
 /* include sources directly instead of linking to library */
-#define GRONMEM_PARALLEL_SINGLETHREAD
 #include "dataconfig/dataconfig.c"
 #include "dataconfig/recordinfo.c"
 #include "advan/advan.c"
