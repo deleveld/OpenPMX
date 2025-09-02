@@ -1,0 +1,59 @@
+#
+#
+# !!! removed zero observation !!!
+# @55,36,0,100,0,Err:502
+#
+#
+set -eu
+TEMP=$(mktemp -d)
+trap "rmdir --ignore-fail-on-non-empty $TEMP" EXIT
+export LC_ALL=C
+
+# inform user if we fail prematurely
+COMPLETION_MESSAGE="WARNING: The script ${0} failed somewhere! The results may not be reliable!!!"
+function inform_error_state {
+	echo $COMPLETION_MESSAGE
+}
+trap inform_error_state EXIT
+
+METHODNAME="${1:-}"
+
+if [ "${METHODNAME}" != "" ]; then
+	(cd ../../; ./install)
+	./generate_results "${METHODNAME}"
+fi
+
+R --vanilla --slave <<-RSCRIPT
+########################################################################
+# problem specific models
+	source("models/_true_values.R")
+########################################################################
+
+	nonmem <- read.table("generate_results.nonmem.txt", header=TRUE)
+
+	if (file.exists("generate_results.openpmx.txt"))
+		gronmem <- read.table("generate_results.openpmx.txt", header=TRUE)
+
+	if (file.exists("generate_results.validate.txt"))
+		validate <- read.table("generate_results.validate.txt", header=TRUE)
+
+	if (file.exists("generate_results.openpmxicov.txt"))
+		gronmemicov <- read.table("generate_results.openpmxicov.txt", header=TRUE)
+	
+#	nonmemlaplace   <- read.table("generate_results.nonmemlaplace.txt", header=TRUE)
+#	gronmemtest 	<- read.table("generate_results.openpmxtest.txt", header=TRUE)
+
+	postscript(file="${TEMP}/${0}.ps", horizontal=TRUE)
+	source("../utils/analysis_tables_and_plots.R")
+	source("../utils/analysis_tables_and_plots2.R")
+	
+	write.csv(tabbias, file="bias.csv")
+	write.csv(tabrmse, file="rmse.csv")
+
+RSCRIPT
+
+../utils/_write_figures.sh ${0} ${TEMP}/${0}.ps
+	
+# tell the user it worked when we exit
+COMPLETION_MESSAGE=""
+

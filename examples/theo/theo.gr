@@ -6,7 +6,7 @@ $IMODEL(V, CL, K, KA)
     V  = THETA(1)*exp(ETA(1)) * pow(BWT/70, 1);
     CL = THETA(2)*exp(ETA(2)) * pow(BWT/70, 0.75);
     K = CL / V;
-    KA = THETA(3)*exp(ETA(3)) * pow(BWT/70, -0.25);
+    KA = THETA(3)*exp(ETA(3)) * pow(BWT/70, -0.25) + THETA(5);
 $PREDICT(IPRED)
     const double DOSE=320.;
     IPRED = DOSE / V * KA / (KA - K) * (exp(-K * TIME)-exp(-KA * TIME));

@@ -1,0 +1,26 @@
+set -eu
+
+move_figures()
+{
+	mv -v ${1}/analysis2.pdf_${2}.pdf figure_${3}.pdf
+	mv -v ${1}/analysis2.pdf_${2}.jpg figure_${3}.jpg
+}
+
+do_run()
+{
+###	(cd "${1}"; ./analysis2 dataset; ./analysis2 nonmem; ./analysis2 openpmx; ./analysis2)
+	(cd "${1}"; ./analysis2 nonmem; ./analysis2 openpmx; ./analysis2)
+	
+	move_figures "${1}"	1	"${2}"
+	move_figures "${1}"	2	"${3}"
+}
+do_run datasim	9	10
+cp -v datasim/bias.csv	table_datasim_bias.csv
+cp -v datasim/rmse.csv	table_datasim_rmse.csv
+do_run schnider	1	2
+do_run sparse	3	4
+do_run warfarin	7	8
+do_run fentanyl	5	6
+
+
+

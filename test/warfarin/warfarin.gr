@@ -1,0 +1,41 @@
+$DATA("models/warfarin_rate0.csv")
+$ADVAN(diffeqn_libgsl)
+	.nstate = 3,
+$IMODEL(V, CL, KA, KOUT, E0, EMAX, C50)
+	const double size = wt / 70.;
+	const double vscale = pow(size, 1);
+	const double cscale = pow(size, 0.75);
+	const double kscale = pow(size, -0.25);
+	V = THETA(1) * exp(ETA(1)) * vscale;
+	CL = THETA(2) * exp(ETA(2)) * cscale;
+	KA = THETA(3) * exp(ETA(3)) * kscale;
+	E0 = THETA(5) + ETA(5);
+	A_0(3, E0);
+	EMAX = THETA(6);
+	C50 = THETA(7) * exp(ETA(6));
+	KOUT = exp(THETA(8));
+$DIFFEQN
+	DADT(1) = -A(1)*KA;
+	DADT(2) = A(1)*KA - A(2)*(CL/V);
+	double dcp = A(2)/V;
+	double deff = dcp/(C50+dcp);
+	double pd = 1 - EMAX*deff;
+	DADT(3) = E0*KOUT*pd - KOUT*A(3);
+$PREDICT(IPRED, BPRED)
+	IPRED = A(2)/V;
+	BPRED = A(3);
+	if (dvid == 1) Y = IPRED*(1+ERR(1)) + ERR(2);
+	if (dvid == 2) Y = BPRED + ERR(3);
+$THETA
+	{ 1,   8,   20, ESTIMATE },
+	{ 0,   0.1,   1, ESTIMATE },
+	{ 0.01,   0.5,   5, ESTIMATE },
+	{ 0, 0, 0, FIXED },
+	{ 50,   100,   150, ESTIMATE },	// E0
+	{ 0,   1,   5, ESTIMATE },	// EMAX
+	{ 0,   2,   5, ESTIMATE },	// C50
+	{ -5,   -3,   1, ESTIMATE },	// log(KOUT)
+$OMEGA(0.1, 0.1, 0.1, 0, 0, 0)
+$SIGMA(1, 1, 100)
+$MAIN
+	estimate();

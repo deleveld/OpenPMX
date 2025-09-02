@@ -234,7 +234,7 @@ void pmx_advan_bioaval(const ADVANSTATE* const advanstate, const int cmt, const 
 	let advanfuncs = advan->advanfuncs;
 	let nstate = advanfuncs->nstate;
 
-	assert(!isnan(t));
+	assert(!isnan(f));
 	assert(cmt >= 0);
 	assert(cmt < nstate);
 	
@@ -251,11 +251,13 @@ void pmx_advan_inittime(const ADVANSTATE* const advanstate, const double t)
 	if (t <= advan->time)
 		return;
 
-	/* if its already on the list then ignore */
+	/* its kind of not clear whether we should or shouldnt ignore the extra
+	 * inittime if another kind of event occurs at the intended time, for
+	 * example an infusion */
 	bool found_already = false;
 	forvector(i, advan->infusions) {
 		let v = &advan->infusions.ptr[i];
-		if (v->cmt == -1. && v->start == t && v->end == t)
+		if (v->start == t)
 			found_already = true;
 	}
 
@@ -272,14 +274,15 @@ void pmx_advan_inittime(const ADVANSTATE* const advanstate, const double t)
 
 void pmx_advan_state_init(const ADVANSTATE* const advanstate, const int cmt, const double v)
 {
+	var advan = advanstate->advan;
+	let advanfuncs = advan->advanfuncs;
+	let nstate = advanfuncs->nstate;
+
 	assert(!isnan(v));
 	assert(cmt >= 0);
 	assert(cmt < nstate);
 
-	var advan = advanstate->advan;
 	if (advan->initcount == 0) {
-		let advanfuncs = advan->advanfuncs;
-		let nstate = advanfuncs->nstate;
 		assert(cmt < nstate);
 		advan->state[cmt] = v;
 	}

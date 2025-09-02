@@ -1,0 +1,73 @@
+########################################################################
+# NONMEM install directory
+NONMEMDIR=~/nm760
+NONMEMFE=nmfe76
+
+########################################################################
+set -e
+TEMP=$(mktemp -d)
+trap "rm -rf ${TEMP}" EXIT
+
+CONTROL=$1
+echo "control is: " ${CONTROL}
+
+# extract datafile name from the control file
+get_datafile() {
+	gawk '{
+		if ($1=="$DATA") {
+			printf("%s", $2)
+			exit 0
+		}
+	}' <${CONTROL}
+}
+DATAFILE=$(get_datafile)
+# remove quotes if they exist
+DATAFILE="${DATAFILE%\"}"
+DATAFILE="${DATAFILE#\"}"
+echo "datafile is: " ${DATAFILE}
+
+BASENAME=${CONTROL%.*}
+
+get_datafile_header() {
+	gawk '{
+		printf("%s", toupper($0))
+		exit 0
+	}' ${DATAFILE}
+}
+DATAHEADER=$(get_datafile_header)
+echo "data header is: " ${DATAHEADER}
+
+echo "tempdir is: " ${TEMP}
+
+# copy control file with header from data file
+gawk '{
+	# make sure the data file header gets copied over
+	if ($1=="$INPUT" && $2=="<fromdata>") {
+		printf("%s '"${DATAHEADER}"'\n", $1)
+	# other lines just get copied over
+	} else
+		print
+}' ${CONTROL} >${TEMP}/${CONTROL}
+
+cp --parents ${DATAFILE} ${TEMP}
+cp ${NONMEMDIR}/run/beolaunch.sh ${TEMP}
+cp ${NONMEMDIR}/run/fpi.pnm ${TEMP}
+
+### (cd ${TEMP}; ${NONMEMDIR}/run/${NONMEMFE} ${CONTROL} ${BASENAME}.out -parafile="fpi.pnm")
+(cd ${TEMP}; ${NONMEMDIR}/run/${NONMEMFE} ${CONTROL} ${BASENAME}.out)
+
+cp -v --preserve ${TEMP}/PRDERR .			| true
+cp -v --preserve ${TEMP}/${BASENAME}.out .
+cp -v --preserve ${TEMP}/${BASENAME}.phi .	| true
+cp -v --preserve ${TEMP}/${BASENAME}.ext .	| true
+cp -v --preserve ${TEMP}/${BASENAME}.grd .	| true
+# copy tables back, but not control file
+# keep the original modification times
+for i in $(ls ${TEMP}/*.txt); do
+	base=$(basename $i)
+	if [ $base != ${CONTROL} ]; then
+		echo ... save table $base
+		cp -v --preserve $i .	| true
+	fi
+done
+

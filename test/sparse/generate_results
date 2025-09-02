@@ -1,0 +1,41 @@
+set -eu
+TEMP=$(mktemp -d)
+trap "rm -rf ${TEMP}" EXIT
+export LC_ALL=C
+
+# inform user if we fail prematurely
+COMPLETION_MESSAGE="WARNING: The script ${0} failed somewhere! The results may not be reliable!!!"
+function inform_error_state {
+	echo $COMPLETION_MESSAGE
+}
+trap inform_error_state EXIT
+
+METHODNAME="${1}"
+SCRIPTNAME=$(basename "${0}")
+
+########################################################################
+# problem specific models
+. "./models/_models_dataset.sh"
+########################################################################
+
+# default methods
+DO_NONMEM_SCRIPT="../utils/do_nonmem_run"
+. "../utils/generate_results_methods.sh"
+
+# loop across datasets calling the method
+for i in {1..500}
+do
+	echo "==============================================================="
+	echo "Dataset ${i}"
+
+	EXISTS=$(run_exists ${i})
+	if [ "${EXISTS}" = "TRUE" ]; then
+		echo "... skipping already exists"
+	else
+		${METHODNAME} ${i}
+	fi
+done
+
+# tell the user it worked when we exit
+COMPLETION_MESSAGE=""
+
