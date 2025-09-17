@@ -74,7 +74,8 @@ ENCODE encode_init(const POPMODEL* const popmodel)
 										 .type = OBJFN_INVALID,
 										 .neval = 0 };	
 	var temp_omegainfo = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed);
-	let n = encode_nparam(popmodel, &temp_omegainfo);
+	let n = encode_nparam(popmodel, &temp_omegainfo); /* TODO: This can probably be removed since it is already computed */
+//	assert(n == popmodel->result.nparam);
 
 	return (ENCODE) {
 		.popmodel = temp_popmodel,
@@ -450,8 +451,8 @@ void encode_update(ENCODE* encode, const double* x)
 	omegainfo_update_inverse_lndet(omegainfo, popmodel->omega);
 
 	/* invalidate the objfn because we dont know it anymore */
-	popmodel->result = (PMXRESULT) { .objfn = DBL_MAX,
-									 .type = OBJFN_INVALID,
-									 .neval = 0 };
+	popmodel->result.objfn = DBL_MAX;
+	popmodel->result.type = OBJFN_INVALID;
+	popmodel->result.neval = 0;
 }
 

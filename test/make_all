@@ -13,14 +13,15 @@ do_run()
 	
 	move_figures "${1}"	1	"${2}"
 	move_figures "${1}"	2	"${3}"
+	move_figures "${1}"	3	"${4}"
 }
-do_run datasim	9	10
+do_run schnider	1	supplement_1	supplement_2
+do_run sparse	2	supplement_3	supplement_4
+do_run warfarin	3	supplement_5	supplement_6
+do_run fentanyl	4	supplement_7	supplement_8
+do_run datasim	5	supplement_9	supplement_10
 cp -v datasim/bias.csv	table_datasim_bias.csv
 cp -v datasim/rmse.csv	table_datasim_rmse.csv
-do_run schnider	1	2
-do_run sparse	3	4
-do_run warfarin	7	8
-do_run fentanyl	5	6
 
 
 

@@ -244,10 +244,9 @@ static void encode_evaluate(ENCODE* const test,
 	scatteroptions.stage1_order = true;
 	scatter_threads(idata, advanfuncs, popmodel, nonzero, options, &scatteroptions, stage1_thread);
 
-	popmodel->result = (PMXRESULT) {
-		.objfn = objfn(idata, omegainfo),
-		.type = OBJFN_CURRENT,
-		.neval = 0 };
+	popmodel->result.objfn = objfn(idata, omegainfo);
+	popmodel->result.type = OBJFN_CURRENT;
+	popmodel->result.neval = 0;
 }
 
 static double focei_stage2_evaluate_population_objfn(const long int _xlength,

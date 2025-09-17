@@ -45,7 +45,7 @@ typedef struct {
 	double sigma[OPENPMX_SIGMA_MAX];
 	int sigmafixed[OPENPMX_SIGMA_MAX];
 	int nsigma;
-
+	
 	/* filled in during estimation iterations */
 	PMXRESULT result;
 } POPMODEL;

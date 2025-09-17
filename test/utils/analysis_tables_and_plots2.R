@@ -139,10 +139,16 @@
 		plot(0, type="n", yaxt="n", xlab=NA, ylab=NA, xlim=(lim), ylim=c(0,1.4), main=NA)
 		mtext("Density", side=2, line=0.5, cex=par()$cex)
 		mtext("Objective function value", side=1, line=2, cex=par()$cex)
+		grid()
 		d1 <- density(objfn1, na.rm=TRUE)
 		d2 <- density(objfn2, na.rm=TRUE)
 		lines(x=(d2$x), y=d2$y/max(d2$y), col="darkgrey", lw=3)
 		lines(x=(d1$x), y=d1$y/max(d1$y), col="black", lw=1)
+		legend("topright",
+			legend=c(basename, gname),
+			col=c("darkgrey", "black"),
+			lw=c(3,1),
+			bty="n", cex=par()$cex*0.85)
 
 		x <- (objfn1 + objfn2) / 2
 		y <- (objfn1 - objfn2)
@@ -151,6 +157,7 @@
 		plot(x=x, y=y, type="n", xlab=NA, ylab=NA, xlim=xlim, ylim=ylim, main=NA)
 		mtext("Difference", side=2, line=2, cex=par()$cex)
 		mtext("Average", side=1, line=2, cex=par()$cex)
+		grid()
 		points(x=x, y=y, col="black")
 		abline(h=0, col="black")
 
@@ -159,12 +166,11 @@
 		xlim <- range(c(x,y))
 		ylim <- range(c(x,y))
 		plot(x=x, y=y, type="n", xlab=NA, ylab=NA, xlim=xlim, ylim=ylim, main=NA)
-#		mtext("Difference", side=2, line=2, cex=par()$cex)
-#		mtext("Average", side=1, line=2, cex=par()$cex)
+		mtext(gname, side=2, line=2, cex=par()$cex)
+		mtext(basename, side=1, line=2, cex=par()$cex)
+		grid()
 		points(x=x, y=y, col="black")
 		abline(a=0, b=1, col="black")
-
-		title(sprintf("Objective function %s vs %s", gname, basename), outer=TRUE)
 	}
 	if (exists("gronmem") && exists("nonmem")) {
 		objfn_compare(gronmem, "OpenPMX", nonmem, "NONMEM")

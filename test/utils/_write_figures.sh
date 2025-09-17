@@ -8,4 +8,5 @@ write_page()
 gs -sDEVICE=pdfwrite -sOutputFile="${1}.pdf" -dNumRenderingThreads=8 -dBATCH -dQUIET -dNOPAUSE -dAutoRotatePages=/None ${2}
 write_page "${1}.pdf" 1 "${2}"
 write_page "${1}.pdf" 2 "${2}"
+write_page "${1}.pdf" 3 "${2}"
 
