@@ -182,6 +182,7 @@ void pmx_copy_popparams(OPENPMX* dest, const OPENPMX* const src)
 	memcpy(dest->omega, src->omega, sizeof(dest->omega));
 
 	dest->result = (PMXRESULT) { .objfn = DBL_MAX,
+								 .nparam = 0,
 								 .type = OBJFN_INVALID,
 								 .neval = 0 };
 }

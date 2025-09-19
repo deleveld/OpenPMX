@@ -71,6 +71,7 @@ ENCODE encode_init(const POPMODEL* const popmodel)
 {
 	var temp_popmodel = *popmodel;
 	temp_popmodel.result = (PMXRESULT) { .objfn = DBL_MAX,
+										 .nparam = 0,
 										 .type = OBJFN_INVALID,
 										 .neval = 0 };	
 	var temp_omegainfo = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed);

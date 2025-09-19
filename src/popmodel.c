@@ -208,6 +208,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 
 	/* initial results are invalid */
 	ret.result = (PMXRESULT) { .objfn = DBL_MAX,
+							   .nparam = nparam,
 							   .type = OBJFN_INVALID,
 							   .neval = 0 };
 
