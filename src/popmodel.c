@@ -206,12 +206,9 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 		}
 	}
 
-	/* initial results are invalid */
-	ret.result = (PMXRESULT) { .objfn = DBL_MAX,
-							   .nparam = nparam,
-							   .type = OBJFN_INVALID,
-							   .neval = 0 };
-
+	/* initial results are invalid, but it is already initialized
+	 * at the start of this function */
+	ret.result = (PMXRESULT) { .nparam = nparam }; 
 	return ret;
 }
 

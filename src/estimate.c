@@ -256,7 +256,7 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 	/* decode the vector in the right way for the advan and make the popmodel ready to test */
 	let params = (STAGE2_PARAMS*) data;
 	let idata = params->idata;
-	assert(_xlength == params->test.nparam);
+	assert(_xlength == params->test.popmodel.result.nparam);
 	encode_update(&params->test, _x);
 
 	/* do the actual test, this sets the objfn */
@@ -336,7 +336,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 
 	let options = params->options;
 
-	let n = params->test.nparam;
+	let n = params->test.popmodel.result.nparam;
 	var initial = mallocvar(double, n);
 	var upper = mallocvar(double, n);
 	var lower = mallocvar(double, n);

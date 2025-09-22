@@ -165,7 +165,6 @@ ADVANFUNCS* pmx_advan_wrapper(const DATACONFIG* const dataconfig, const ADVANCON
 /*---------------------------------------------------------------------*/
 typedef struct {
 	double objfn;
-	int nparam;
 	enum {
 		OBJFN_INVALID = 0,
 		OBJFN_EVALUATE,
@@ -173,6 +172,7 @@ typedef struct {
 		OBJFN_FINAL,
 	} type;
 	int neval;
+	int nparam;
 } PMXRESULT;
 
 /*---------------------------------------------------------------------*/
