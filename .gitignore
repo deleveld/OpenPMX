@@ -4,6 +4,7 @@
 openpmx
 bin/openpmxtran
 examples/schnider/schnider.gr.*
+examples/schnider/schnider_diffeqn.gr.*
 examples/theo/theo.gr.*
 examples/warfarin/warfarin.gr.*
 src/openpmx_compile_options.h

@@ -29,8 +29,10 @@ typedef struct {
 	POPMODEL popmodel;
 	OMEGAINFO omegainfo;
 	const int nparam;
-	/* this is more than enough room because we only need lower triangular omega
-	 * but it is hard to get the right number of elements */
+	/* this is more than enough room because we only need thetas, sigmas,
+	 * and lower triangular omega but it is hard to get the right number
+	 * and we statically allocate so its not much of an issue to have
+	 * room for too many elements */
 	double offset[OPENPMX_THETA_MAX + OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX + OPENPMX_SIGMA_MAX];
 	bool has_offsets;
 } ENCODE;

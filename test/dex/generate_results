@@ -1,0 +1,173 @@
+set -eu
+TEMP=$(mktemp -d)
+trap "rm -rf ${TEMP}" EXIT
+export LC_ALL=C
+
+# inform user if we fail prematurely
+COMPLETION_MESSAGE="WARNING: The script ${0} failed somewhere! The results may not be reliable!!!"
+function inform_error_state {
+	echo $COMPLETION_MESSAGE
+}
+trap inform_error_state EXIT
+
+SCRIPTNAME=$(basename "${0}")
+
+# structure of the NONMEM model
+NONMEM_MODEL_PREFIX=$(cat <<-MODELPREFIX
+	\$PROB Sufentanil
+	\$INPUT <fromdata>
+MODELPREFIX
+)
+NONMEM_MODEL_CODE=$(cat <<-MODELCODE
+	\$SUBROUTINES ADVAN11 TRANS4
+	\$PK
+		VSIZ=(WGT/70)
+		CSIZ=(WGT/70)**0.75
+		SES1=(2-SESS)
+		SES2=(SESS-1)
+		V1 =EXP(THETA(1)+ETA(1) + SES1*ETA(2) + SES2*ETA(3)) * VSIZ
+		V2 =EXP(THETA(2)       ) * VSIZ
+		V3 =EXP(THETA(3)+ETA(4)) * VSIZ
+		CL =EXP(THETA(4)+ETA(5)) * CSIZ
+		RV2=EXP(THETA(2))
+		Q2 =EXP(THETA(5)) * ((V2/RV2)**0.75)
+		RV3=EXP(THETA(3))
+		Q3 =EXP(THETA(6)) * ((V3/RV3)**0.75)
+		S1 =V1
+MODELCODE
+)
+
+NONMEM_MODEL_TRUE=$(cat <<-MODELINITIAL
+	\$THETA
+		( -2, 6.046010e-01, 3)
+		( 1, 3.326570e+00, 5)
+		( 3, 3.997030e+00, 6)
+		( -2, -3.641990e-01, 1)
+		( -2, 1.178030e+00, 4)
+		( -2, -3.720650e-01, 2)
+	\$OMEGA 3.50E-02
+	\$OMEGA BLOCK(1) 2.73E-01
+	\$OMEGA BLOCK SAME
+	\$OMEGA 6.33E-02 2.76E-02
+	\$SIGMA 3.63E-02
+	\$ERROR
+		IPRED=A(1)/V1
+		Y=IPRED + IPRED*ERR(1)
+MODELINITIAL
+)
+NONMEM_MODEL_INITIAL=$(cat <<-MODELINITIAL
+	\$THETA
+		( -2, 0.5, 3)
+		( 1, 3, 5)
+		( 3, 5, 6)
+		( -2, -0.5, 1)
+		( -2, 1, 4)
+		( -2, -0.5, 2)
+	\$OMEGA 0.1
+	\$OMEGA BLOCK(1) 0.1
+	\$OMEGA BLOCK SAME
+	\$OMEGA 0.1 0.1
+	\$SIGMA 0.1
+	\$ERROR
+		IPRED=A(1)/V1
+		Y=IPRED*(1+ERR(1))
+MODELINITIAL
+)
+
+OPENPMX_MODEL_INITIAL=$(cat <<-GRONMEMMODEL
+	\$ADVAN(threecomp)
+	\$IMODEL(V1, V2, V3, CL, Q2, Q3)
+		const double VSIZ=(WGT/70.);
+		const double CSIZ=pow(WGT/70.,0.75);
+		const double SES1=(2-SESS);
+		const double SES2=(SESS-1);
+		V1 =exp(THETA(1)+ETA(1) + SES1*ETA(2) + SES2*ETA(3)) * VSIZ;
+		V2 =exp(THETA(2)       ) * VSIZ;
+		V3 =exp(THETA(3)+ETA(4)) * VSIZ;
+		CL =exp(THETA(4)+ETA(5)) * CSIZ;
+		const double RV2=exp(THETA(2));
+		Q2 =exp(THETA(5)) * pow(V2/RV2,0.75);
+		const double RV3=exp(THETA(3));
+		Q3 =exp(THETA(6)) * pow(V3/RV3,0.75);
+	\$PREDICT(IPRED)
+		IPRED=A(1)/V1;
+		Y=IPRED*(1+ERR(1));
+	\$THETA
+		{ -2, 0.5, 3, ESTIMATE },
+		{ 1, 3, 5, ESTIMATE },
+		{ 3, 5, 6, ESTIMATE },
+		{ -2, -0.5, 1, ESTIMATE },
+		{ -2, 1, 4, ESTIMATE },
+		{ -2, -0.5, 2, ESTIMATE },
+	\$OMEGA(0.1)
+	\$OMEGA(0.1)
+	\$OMEGASAME(1)
+	\$OMEGA(0.1, 0.1)
+	\$SIGMA(0.1)
+	\$MAIN
+GRONMEMMODEL
+)
+
+get_datafile_header() {
+	gawk '{
+		printf("%s", toupper($0))
+		exit 0
+	}' ${1}
+}
+
+###################
+# generate dataset
+generate_dataset()
+{
+	DATASET=${1}
+
+	DATASET_SEED=$(../utils/_get_simulation_seed.sh ${DATASET})
+	DATASET_HEADER=$(get_datafile_header "data.csv")
+
+	cat >control.${DATASET}.txt <<-CONTROLFILE
+	${NONMEM_MODEL_PREFIX}
+	\$DATA "data.csv" IGNORE=@
+	${NONMEM_MODEL_CODE}
+	${NONMEM_MODEL_TRUE}
+	\$SIM (${DATASET_SEED}) ONLYSIM
+	\$TABLE ${DATASET_HEADER}
+	NOPRINT ONEHEADER NOAPPEND file="control.table.txt"
+CONTROLFILE
+	cat control.${DATASET}.txt
+	../utils/do_nonmem_run control.${DATASET}.txt
+	cat control.${DATASET}.out
+	# collect NONMEM results
+	gawk '{
+		if (NR != 1)
+			print
+	}' <"control.table.txt" >"simdata/data.${DATASET}.txt"
+	rm control.${DATASET}.out
+	rm control.${DATASET}.ext
+	rm control.${DATASET}.txt
+	rm gfortran.txt
+	rm nmpathlist.txt
+}
+
+###################
+# include the methods we test
+DO_NONMEM_SCRIPT="../utils/do_nonmem_run"
+. "../utils/generate_results_methods.sh"
+
+###################
+# do all the datasets
+
+for i in {1..100}
+do
+	echo "==============================================================="
+	echo "Dataset ${i}"
+	generate_dataset ${i}
+
+	nonmem ${i}
+	openpmx ${i}
+#	openpmxicov ${i}
+#	openpmxtest ${i}
+done
+
+# tell the user it worked when we exit
+COMPLETION_MESSAGE=""
+

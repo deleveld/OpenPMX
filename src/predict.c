@@ -49,7 +49,7 @@ static void idata_predict_yhat_thread(INDIVID* const individ,
 		.nrecord = individ->nrecord,
 		.advanfuncs = advanfuncs,
 		.popparam = popparam_init(popmodel, advanfuncs, etaarray),
-		.logstream = scatteroptions->logstream,
+		.logstream = scatteroptions ? scatteroptions->logstream : 0,
 	};
 	struct timespec t3;
 	clock_gettime(CLOCK_REALTIME, &t3);
@@ -89,7 +89,7 @@ static void idata_predict_pred_thread(INDIVID* const individ,
 		.nrecord = individ->nrecord,
 		.advanfuncs = advanfuncs,
 		.popparam = popparam_init(popmodel, advanfuncs, etaarray),
-		.logstream = scatteroptions->logstream,
+		.logstream = scatteroptions ? scatteroptions->logstream : 0,
 	};
 	struct timespec t3;
 	clock_gettime(CLOCK_REALTIME, &t3);

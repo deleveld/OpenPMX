@@ -1,0 +1,47 @@
+set -eu
+TEMP=$(mktemp -d)
+trap "rmdir --ignore-fail-on-non-empty $TEMP" EXIT
+export LC_ALL=C
+
+# inform user if we fail prematurely
+COMPLETION_MESSAGE="WARNING: The script ${0} failed somewhere! The results may not be reliable!!!"
+function inform_error_state {
+	echo $COMPLETION_MESSAGE
+}
+trap inform_error_state EXIT
+
+METHODNAME="${1:-}"
+
+if [ "${METHODNAME}" != "" ]; then
+	(cd ../../; ./install)
+	./generate_results "${METHODNAME}"
+fi
+
+R --vanilla --slave <<-RSCRIPT
+########################################################################
+# problem specific models
+	source("models/_true_values.R")
+########################################################################
+
+	nonmem <- readin("generate_results.nonmem.txt")
+
+	if (file.exists("generate_results.openpmx.txt"))
+		gronmem <- readin("generate_results.openpmx.txt")
+
+	if (file.exists("generate_results.validate.txt"))
+		validate <- readin("generate_results.validate.txt")
+
+	if (file.exists("generate_results.openpmxicov.txt"))
+		gronmemicov <- readin("generate_results.openpmxicov.txt")
+	
+	postscript(file="${TEMP}/${0}.ps", horizontal=TRUE)
+	source("../utils/analysis_tables_and_plots.R")
+	source("../utils/analysis_tables_and_plots2.R")
+	
+RSCRIPT
+
+../utils/_write_figures.sh "${0}" "${TEMP}/${0}.ps"
+	
+# tell the user it worked when we exit
+COMPLETION_MESSAGE=""
+

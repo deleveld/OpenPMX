@@ -10,8 +10,6 @@ $DATA("data.csv")
 $ADVAN(diffeqn_libgsl)
 	.firstonly = 1,
 	.nstate = 3,
-	.args.diffeqn.reltol = 1e-6,
-	.args.diffeqn.abstol = 1e-6,
 $IMODEL(V1, V2, V3, CL, Q2, Q3, SIZE)
 	SIZE = WT/70.;
 	V1 = THETA(1) * SIZE * exp(ETA(1));
@@ -34,13 +32,13 @@ $PREDICT(IPRED)
 	IPRED = A(1)/V1;
 	Y = IPRED*(1 + ERR(1));
 $THETA
-	{            2,	      5,		           15,	 ESTIMATE },
-	{            5,	      20,		           50,	 ESTIMATE },
-	{           20,	      100,		         1000,	 ESTIMATE },
-	{          0.1,	      1,		            5,	 ESTIMATE },
-	{          0.1,	      1,		            5,	 ESTIMATE },
-	{          0.1,	     0.5,		            5,	 ESTIMATE },
-$OMEGA(0.1, 0.1, 0, 0.1, 0.1, 0)
+	{   1,   4,   10,  ESTIMATE     },
+	{   5,   20,   50,  ESTIMATE     },
+	{   20,   100,   1000,  ESTIMATE     },
+	{   0.1,   2,   5,  ESTIMATE     },
+	{   0.1,   2,   5,  ESTIMATE     },
+	{   0.1,   1,   5,  ESTIMATE     },
+$OMEGA(0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
 $SIGMA(0.1)
 $MAIN
 //	openpmx.verbose=true;

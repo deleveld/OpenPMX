@@ -168,14 +168,6 @@ static void pmxstate_free(PMXSTATE* pstate)
 	free(pstate);
 }
 
-const PREDICTVARS* pmx_predictvars(OPENPMX* const pmx)
-{
-	if (!pmx->state)
-		return 0;
-	assert(pmx->state->idata.individ[0].predictvars);
-	return pmx->state->idata.individ[0].predictvars;
-}
-
 OPENPMX pmx_copy(const OPENPMX* const pmx)
 {
 	OPENPMX ret = *pmx;
@@ -198,6 +190,71 @@ void pmx_cleanup(OPENPMX* pmx)
 {
 	pmxstate_free(pmx->state);
 	pmx->state = 0;
+}
+
+/* direct access to individual data */
+
+const IMODEL* pmx_imodel(OPENPMX* const pmx)
+{
+	if (!pmx->state)
+		pmxstate_ensure(pmx);
+
+	assert(pmx->state->idata.individ[0].imodel);
+	return pmx->state->idata.individ[0].imodel;
+}
+
+const double* pmx_state(OPENPMX* const pmx)
+{
+	if (!pmx->state)
+		pmxstate_ensure(pmx);
+
+	assert(pmx->state->idata.individ[0].istate);
+	return pmx->state->idata.individ[0].istate;
+}
+
+const double* pmx_eta(OPENPMX* const pmx)
+{
+	if (!pmx->state)
+		pmxstate_ensure(pmx);
+
+	assert(pmx->state->idata.individ[0].eta);
+	return pmx->state->idata.individ[0].eta;
+}
+
+const double* pmx_yhat(OPENPMX* const pmx)
+{
+	if (!pmx->state)
+		pmxstate_ensure(pmx);
+
+	assert(pmx->state->idata.individ[0].yhat);
+	return pmx->state->idata.individ[0].yhat;
+}
+
+const double* pmx_yhatvar(OPENPMX* const pmx)
+{
+	if (!pmx->state)
+		pmxstate_ensure(pmx);
+
+	assert(pmx->state->idata.individ[0].yhatvar);
+	return pmx->state->idata.individ[0].yhatvar;
+}
+
+const double* pmx_pred(OPENPMX* const pmx)
+{
+	if (!pmx->state)
+		pmxstate_ensure(pmx);
+
+	assert(pmx->state->idata.individ[0].pred);
+	return pmx->state->idata.individ[0].pred;
+}
+
+const PREDICTVARS* pmx_predictvars(OPENPMX* const pmx)
+{
+	if (!pmx->state)
+		pmxstate_ensure(pmx);
+
+	assert(pmx->state->idata.individ[0].predictvars);
+	return pmx->state->idata.individ[0].predictvars;
 }
 
 

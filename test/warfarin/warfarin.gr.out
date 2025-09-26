@@ -1,0 +1,16 @@
+$OUTFILE
+OpenPMX 0.0.1 6b8fe54
+config pthread 8
+data records 526 used 526 removed 0
+data individuals 32 observations 483
+data table offset true
+advan model GNU Scientific Library ODE
+advan stepper gsl_odeiv2_step_rk8pd
+advan nstate 3
+advan abstol 1e-09 reltol 1e-09 hstart 1
+optim FOCEI BOBYQA
+checkout begin
+tpool: start 0 1 2 3 4 5 6 7
+warning: DV zero for observation: ID 8.000000 time 0.500000 record 2
+error: AMT not finite (nan): ID 0.000000 time 0.000000 record 1
+warning: DV zero for observation: ID 14.000000 time 0.500000 record 2
