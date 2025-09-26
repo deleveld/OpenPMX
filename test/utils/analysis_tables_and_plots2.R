@@ -35,7 +35,7 @@
 			w <- wilcox.test(v, alternative="two.sided")
 			pval <- w[["p.value"]]
 
-			plot(0, type="n", yaxt="n", xlab=NA, ylab=NA, xlim=(xlim), ylim=c(0,1.4), main=NA)
+			plot(0, type="n", yaxt="n", xlab=NA, ylab=NA, xlim=c(0,max(xlim)), ylim=c(0,1.4), main=NA, xaxs="i", yaxs="i")
 			mtext("Density", side=2, line=0.5, cex=par()$cex)
 
 			m <- median(v)
@@ -56,8 +56,12 @@
 
 			d1 <- density((pest1), na.rm=TRUE)
 			d2 <- density((pest2), na.rm=TRUE)
-			lines(x=(d2$x), y=d2$y/max(d2$y), col="darkgrey", lw=3)
-			lines(x=(d1$x), y=d1$y/max(d1$y), col="black", lw=1)
+			d1x <- d1$x
+			d1y <- d1$y/max(d1$y)
+			d2x <- d2$x
+			d2y <- d2$y/max(d2$y)
+			lines(x=d2x, y=d2y, col="darkgrey", lw=3)
+			lines(x=d1x, y=d1y, col="black", lw=1)
 
 			grid()
 			box()

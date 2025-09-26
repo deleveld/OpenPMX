@@ -183,6 +183,7 @@ void pmx_copy_popparams(OPENPMX* dest, const OPENPMX* const src)
 
 	dest->result = (PMXRESULT) { .objfn = DBL_MAX,
 								 .type = OBJFN_INVALID,
+								 .nparam = 0,
 								 .neval = 0 };
 }
 

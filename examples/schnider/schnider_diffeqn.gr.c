@@ -1491,23 +1491,21 @@ static OPENPMX openpmx = (OPENPMX) {
 		.method = pmx_advan_diffeqn_libgsl,
 		.firstonly = 1,
 	.nstate = 3,
-	.args.diffeqn.reltol = 1e-6,
-	.args.diffeqn.abstol = 1e-6,
 /* end OPENPMXTRAN_ADVAN_INIT */
 	},
 	.theta = {
 /* begin OPENPMXTRAN_THETA_INIT */
-	{            2,	      5,		           15,	 ESTIMATE },
-	{            5,	      20,		           50,	 ESTIMATE },
-	{           20,	      100,		         1000,	 ESTIMATE },
-	{          0.1,	      1,		            5,	 ESTIMATE },
-	{          0.1,	      1,		            5,	 ESTIMATE },
-	{          0.1,	     0.5,		            5,	 ESTIMATE },
+	{   1,   4,   10,  ESTIMATE     },
+	{   5,   20,   50,  ESTIMATE     },
+	{   20,   100,   1000,  ESTIMATE     },
+	{   0.1,   2,   5,  ESTIMATE     },
+	{   0.1,   2,   5,  ESTIMATE     },
+	{   0.1,   1,   5,  ESTIMATE     },
 /* end OPENPMXTRAN_THETA_INIT */
 	},
 	.omega = {
 /* begin OPENPMXTRAN_OMEGA_INIT */
-			{ OMEGA_DIAG, 6, { 0.1, 0.1, 0, 0.1, 0.1, 0 } },
+			{ OMEGA_DIAG, 6, { 0.1, 0.1, 0.1, 0.1, 0.1, 0.1 } },
 /* end OPENPMXTRAN_OMEGA_INIT */
 	},
 	.sigma = {

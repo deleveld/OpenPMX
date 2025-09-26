@@ -171,6 +171,7 @@ typedef struct {
 		OBJFN_CURRENT,
 		OBJFN_FINAL,
 	} type;
+	int nparam;
 	int neval;
 } PMXRESULT;
 

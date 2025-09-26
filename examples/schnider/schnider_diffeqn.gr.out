@@ -1,5 +1,5 @@
 $OUTFILE
-OpenPMX 0.0.1 be7f616
+OpenPMX 0.0.1 6b8fe54
 config pthread 8
 data records 1102 used 1102 removed 0
 data individuals 24 observations 1006
@@ -7,41 +7,41 @@ data table offset true
 advan model GNU Scientific Library ODE
 advan stepper gsl_odeiv2_step_rk8pd
 advan nstate 3
-advan abstol 1e-06 reltol 1e-06 hstart 1
+advan abstol 1e-09 reltol 1e-09 hstart 1
 optim FOCEI BOBYQA
 checkout begin
 tpool: start 0 1 2 3 4 5 6 7
 checkout end
 stabilize begin
-time 0.046 neval 1 objfn -2144.519151
-stabilize iter 2
-time 0.085 neval 3 objfn -2144.607423
+time 0.128 neval 1 objfn -2687.702910
+stabilize iter 3
+time 0.245 neval 4 objfn -2686.970927
 optim rho 0.2 0.05
-time 3.669 neval 105 objfn -3010.817658
+time 9.943 neval 124 objfn -3046.729465
 optim rho 0.05 6.05545e-05
-time 7.514 neval 256 objfn -3039.306651
+time 23.911 neval 341 objfn -3050.347963
 optim rho 0.05 6.05545e-05
-time 9.636 neval 346 objfn -3039.804499
+time 31.351 neval 459 objfn -3050.428323
 optim rho 0.05 6.05545e-05
-time 11.513 neval 425 objfn -3039.809226
+time 37.410 neval 553 objfn -3050.441820
 optim rho 0.05 6.05545e-05
-time 13.129 neval 495 objfn -3039.809992
+time 43.390 neval 640 objfn -3050.442256
 optim rho 6.05545e-05
 popmodel final
-time 13.129 neval 495 objfn -3039.809992
+time 43.390 neval 640 objfn -3050.442256 nparam 13
 THETA(6)
-       5.7943
-      25.9684
-       308.37
-      1.91549
-      1.34719
-     0.866653
+      5.49852
+      24.1273
+      284.194
+      1.93529
+      1.38135
+     0.868278
 OMEGA(6)
-    0.0914662 
-            0     0.0726737 
-            0             0             0 
-            0             0             0     0.0194104 
-            0             0             0             0      0.124814 
-            0             0             0             0             0             0 
+    0.0824546 
+            0     0.0877251 
+            0             0     0.0326301 
+            0             0             0     0.0174842 
+            0             0             0             0      0.106514 
+            0             0             0             0             0     0.0228163 
 SIGMA(1)
-    0.0540431 
+    0.0518341 

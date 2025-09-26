@@ -72,6 +72,7 @@ ENCODE encode_init(const POPMODEL* const popmodel)
 	var temp_popmodel = *popmodel;
 	temp_popmodel.result = (PMXRESULT) { .objfn = DBL_MAX,
 										 .type = OBJFN_INVALID,
+										 .nparam = 0,
 										 .neval = 0 };	
 	var temp_omegainfo = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed);
 	let n = encode_nparam(popmodel, &temp_omegainfo);
@@ -452,6 +453,7 @@ void encode_update(ENCODE* encode, const double* x)
 	/* invalidate the objfn because we dont know it anymore */
 	popmodel->result = (PMXRESULT) { .objfn = DBL_MAX,
 									 .type = OBJFN_INVALID,
+									 .nparam = 0,
 									 .neval = 0 };
 }
 
