@@ -41,7 +41,9 @@ static void idata_predict_yhat_thread(INDIVID* const individ,
 	(void)nonzero;
 	(void)options;
 
-	double etaarray[OPENPMX_OMEGA_MAX] = { };
+	double etaarray[OPENPMX_OMEGA_MAX];
+	forcount(i, OPENPMX_OMEGA_MAX)
+		etaarray[i] = NAN;
 	memcpy(etaarray, individ->eta, popmodel->nomega * sizeof(double));
 
 	let ievaluate_args = (IEVALUATE_ARGS) {
@@ -82,7 +84,11 @@ static void idata_predict_pred_thread(INDIVID* const individ,
 	(void)options;
 
 	/* zero eta for pred */
-	double etaarray[OPENPMX_OMEGA_MAX] = { };
+	double etaarray[OPENPMX_OMEGA_MAX];
+	forcount(i, OPENPMX_OMEGA_MAX)
+		etaarray[i] = NAN;
+	forcount(i, popmodel->nomega)
+		etaarray[i] = 0.;
 
 	let ievaluate_args = (IEVALUATE_ARGS) {
 		.record = individ->record,

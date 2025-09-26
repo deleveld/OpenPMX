@@ -118,8 +118,8 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 		let ndim = omegablocks[i].ndim;
 		let v = omegablocks[i].values;
 		let type = omegablocks[i].type;
+		var n = 0;
 		if (type == OMEGA_BLOCK) {
-			var n = 0;
 			forcount(r, ndim) {
 				/* off diagonal */
 				for (var c=0; c<r; c++) {
@@ -132,8 +132,9 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 				ret.omega[d + r][d + r] = v[n];
 				++n;
 			}
+
+		/* get entries from elsewhere set omega elements */
 		} else if (type == OMEGA_SAME) {
-			/* get entries from elsewhere set omega elements */
 			forcount(r, ndim) {
 				for (var c=0; c<r; c++) {
 					let value = ret.omega[d + c - ndim][d + r - ndim];
@@ -147,17 +148,25 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 				ret.omega[d + r][d + r] = value;
 				ret.omegafixed[d + r][d + r] = 2;
 			}
+
+		/* normal diagonal omega block */
 		} else if (type == OMEGA_DIAG) {
-			/* normal diagonal omega block */
-			var n = 0;
 			forcount(r, ndim) {
 				ret.omega[d + r][d + r] = v[n];
 				++n;
 			}
+
 		} else
 			fatal(0, "invalid OMEGA block type (%i)\n", type);
 
-		d += ndim;
+		/* make sure there are no extra values in list we are ignoring */
+		for (int i=n; i<OPENPMX_OMEGABLOCKSIZE_MAX; i++) {
+			if (v[i] != 0.)
+				fatal(0, "excess value (%f) in omega block\n", v[i]);
+		}
+
+		/* set offset for the next block */
+		d += ndim; 
 	}
 
 	/* find out which elements of omega matrix are fixed */
