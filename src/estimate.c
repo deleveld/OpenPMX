@@ -244,9 +244,10 @@ static void encode_evaluate(ENCODE* const test,
 	scatteroptions.stage1_order = true;
 	scatter_threads(idata, advanfuncs, popmodel, nonzero, options, &scatteroptions, stage1_thread);
 
-	popmodel->result.objfn = objfn(idata, omegainfo);
-	popmodel->result.type = OBJFN_CURRENT;
-	popmodel->result.neval = 0;
+	popmodel->result = (PMXRESULT) {
+		.objfn = objfn(idata, omegainfo),
+		.type = OBJFN_CURRENT,
+		.neval = 0 };
 }
 
 static double focei_stage2_evaluate_population_objfn(const long int _xlength,
@@ -256,7 +257,7 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 	/* decode the vector in the right way for the advan and make the popmodel ready to test */
 	let params = (STAGE2_PARAMS*) data;
 	let idata = params->idata;
-	assert(_xlength == params->test.popmodel.result.nparam);
+	assert(_xlength == params->test.nparam);
 	encode_update(&params->test, _x);
 
 	/* do the actual test, this sets the objfn */
@@ -336,7 +337,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 
 	let options = params->options;
 
-	let n = params->test.popmodel.result.nparam;
+	let n = params->test.nparam;
 	var initial = mallocvar(double, n);
 	var upper = mallocvar(double, n);
 	var lower = mallocvar(double, n);

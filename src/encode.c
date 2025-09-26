@@ -33,11 +33,53 @@
 //#define ENCODE_LINEAR
 //#define ENCODE_NONMEM
 
+static int encode_nparam(const POPMODEL* const popmodel,
+						 const OMEGAINFO* const omegainfo)
+{
+	var nparam = 0;
+
+	let ntheta = popmodel->ntheta;
+	let thetaestim = popmodel->thetaestim;
+	forcount(i, ntheta) {
+		if (thetaestim[i] != FIXED)
+			++nparam;
+	}
+	let nsigma = popmodel->nsigma;
+	let sigmafixed = popmodel->sigmafixed;
+	forcount(i, nsigma) {
+		if (sigmafixed[i] == 0)
+			++nparam;
+	}
+	let nonfixed = &omegainfo->nonfixed;
+	var ndim = nonfixed->n;
+	if (ndim) {
+		var rowcol = nonfixed->rowcol;
+		forcount(i, ndim) {
+			forcount(j, i+1) {
+				let r = rowcol[i];
+				let c = rowcol[j];
+				let fixed = popmodel->omegafixed[r][c];
+				if (fixed == 0)
+					++nparam;
+			}
+		}
+	}
+	return nparam;
+}
+
 ENCODE encode_init(const POPMODEL* const popmodel)
 {
+	var temp_popmodel = *popmodel;
+	temp_popmodel.result = (PMXRESULT) { .objfn = DBL_MAX,
+										 .type = OBJFN_INVALID,
+										 .neval = 0 };	
+	var temp_omegainfo = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed);
+	let n = encode_nparam(popmodel, &temp_omegainfo);
+
 	return (ENCODE) {
-		.popmodel = *popmodel,
-		.omegainfo = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed),
+		.popmodel = temp_popmodel,
+		.omegainfo = temp_omegainfo,
+		.nparam = n,
 		.offset = { },
 		.has_offsets = false,
 	};
@@ -237,7 +279,7 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 		gsl_matrix_free(z);
 		gsl_matrix_free(cholesky);
 	}
-	assert(n == encode->popmodel.result.nparam);
+	assert(n == encode->nparam);
 }
 
 static void fill_in_OMEGA_SAME_blocks(POPMODEL* const popmodel)
@@ -401,16 +443,15 @@ void encode_update(ENCODE* encode, const double* x)
 		popmodel_omega_update(popmodel, temp, omegainfo->nonfixed.rowcol);
 		gsl_matrix_free(temp);
 	}
-	assert(n == encode->popmodel.result.nparam);
+	assert(n == encode->nparam);
 
 	/* foce advan need to see updated omega cholesky and lndet */
 	/* we assume the empty rows and cols dont change */
 	omegainfo_update_inverse_lndet(omegainfo, popmodel->omega);
 
-	/* invalidate the objfn because we dont know it anymore 
-	 * but keep other things like nparam unchanged */
-	popmodel->result.objfn = DBL_MAX;
-	popmodel->result.type = OBJFN_INVALID;
-	popmodel->result.neval = 0;
+	/* invalidate the objfn because we dont know it anymore */
+	popmodel->result = (PMXRESULT) { .objfn = DBL_MAX,
+									 .type = OBJFN_INVALID,
+									 .neval = 0 };
 }
 

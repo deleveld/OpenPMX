@@ -142,7 +142,7 @@ int main(void)
 								advanfuncs->nstate,
 								advanfuncs->advanconfig->imodelfields.size,
 								advanfuncs->advanconfig->predictfields.size);
-	idata_alloc_icovresample(&idata);
+//	idata_alloc_icovresample(&idata);
 
 	let omegainfo = omegainfo_init(popmodel.nomega,
 								   popmodel.omega,
@@ -162,7 +162,7 @@ int main(void)
 				  &popmodel,
 				  0,
 				  &options,
-				  &scatteroptions);
+				  0 /*scatteroptions*/);
 
 	forcount(i, idata.nindivid) {
 		let individ = &idata.individ[i];

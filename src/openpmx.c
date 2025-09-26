@@ -181,7 +181,9 @@ void pmx_copy_popparams(OPENPMX* dest, const OPENPMX* const src)
 	memcpy(dest->sigma, src->sigma, sizeof(dest->sigma));
 	memcpy(dest->omega, src->omega, sizeof(dest->omega));
 
-	dest->result = (PMXRESULT) { };
+	dest->result = (PMXRESULT) { .objfn = DBL_MAX,
+								 .type = OBJFN_INVALID,
+								 .neval = 0 };
 }
 
 void pmx_cleanup(OPENPMX* pmx)
@@ -191,7 +193,6 @@ void pmx_cleanup(OPENPMX* pmx)
 }
 
 /* direct access to individual data */
-#if 0
 
 const IMODEL* pmx_imodel(OPENPMX* const pmx)
 {
@@ -256,5 +257,4 @@ const PREDICTVARS* pmx_predictvars(OPENPMX* const pmx)
 	return pmx->state->idata.individ[0].predictvars;
 }
 
-#endif
 

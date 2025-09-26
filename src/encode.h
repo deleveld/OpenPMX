@@ -28,6 +28,7 @@ extern "C" {
 typedef struct {
 	POPMODEL popmodel;
 	OMEGAINFO omegainfo;
+	const int nparam;
 	/* this is more than enough room because we only need thetas, sigmas,
 	 * and lower triangular omega but it is hard to get the right number
 	 * and we statically allocate so its not much of an issue to have

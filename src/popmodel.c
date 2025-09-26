@@ -34,7 +34,6 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 	let omegablocks = pmx->omega;
 	let sigma = pmx->sigma;
 	
-	var nparam = 0;
 	POPMODEL ret = { };
 	ret.ntheta = 0;
 	ret.nblock = 0;
@@ -84,7 +83,6 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 			if (theta[i].value == theta[i].lower ||
 				theta[i].value == theta[i].upper)
 				fatal(0, "THETA at boundary { %g, %g, %g, ESTIMATE }\n", theta[i].lower, theta[i].value, theta[i].upper);
-			++nparam;
 		}
 		ret.thetaestim[i] = est;
 	}
@@ -129,12 +127,10 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 					ret.omega[d + c][d + r] = value;
 					ret.omega[d + r][d + c] = value;
 					++n;
-					++nparam;
 				}
 				/* on diagonal */
 				ret.omega[d + r][d + r] = v[n];
 				++n;
-				++nparam;
 			}
 		} else if (type == OMEGA_SAME) {
 			/* get entries from elsewhere set omega elements */
@@ -157,7 +153,6 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 			forcount(r, ndim) {
 				ret.omega[d + r][d + r] = v[n];
 				++n;
-				++nparam;
 			}
 		} else
 			fatal(0, "invalid OMEGA block type (%i)\n", type);
@@ -199,16 +194,14 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 		
 		let fabsv = fabs(v);
 		ret.sigma[i] = fabsv;
-		ret.sigmafixed[i] = 1;
-		if (v > 0.) {
-			ret.sigmafixed[i] = 0;
-			++nparam;
-		}
+		ret.sigmafixed[i] = (v <= 0.) ? 1 : 0;
 	}
 
-	/* initial results are invalid, but it is already initialized
-	 * at the start of this function */
-	ret.result = (PMXRESULT) { .nparam = nparam }; 
+	/* initial results are invalid */
+	ret.result = (PMXRESULT) { .objfn = DBL_MAX,
+							   .type = OBJFN_INVALID,
+							   .neval = 0 };
+
 	return ret;
 }
 
@@ -336,9 +329,9 @@ static void info_iteration(FILE* f1,
 						   const POPMODEL* popmodel,
 						   const char* suffix)
 {
-	let objfn = popmodel->result.objfn;
+	let _objfn = popmodel->result.objfn;
 	let neval = popmodel->result.neval;
-	info(f1, "time %.3f neval %i objfn %.6f", runtime_s, neval, objfn);
+	info(f1, "time %.3f neval %i objfn %.6f", runtime_s, neval, _objfn);
 	if (suffix)
 		info(f1, "%s", suffix);
 	info(f1, "\n");

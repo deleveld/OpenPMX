@@ -172,7 +172,6 @@ typedef struct {
 		OBJFN_FINAL,
 	} type;
 	int neval;
-	int nparam;
 } PMXRESULT;
 
 /*---------------------------------------------------------------------*/
@@ -225,6 +224,8 @@ void pmx_copy_popparams(OPENPMX* dest, const OPENPMX* const src);
 /*---------------------------------------------------------------------*/
 void pmx_predict(OPENPMX* openpmx);
 void pmx_predict_pred(OPENPMX* openpmx);
+const IMODEL* pmx_imodel(OPENPMX* const pmx);
+const PREDICTVARS* pmx_predictvars(OPENPMX* const pmx);
 
 /*---------------------------------------------------------------------*/
 /* simulation */
