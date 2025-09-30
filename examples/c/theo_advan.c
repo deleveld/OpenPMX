@@ -66,7 +66,19 @@ static double imodel_predict(const IMODEL* const _imodel,
 
 #define ARRAYSIZE(a) (sizeof(a)/sizeof(a[0]))
 
-extern RECORD data[11]; /* forward declaration */
+const RECORD data[11] = {
+	{	1,	4.02,	0.,	.74,	179.6,	},
+	{	1,	0.,	0.25,	2.84,	0.,	},
+	{	1,	0.,	0.57,	6.57,	0.,	},
+	{	1,	0.,	1.12,	10.5,	0.,	},
+	{	1,	0.,	2.02,	9.66,	0.,	},
+	{	1,	0.,	3.82,	8.58,	0.,	},
+	{	1,	0.,	5.1,	8.36,	0.,	},
+	{	1,	0.,	7.03,	7.47,	0.,	},
+	{	1,	0.,	9.05,	6.89,	0.,	},
+	{	1,	0.,	12.12,	5.94,	0.,	},
+	{	1,	0.,	24.37,	3.28,	0.,	},
+};
 
 /* include sources directly instead of linking to library */
 #include "dataconfig/dataconfig.c"
@@ -82,7 +94,7 @@ int main(void)
 {
 	OPENPMX openpmx = (OPENPMX) {
 		.data = {
-			.writeable = data,
+			.writeable = 0,
 			.records = data,
 			.nrecords = ARRAYSIZE(data),
 			.recordfields = {
@@ -158,18 +170,4 @@ int main(void)
 
 	return EXIT_SUCCESS;
 }
-
-RECORD data[11] = {
-	{	1,	4.02,	0.,	.74,	179.6,	},
-	{	1,	0.,	0.25,	2.84,	0.,	},
-	{	1,	0.,	0.57,	6.57,	0.,	},
-	{	1,	0.,	1.12,	10.5,	0.,	},
-	{	1,	0.,	2.02,	9.66,	0.,	},
-	{	1,	0.,	3.82,	8.58,	0.,	},
-	{	1,	0.,	5.1,	8.36,	0.,	},
-	{	1,	0.,	7.03,	7.47,	0.,	},
-	{	1,	0.,	9.05,	6.89,	0.,	},
-	{	1,	0.,	12.12,	5.94,	0.,	},
-	{	1,	0.,	24.37,	3.28,	0.,	},
-};
 
