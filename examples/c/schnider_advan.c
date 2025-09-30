@@ -1,6 +1,6 @@
 /*
- * Theophylline oral from Bae and Yim from TCP 2016
- * compile and run with:
+ * Prediction from single individual with a three compartment model
+ * Compile and run with:
  * gcc -W -Wall -Wextra -O2 schnider_advan.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out
 */
 
@@ -25,8 +25,8 @@ typedef struct RECORD {
 } RECORD;
 
 static void imodel_init(IMODEL* const _imodel,
-						 ADVANSTATE* const _advanstate,
-						 const POPPARAM* const _popparam)
+						ADVANSTATE* const _advanstate,
+						const POPPARAM* const _popparam)
 {
 	const double* _theta = _popparam->theta;
 	const double* _eta = _popparam->eta;
@@ -70,7 +70,7 @@ static void imodel_diffeqn(double _dadt[],
 	const double Q3 = _imodel->Q3;
 
 #define THETA(i) 	((const double)_theta[i-1])
-#define ETA(i) 	((const double)_eta[i-1])
+#define ETA(i) 		((const double)_eta[i-1])
 #define A(i) 		((const double)_state[i-1])
 #define DADT(i) 	(_dadt[i-1])
 	const double K10 = CL/V1;
@@ -115,6 +115,11 @@ static double imodel_predict(const IMODEL* const _imodel,
 
 #define ARRAYSIZE(a) (sizeof(a)/sizeof(a[0]))
 
+/* Data from first individual:
+ * Schnider T, Minto C, Gambus P, Andresen C, Goodale D, Shafer S, Youngs E:
+ * The influence of method of administration and covariates on the pharmacokinetics
+ * of propofol in adult volunteers. Anesthesiology 1998; 88:1170–82 PMID: 9605675
+ */
 const RECORD data[] = {
 	{	1,0,0,92.60001,342.963,4,34,46.3,157.5,2,1	},
 	{	1,2.11,3.62,0,0,0,34,46.3,157.5,2,1	},

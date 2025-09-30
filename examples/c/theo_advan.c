@@ -1,6 +1,6 @@
 /*
  * Theophylline oral from Bae and Yim from TCP 2016
- * compile and run with:
+ * Compile and run with:
  * gcc -W -Wall -Wextra -O2 theo_advan.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out
 */
 
