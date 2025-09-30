@@ -38,7 +38,9 @@ static inline double evaluate_yhat(const IMODEL* const imodel,
 								   const double errarray[static OPENPMX_SIGMA_MAX],
 								   PREDICTVARS* predictvars)
 {
-	memset(predictvars, 0, OPENPMX_PREDICTVARS_MAX * sizeof(double));
+	/* TODO: Is this needed? It does stop PREDICTVARS from 'leaking' from 
+	 * one record to the next. Is this important? */
+//	memset(predictvars, 0, OPENPMX_PREDICTVARS_MAX * sizeof(double));
 		
 	/* the errarray should be already set to zero for a normal call but
 	 * it could be non-zero if we are simulating with residual error */
@@ -316,6 +318,14 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		/* state should not be accessed outside of its limits */
 		for (int j=advanfuncs->nstate; j<OPENPMX_STATE_MAX; j++)
 			advan->state[j] = NAN;
+			
+		/* PREDICTVARS should not be read from, only written from. So for
+		 * finding errors we will fill it with NAN. We dont know when or
+		 * if they were written so we cant check. Neither do we know the
+		 * elements (they could be something other than double) so just
+		 * write it and user code should fail for the NAN. */
+		for (int j=0; j<OPENPMX_PREDICTVARS_MAX; j++)
+			advanmem._predictvars[j] = NAN;
 
 		/* check record before advance */
 		/* observations */

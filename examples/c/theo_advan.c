@@ -1,7 +1,7 @@
 /*
  * Theophylline oral from Bae and Yim from TCP 2016
  * compile and run with:
- * gcc -W -Wall -Wextra -O2 theo_posthoc.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out
+ * gcc -W -Wall -Wextra -O2 theo_advan.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out
 */
 
 #include <stdlib.h>
@@ -38,7 +38,7 @@ static void imodel_init(IMODEL* const _imodel,
 }
 
 typedef struct PREDICTVARS {
-	/* nothing */
+	double IPRED;
 } PREDICTVARS;
 
 static double imodel_predict(const IMODEL* const _imodel,
@@ -59,6 +59,7 @@ static double imodel_predict(const IMODEL* const _imodel,
 
 	const double DOSE=320.;
     const double IPRED = DOSE / V * KA / (KA - K) * (exp(-K * TIME)-exp(-KA * TIME));
+    _predparams->IPRED = IPRED;
     
     return IPRED * (1 + err[0]) + err[1];
 }
@@ -72,19 +73,10 @@ extern RECORD data[11]; /* forward declaration */
 #include "dataconfig/recordinfo.c"
 #include "advan/advan.c"
 #include "advan/pred.c"
-#include "bobyqa/bobyqa.c"
-#include "openpmx.c"
-#include "idata.c"
 #include "print.c"
 #include "popmodel.c"
-#include "omegainfo.c"
-#include "linalg.c"
-#include "ievaluate.c"
-#include "predict.c"
-#include "stage1.c"
-#include "scatter.c"
+#include "ievaluate.h"
 #include "utils/vector.c"
-#include "utils/various.c"
 
 int main(void)
 {
@@ -107,18 +99,8 @@ int main(void)
 		.advan = {
 			.init = imodel_init,
 			.predict = imodel_predict,
-			.imodelfields = {
-				.size = sizeof(IMODEL),
-				.field = {
-					{ .name="V", .offset = offsetof(IMODEL, V) },
-					{ .name="K", .offset = offsetof(IMODEL, K) },
-					{ .name="KA", .offset = offsetof(IMODEL, KA) },
-				},
-			},
-			.predictfields = {
-				.size = sizeof(PREDICTVARS),
-				.field = { },
-			},
+			.imodelfields = { },
+			.predictfields = { },
 			.method = pmx_advan_pred,
 			.firstonly = true,
 		},
@@ -133,56 +115,47 @@ int main(void)
 		.sigma = { 0.0168844,	0.0732164 },
 	};
 
+	/* get advancer function table, memory needed to iterate, and construct advancer */
 	let advanfuncs = advanfuncs_alloc(&openpmx.data, &openpmx.advan);
+	ADVAN* advan = calloc(advanfuncs->advan_size, 1);	
+	advanfuncs->construct(advan, advanfuncs);
+	
+	/* arguments needed to iterate */
+	double eta[OPENPMX_OMEGA_MAX] = { };
 	let popmodel = popmodel_init(&openpmx);
-	var idata = idata_construct(&advanfuncs->recordinfo,
-								popmodel.ntheta,
-								popmodel.nomega,
-								popmodel.nsigma,
-								advanfuncs->nstate,
-								advanfuncs->advanconfig->imodelfields.size,
-								advanfuncs->advanconfig->predictfields.size);
-
-	let omegainfo = omegainfo_init(popmodel.nomega,
-								   popmodel.omega,
-								   popmodel.omegafixed);
-	let o = (OPTIONS){ };
-	let options = options_default(&o);
-
-	stage1_thread(idata.individ,
-				  advanfuncs,
-				  &popmodel,
-				  &omegainfo.nonzero,
-				  &options,
-				  0 /*scatteroptions*/);
-
-	idata_predict_pred_thread(idata.individ,
-				  advanfuncs,
-				  &popmodel,
-				  0,
-				  &options,
-				  0 /*scatteroptions*/);
-
-	forcount(i, idata.nindivid) {
-		let individ = &idata.individ[i];
-		let imodel = &individ->imodel[i];
-
-		printf("ID %f\n", individ->ID);
-		printf("V %f\n", imodel->V);
-		printf("K %f\n", imodel->K);
-		printf("KA %f\n", imodel->KA);
+	let ievaluate_args = (IEVALUATE_ARGS) {
+		.record = data,
+		.nrecord = ARRAYSIZE(data),
+		.advanfuncs = advanfuncs,
+		.popparam = { 
+			.theta = popmodel.theta,
+			.ntheta = popmodel.ntheta,
+			.eta = eta,
+			.nomega = popmodel.nomega,
+			.sigma = popmodel.sigma,
+			.nsigma = popmodel.nsigma,
+			.nstate = advanfuncs->nstate,
+		},
+		.logstream = 0,
+	};
 	
-		forcount(n, individ->nrecord) {
-			let record = &individ->record[n];
-			let ipred = individ->yhat[n];
-			let pred = individ->pred[n];
-			printf("%f %f %f %f %f\n", record->ID, record->TIME, record->DV, ipred, pred);
-		}
+	/* scratch memory needed to iterate */
+	double errarray[OPENPMX_SIGMA_MAX] = { };
+	IMODEL imodel;
+	PREDICTVARS predictvars;
+
+	/* advance over individuals data */
+	let predict = openpmx.advan.predict;
+	forcount(i, ARRAYSIZE(data)) {
+		let ptr = &data[i];
+		let predictstate = advan_advance(advan, &imodel, ptr, &ievaluate_args.popparam);
+		let yhat = predict(&imodel, &predictstate, &ievaluate_args.popparam, errarray, &predictvars);
+		
+		printf("%f %f %f %f %f\n", ptr->ID, ptr->TIME, ptr->DV, yhat, predictvars.IPRED);
 	}
+	advanfuncs->destruct(advan);
+	free(advan);
 
-	advanfuncs_free(advanfuncs);
-	idata_destruct(&idata);
-	
 	return EXIT_SUCCESS;
 }
 
