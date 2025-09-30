@@ -24,17 +24,12 @@ static void imodel_init(IMODEL* const _imodel,
 {
 	const double* theta = _popparam->theta;
 	const double* eta = _popparam->eta;
-
 	const RECORD* record = _advanstate->record;
 	const double BWT = record->BWT;
 
-	const double V  = theta[0]*exp(eta[0]) * pow(BWT/70., 1);
-    const double K  = theta[1]*exp(eta[1]) * pow(BWT/70., -0.25);
-    const double KA = theta[2]*exp(eta[2]) * pow(BWT/70., -0.25);
-    
-	_imodel-> V = V;
-	_imodel-> K = K;
-	_imodel-> KA = KA;
+	_imodel->V  = theta[0]*exp(eta[0]) * pow(BWT/70., 1);
+    _imodel->K  = theta[1]*exp(eta[1]) * pow(BWT/70., -0.25);
+    _imodel->KA = theta[2]*exp(eta[2]) * pow(BWT/70., -0.25);
 }
 
 typedef struct PREDICTVARS {
@@ -66,7 +61,7 @@ static double imodel_predict(const IMODEL* const _imodel,
 
 #define ARRAYSIZE(a) (sizeof(a)/sizeof(a[0]))
 
-const RECORD data[11] = {
+const RECORD data[] = {
 	{	1,	4.02,	0.,	.74,	179.6,	},
 	{	1,	0.,	0.25,	2.84,	0.,	},
 	{	1,	0.,	0.57,	6.57,	0.,	},
@@ -87,7 +82,6 @@ const RECORD data[11] = {
 #include "advan/pred.c"
 #include "print.c"
 #include "popmodel.c"
-#include "ievaluate.h"
 #include "utils/vector.c"
 
 int main(void)
@@ -111,8 +105,6 @@ int main(void)
 		.advan = {
 			.init = imodel_init,
 			.predict = imodel_predict,
-			.imodelfields = { },
-			.predictfields = { },
 			.method = pmx_advan_pred,
 			.firstonly = true,
 		},
@@ -120,11 +112,10 @@ int main(void)
 					{       0.0001,	    0.0867683,	            1,	 ESTIMATE },
 					{       0.0001,	      1.51591,	            5,	 ESTIMATE },
 		},
-		.omega = {	{ OMEGA_BLOCK, 3, { 0.0108327,
-										0.0142938,	0.018945,
-										0.00866303,	0.00981528,	0.454379 } },
+		.omega = {	
+			{ OMEGA_DIAG, 3, { 0, 0, 0 } }, 
 		},
-		.sigma = { 0.0168844,	0.0732164 },
+		.sigma = { 0, 0 },
 	};
 
 	/* get advancer function table, memory needed to iterate, and construct advancer */
@@ -135,20 +126,14 @@ int main(void)
 	/* arguments needed to iterate */
 	double eta[OPENPMX_OMEGA_MAX] = { };
 	let popmodel = popmodel_init(&openpmx);
-	let ievaluate_args = (IEVALUATE_ARGS) {
-		.record = data,
-		.nrecord = ARRAYSIZE(data),
-		.advanfuncs = advanfuncs,
-		.popparam = { 
-			.theta = popmodel.theta,
-			.ntheta = popmodel.ntheta,
-			.eta = eta,
-			.nomega = popmodel.nomega,
-			.sigma = popmodel.sigma,
-			.nsigma = popmodel.nsigma,
-			.nstate = advanfuncs->nstate,
-		},
-		.logstream = 0,
+	let popparam = (POPPARAM) { 
+		.theta = popmodel.theta,
+		.ntheta = popmodel.ntheta,
+		.eta = eta,
+		.nomega = popmodel.nomega,
+		.sigma = popmodel.sigma,
+		.nsigma = popmodel.nsigma,
+		.nstate = advanfuncs->nstate,
 	};
 	
 	/* scratch memory needed to iterate */
@@ -160,8 +145,8 @@ int main(void)
 	let predict = openpmx.advan.predict;
 	forcount(i, ARRAYSIZE(data)) {
 		let ptr = &data[i];
-		let predictstate = advan_advance(advan, &imodel, ptr, &ievaluate_args.popparam);
-		let yhat = predict(&imodel, &predictstate, &ievaluate_args.popparam, errarray, &predictvars);
+		let predictstate = advan_advance(advan, &imodel, ptr, &popparam);
+		let yhat = predict(&imodel, &predictstate, &popparam, errarray, &predictvars);
 		
 		printf("%f %f %f %f %f\n", ptr->ID, ptr->TIME, ptr->DV, yhat, predictvars.IPRED);
 	}
