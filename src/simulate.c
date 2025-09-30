@@ -42,7 +42,9 @@ static void simulate_with_error_thread(INDIVID* const individ,
 	(void) options;
 	
 	let nomega = popmodel->nomega;
-	double etacopy[OPENPMX_OMEGA_MAX] = { };
+	double etacopy[OPENPMX_OMEGA_MAX];
+	forcount(i, OPENPMX_OMEGA_MAX)
+		etacopy[i] = NAN;
 	memcpy(etacopy, individ->eta, nomega * sizeof(double));
 
 	let ievaluate_args = (IEVALUATE_ARGS) {

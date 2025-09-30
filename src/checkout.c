@@ -41,7 +41,12 @@ static void idata_checkout_thread(INDIVID* const individ,
 	clock_gettime(CLOCK_REALTIME, &t3);
 
 	/* checkout is at ETA at 0 */
-	double eta[OPENPMX_OMEGA_MAX] = { };
+	double eta[OPENPMX_OMEGA_MAX];
+	forcount(i, OPENPMX_OMEGA_MAX)
+		eta[i] = NAN;
+	forcount(i, popmodel->nomega)
+		eta[i] = 0.;
+	
 	let ievaluate_args = (IEVALUATE_ARGS) {
 		.record = individ->record,
 		.nrecord = individ->nrecord,

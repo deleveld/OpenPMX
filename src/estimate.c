@@ -247,6 +247,7 @@ static void encode_evaluate(ENCODE* const test,
 	popmodel->result = (PMXRESULT) {
 		.objfn = objfn(idata, omegainfo),
 		.type = OBJFN_CURRENT,
+		.nparam = 0,
 		.neval = 0 };
 }
 
@@ -692,6 +693,7 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 	if (maxeval > 1) {
 		focei(params); /* TODO: this should be renamed I think */
 		params->best.result.type = OBJFN_FINAL;
+		params->best.result.nparam = params->test.nparam;
 		params->best.result.neval = params->neval;
 
 		/* at end we encode the best so far */
@@ -816,6 +818,7 @@ static void estimate_popmodel(const char* filename,
 
 	/* setup the minimizer */
 	var params = stage2_params(filename, idata, advanfuncs, popmodel, options);
+	popmodel->result.nparam = params.test.nparam;
 
 	/* do some logging */
 	/* start extfile and other headers, rest will be saved during iterations */

@@ -528,6 +528,8 @@ void stage1_thread(INDIVID* const individ,
 		it is only nomega wide. We just have to copy back and forth. */
 	int stage1_ineval = 0;
 	double testeta[OPENPMX_OMEGA_MAX] = { };
+	forcount(i, OPENPMX_OMEGA_MAX)
+		testeta[i] = NAN;
 	let stage1_params = (const STAGE1_PARAMS) {
 		.testeta = testeta,
 		.nonzero = nonzero,

@@ -103,9 +103,14 @@
 		}
 		calc_rmse <- function(est, trueval)
 		{
-			est <- (est - trueval) / trueval
-			ret <- sqrt(mean(est*est)) * 100
-			ret
+#			err <- (est - trueval) / trueval
+#			ret <- sqrt(mean(err*err)) * 100
+#			ret
+
+### corrected equation but the same results as above
+			err <- (est - trueval)
+			ret2 <- sqrt(mean(err*err) / (trueval*trueval)) * 100
+			ret2
 		}
 		calc_medrerr <- function(est1, est2, trueval)
 		{
@@ -167,11 +172,27 @@
 
 		tallv <- allv
 		xlim <- range(c(trueval, allv), na.rm=TRUE)
+		ttt <- bquote(.(displayname) ~ .(units))
 
 		log <- ""
 		
+		xaxs <- "r"
+		if (any(grepl("var", ttt) == TRUE)) {
+			xaxs <- "i"
+			rdelta <- xlim[2] - trueval
+			if (trueval - rdelta < 0)
+				xlim[1] <- 0.
+		}
+		if (any(grepl("corr", ttt) == TRUE)) {
+			xaxs <- "i"
+			if (max(allv) > 90)
+				xlim[2] <- 100
+			if (min(allv) < -90)
+				xlim[1] <- -100
+		}
+		
 		d0 <- density(tallv, na.rm=TRUE)
-		plot(d0, type="n", yaxt="n", xlab=NA, ylab=NA, xlim=(xlim), ylim=c(0,1.4), log=log, main=NA)
+		plot(d0, type="n", yaxt="n", xlab=NA, ylab=NA, xlim=(xlim), ylim=c(0,1.4), log=log, main=NA, xaxs=xaxs, yaxs="i")
 		mtext("Density", side=2, line=0.5, cex=par()$cex)
 
 		for (i in 1:nmethods) {
@@ -188,9 +209,9 @@
 		lines(x=(c(trueval,trueval)), y=c(0,1), col="black", lw=2)
 
 		grid()
+		box()
 		
 #		ttt <- sprintf("%s %s", displayname, units)
-		ttt <- bquote(.(displayname) ~ .(units))
 		title(ttt, line=0.5, cex=par()$cex)
 
 		allname <- NA

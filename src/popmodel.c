@@ -107,7 +107,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 		ret.nblock += 1;
 	}
 	if (ret.nomega > OPENPMX_OMEGA_MAX)
-		fatal(0, "Omega size (%i) is too large, Max is %i\n", ret.nomega, OPENPMX_OMEGA_MAX);
+		fatal(0, "Omega size (%i) is too large, max is %i\n", ret.nomega, OPENPMX_OMEGA_MAX);
 
 	/* initialize the omega matrix from the blocks */
 	forcount(i, ret.nomega) 
@@ -118,8 +118,8 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 		let ndim = omegablocks[i].ndim;
 		let v = omegablocks[i].values;
 		let type = omegablocks[i].type;
+		var n = 0;
 		if (type == OMEGA_BLOCK) {
-			var n = 0;
 			forcount(r, ndim) {
 				/* off diagonal */
 				for (var c=0; c<r; c++) {
@@ -132,8 +132,9 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 				ret.omega[d + r][d + r] = v[n];
 				++n;
 			}
+
+		/* get entries from elsewhere set omega elements */
 		} else if (type == OMEGA_SAME) {
-			/* get entries from elsewhere set omega elements */
 			forcount(r, ndim) {
 				for (var c=0; c<r; c++) {
 					let value = ret.omega[d + c - ndim][d + r - ndim];
@@ -147,17 +148,25 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 				ret.omega[d + r][d + r] = value;
 				ret.omegafixed[d + r][d + r] = 2;
 			}
+
+		/* normal diagonal omega block */
 		} else if (type == OMEGA_DIAG) {
-			/* normal diagonal omega block */
-			var n = 0;
 			forcount(r, ndim) {
 				ret.omega[d + r][d + r] = v[n];
 				++n;
 			}
+
 		} else
 			fatal(0, "invalid OMEGA block type (%i)\n", type);
 
-		d += ndim;
+		/* make sure there are no extra values in list we are ignoring */
+		for (int i=n; i<OPENPMX_OMEGABLOCKSIZE_MAX; i++) {
+			if (v[i] != 0.)
+				fatal(0, "excess value (%f) in omega block\n", v[i]);
+		}
+
+		/* set offset for the next block */
+		d += ndim; 
 	}
 
 	/* find out which elements of omega matrix are fixed */
@@ -167,7 +176,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 			if (i == j && v <= 0.) {
 				ret.omega[i][j] = fabs(v);
 				if (ret.omegafixed[i][j] == 2)
-					fatal(0, "variances on diagonal set fixed cannot be part of a SAME block\n");
+					fatal(0, "variances on diagonal of a SAME block cannot be fixed\n");
 				ret.omegafixed[i][j] = 1;
 			} else if (v == 0.)
 				ret.omegafixed[i][j] = 1;
@@ -192,14 +201,14 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 		if (!isfinite(v))
 			fatal(0, "invalid sigma %g\n", v);
 		
-		let fabsv = fabs(v);
-		ret.sigma[i] = fabsv;
+		ret.sigma[i] = fabs(v);
 		ret.sigmafixed[i] = (v <= 0.) ? 1 : 0;
 	}
 
 	/* initial results are invalid */
 	ret.result = (PMXRESULT) { .objfn = DBL_MAX,
 							   .type = OBJFN_INVALID,
+							   .nparam = 0,
 							   .neval = 0 };
 
 	return ret;
@@ -341,8 +350,8 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 {
 	const char* message = 0;
 	switch (popmodel->result.type) {
-		case OBJFN_INVALID:		message = "invalid";		break;
-		case OBJFN_CURRENT:		message = "current";		break;
+		case OBJFN_INVALID:		message = "invalid";	break;
+		case OBJFN_CURRENT:		message = "current";	break;
 		case OBJFN_FINAL:		message = "final";		break;
 		case OBJFN_EVALUATE:	message = "evaluate";	break;
 		default:
@@ -357,7 +366,8 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 		if (timestamp != DBL_MAX)
 			info(f2, "time %.3f ", timestamp);
 		info(f2, "neval %i ", popmodel->result.neval);
-		info(f2, "objfn %.6f\n", popmodel->result.objfn);
+		info(f2, "objfn %.6f ", popmodel->result.objfn);
+		info(f2, "nparam %i\n", popmodel->result.nparam);
 	}
 
 	/* info about theta */
