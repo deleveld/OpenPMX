@@ -67,9 +67,7 @@ void idata_checkout(const IDATA* const idata,
 					FILE* logstream)
 {
 	info(logstream, "checkout begin\n");
-
 	
-
 	SCATTEROPTIONS scatteroptions = { };
 	scatteroptions.checkout_errors = true;
 	scatteroptions.logstream = logstream;

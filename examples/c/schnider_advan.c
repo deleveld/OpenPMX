@@ -1,8 +1,14 @@
 /*
  * Prediction from single individual with a three compartment model
+ * 
+ * PK model and data from first individual:
+ * Schnider T, Minto C, Gambus P, Andresen C, Goodale D, Shafer S, Youngs E:
+ * The influence of method of administration and covariates on the pharmacokinetics
+ * of propofol in adult volunteers. Anesthesiology 1998; 88:1170–82 PMID: 9605675
+ * 
  * Compile and run with:
  * gcc -W -Wall -Wextra -O2 schnider_advan.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out
-*/
+ */
 
 #include <stdlib.h>
 #include <math.h>
@@ -17,7 +23,6 @@ typedef struct IMODEL {
 	double CL;
 	double Q2;
 	double Q3;
-	double SIZE;
 } IMODEL;
 
 typedef struct RECORD {
@@ -28,23 +33,27 @@ static void imodel_init(IMODEL* const _imodel,
 						ADVANSTATE* const _advanstate,
 						const POPPARAM* const _popparam)
 {
-	const double* _theta = _popparam->theta;
-	const double* _eta = _popparam->eta;
 	const RECORD* const _record = _advanstate->record;
+	const double WGT = _record->WT;
+	const double AGE = _record->AGE;
+	const double HGT = _record->HT;
+	const double M1F2 = _record->M1F2;
+	(void)_popparam;
 
-#define THETA(i) 		((const double)_theta[(i)-1])
-#define ETA(i) 			((const double)_eta[(i)-1])
-#define A(i) 			((const double)_advanstate->state[(i)-1])
-	_imodel->SIZE = _record->WT/70.;
-	_imodel->V1 = THETA(1) * _imodel->SIZE * exp(ETA(1));
-	_imodel->V2 = THETA(2) * _imodel->SIZE * exp(ETA(2));
-	_imodel->V3 = THETA(3) * _imodel->SIZE * exp(ETA(3));
-	_imodel->CL = THETA(4) * pow(_imodel->SIZE, 0.75) * exp(ETA(4));
-	_imodel->Q2 = THETA(5) * pow(_imodel->SIZE, 0.75) * exp(ETA(5));
-	_imodel->Q3 = THETA(6) * pow(_imodel->SIZE, 0.75) * exp(ETA(6));
-#undef THETA
-#undef ETA
-#undef A
+/* james equation */
+    const double LBMM=1.1 *WGT-128*(WGT/HGT)*(WGT/HGT);
+    const double LBMF=1.07*WGT-148*(WGT/HGT)*(WGT/HGT);
+    const double FEM =M1F2-1;
+    const double LBM =(1-FEM)*LBMM+(FEM)*LBMF;
+/* schnider model */
+    _imodel->V1 = 4.27;
+    _imodel->V2 = 18.9-0.391*(AGE-53);
+    _imodel->V3 = 238;
+    _imodel->CL = 1.89+0.0456*(WGT-77)-0.0681*(LBM-59)+0.0264*(HGT-177);
+    if (_imodel->CL <= 0.) 
+		_imodel->CL = 0.01;
+    _imodel->Q2 = 1.29-0.024*(AGE-53);
+    _imodel->Q3 = 0.836;
 }
 
 typedef struct PREDICTVARS {
@@ -115,11 +124,7 @@ static double imodel_predict(const IMODEL* const _imodel,
 
 #define ARRAYSIZE(a) (sizeof(a)/sizeof(a[0]))
 
-/* Data from first individual:
- * Schnider T, Minto C, Gambus P, Andresen C, Goodale D, Shafer S, Youngs E:
- * The influence of method of administration and covariates on the pharmacokinetics
- * of propofol in adult volunteers. Anesthesiology 1998; 88:1170–82 PMID: 9605675
- */
+/* ID, TIME, DV, AMT, RATE, EVID, AGE, WT, HT, M1F2, A1V2 */
 const RECORD data[] = {
 	{	1,0,0,92.60001,342.963,4,34,46.3,157.5,2,1	},
 	{	1,2.11,3.62,0,0,0,34,46.3,157.5,2,1	},
@@ -171,7 +176,6 @@ const RECORD data[] = {
 
 /* include sources directly instead of linking to library */
 #include "dataconfig/dataconfig.c"
-#include "dataconfig/recordinfo.c"
 #include "advan/advan.c"
 #include "advan/diffeqn_libgsl.c"
 #include "print.c"
@@ -204,18 +208,9 @@ int main(void)
 			.firstonly = 1,
 			.nstate = 3,
 		},
-		.theta = {
-			{   1,   5.49866,   10,  ESTIMATE     },
-			{   5,   24.1257,   50,  ESTIMATE     },
-			{   20,   284.311,   1000,  ESTIMATE     },
-			{   0.1,   1.93435,   5,  ESTIMATE     },
-			{   0.1,   1.38236,   5,  ESTIMATE     },
-			{   0.1,   0.868029,   5,  ESTIMATE     },
-		},
-		.omega = {	
-			{ OMEGA_DIAG, 6, { 0, 0, 0, 0, 0, 0 } }, 
-		},
-		.sigma = { 0 },
+		.theta = { },
+		.omega = { },
+		.sigma = { },
 	};
 
 	/* get advancer function table, memory needed to iterate, and construct advancer */

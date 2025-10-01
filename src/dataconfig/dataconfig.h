@@ -18,14 +18,122 @@
 #ifndef OPENPMX_DATACONFIG_INTERNAL_H
 #define OPENPMX_DATACONFIG_INTERNAL_H
 
-#include <stddef.h>
+#include <math.h>
+
 #include "openpmx.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+typedef struct {
+	const DATACONFIG* dataconfig;
+	const int offsetID;
+	const int offsetTIME;
+	const int offsetDV;
+	const int offsetEVID;
+	const int offsetMDV;
+	const int offsetAMT;
+	const int offsetRATE;
+	const int offsetCMT;
+	const int offsetDVLOW;
+	const bool _offset1;
+	const int ndata;
+	const int nindivid;
+	const int nobs;
+} RECORDINFO;
+
+RECORDINFO recordinfo_init(const DATACONFIG* const dataconfig);
 
 int structinfo_find_offset(const char* name, const STRUCTINFO* const structinfo);
+
+static inline double DATA_FIELD(const void* p, const int offset)
+{
+	return *(const double*)((const char*)p + offset);
+}
+
+static inline const RECORD* RECORD_INDEX(const RECORD* p, const int size, const int i)
+{
+	return (const RECORD*)((const char*)p + size * (int)i);
+}
+
+static inline double RECORDINFO_ID(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	return *(const double*)((const char*)p + recordinfo->offsetID);
+}
+
+static inline double RECORDINFO_TIME(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	return *(const double*)((const char*)p + recordinfo->offsetTIME);
+}
+
+static inline double RECORDINFO_DV(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	return *(const double*)((const char*)p + recordinfo->offsetDV);
+}
+
+static inline double RECORDINFO_AMT(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	if (recordinfo->offsetAMT != -1)
+		return *(const double*)((const char*)p + recordinfo->offsetAMT);
+	return 0.;
+}
+
+static inline double RECORDINFO_RATE(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	if (recordinfo->offsetRATE != -1)
+		return *(const double*)((const char*)p + recordinfo->offsetRATE);
+	return 0.;
+}
+
+static inline int RECORDINFO_MDV(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	if (recordinfo->offsetMDV != -1)
+		return (int)(*(const double*)((const char*)p + recordinfo->offsetMDV));
+	if (isnan(RECORDINFO_DV(recordinfo, p)))
+		return 1;
+	return 0;
+}
+
+static inline int RECORDINFO_EVID(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	if (recordinfo->offsetEVID != -1) 
+		return (int)(*(const double*)((const char*)p + recordinfo->offsetEVID));
+	if (RECORDINFO_MDV(recordinfo, p) == 0)
+		return 0;
+	if (RECORDINFO_AMT(recordinfo, p) != 0.)
+		return 1;
+	return 2;
+}
+
+static inline int RECORDINFO_CMT_0offset(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	if (recordinfo->offsetCMT == -1)
+		return 0.;
+
+	const int ret = (int)(*(const double*)((const char*)p + recordinfo->offsetCMT));
+	return (recordinfo->_offset1) ? (ret - 1) : ret;
+}
+
+static inline double RECORDINFO_CMT(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	if (recordinfo->offsetCMT == -1)
+		return 0.;
+
+	return *(const double*)((const char*)p + recordinfo->offsetCMT);
+}
+
+static inline double RECORDINFO_DVLOW(const RECORDINFO* const recordinfo, const RECORD* p)
+{
+	if (recordinfo->offsetDVLOW == -1)
+		return 0.;
+
+	return *(const double*)((const char*)p + recordinfo->offsetDVLOW);
+}
+
+static inline const RECORD* RECORDINFO_INDEX(const RECORDINFO* const recordinfo, const RECORD* p, const int i)
+{
+	return RECORD_INDEX(p, recordinfo->dataconfig->recordfields.size, i);
+}
 
 #ifdef __cplusplus
 }

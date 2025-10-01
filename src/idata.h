@@ -19,7 +19,7 @@
 #define OPENPMX_IDATA_H
 
 #include "openpmx.h"
-#include "dataconfig/recordinfo.h"
+#include "dataconfig/dataconfig.h"
 
 #ifdef __cplusplus
 extern "C" {

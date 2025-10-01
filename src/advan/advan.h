@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "dataconfig/recordinfo.h"
+#include "dataconfig/dataconfig.h"
 #include "utils/vector.h"
 
 #ifdef __cplusplus

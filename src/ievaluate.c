@@ -25,7 +25,6 @@
 #include "print.h"
 #include "advan/advan.h"
 #include "dataconfig/dataconfig.h"
-#include "dataconfig/recordinfo.h"
 #include "utils/c22.h"
 
 /* NOTE: these functions must be thread safe on the level of an individual */

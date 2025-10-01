@@ -60,7 +60,6 @@ SOURCEFILES="openpmx.c
 			scatter.c
 			estimate.c
 			simulate.c
-			dataconfig/recordinfo.c
 			dataconfig/dataconfig.c
 			advan/advan.c
 			advan/pred.c
