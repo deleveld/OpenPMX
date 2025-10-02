@@ -141,7 +141,6 @@ int main(void)
 								advanfuncs->nstate,
 								advanfuncs->advanconfig->imodelfields.size,
 								advanfuncs->advanconfig->predictfields.size);
-
 	let omegainfo = omegainfo_init(popmodel.nomega,
 								   popmodel.omega,
 								   popmodel.omegafixed);

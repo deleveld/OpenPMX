@@ -213,12 +213,8 @@ int main(void)
 		.sigma = { },
 	};
 
-	/* get advancer function table, memory needed to iterate, and construct advancer */
+	/* advanfuncs and arguments needed to iterate */
 	let advanfuncs = advanfuncs_alloc(&openpmx.data, &openpmx.advan);
-	ADVAN* advan = calloc(advanfuncs->advan_size, 1);	
-	advanfuncs->construct(advan, advanfuncs);
-	
-	/* arguments needed to iterate */
 	double eta[OPENPMX_OMEGA_MAX] = { };
 	let popmodel = popmodel_init(&openpmx);
 	let popparam = (POPPARAM) { 
@@ -231,6 +227,9 @@ int main(void)
 		.nstate = advanfuncs->nstate,
 	};
 	
+	/* get memory needed to iterate, and construct advancer */
+	ADVAN* advan = calloc(advanfuncs->advan_size, 1);	
+	advanfuncs->construct(advan, advanfuncs);
 	/* scratch memory needed to iterate */
 	double errarray[OPENPMX_SIGMA_MAX] = { };
 	IMODEL imodel;
@@ -250,6 +249,7 @@ int main(void)
 	}
 	advanfuncs->destruct(advan);
 	free(advan);
+	advanfuncs_free(advanfuncs);
 
 	return EXIT_SUCCESS;
 }

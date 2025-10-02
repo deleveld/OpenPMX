@@ -1,6 +1,6 @@
 $OUTFILE
-OpenPMX 0.0.1 6b8fe54
-config pthread 8
+OpenPMX 0.0.1 3d2a92f
+config pthread 32
 data records 1102 used 1102 removed 0
 data individuals 24 observations 1006
 data table offset true
@@ -10,25 +10,26 @@ advan nstate 3
 advan abstol 1e-09 reltol 1e-09 hstart 1
 optim FOCEI BOBYQA
 checkout begin
-tpool: start 0 1 2 3 4 5 6 7
+nthread (32) limited to number of individuals (24)
+tpool: start 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23
 checkout end
 stabilize begin
-time 0.120 neval 1 objfn -2687.702910
+time 0.143 neval 1 objfn -2687.702910
 stabilize iter 3
-time 0.234 neval 4 objfn -2686.970927
+time 0.240 neval 4 objfn -2686.970927
 optim rho 0.2 0.05
-time 9.767 neval 124 objfn -3046.729465
+time 7.692 neval 124 objfn -3046.729465
 optim rho 0.05 6.05545e-05
-time 23.355 neval 341 objfn -3050.347963
+time 17.364 neval 341 objfn -3050.347963
 optim rho 0.05 6.05545e-05
-time 30.994 neval 459 objfn -3050.428323
+time 21.916 neval 459 objfn -3050.428323
 optim rho 0.05 6.05545e-05
-time 37.306 neval 553 objfn -3050.441820
+time 25.699 neval 553 objfn -3050.441820
 optim rho 0.05 6.05545e-05
-time 43.531 neval 640 objfn -3050.442256
+time 29.544 neval 640 objfn -3050.442256
 optim rho 6.05545e-05
 popmodel final
-time 43.531 neval 640 objfn -3050.442256 nparam 13
+time 29.544 neval 640 objfn -3050.442256 nparam 13
 THETA(6)
       5.49852
       24.1273
