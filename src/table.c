@@ -24,7 +24,7 @@
 #include <dirent.h>
 
 #include "openpmx.h"
-#include "openpmx_internal.h"
+#include "pmxstate.h"
 #include "print.h"
 #include "defines.h"
 #include "advan/advan.h"

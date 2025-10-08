@@ -26,7 +26,8 @@
 #include "scatter.h"
 #include "utils/c22.h"
 #include "utils/various.h"
-#include "openpmx_internal.h"
+#include "options.h"
+#include "pmxstate.h"
 
 /* NOTE: this function must be thread safe on the level of an individual */
 static void idata_predict_yhat_thread(INDIVID* const individ,

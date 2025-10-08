@@ -23,7 +23,7 @@
 #include "idata.h"
 #include "popmodel.h"
 #include "nonzero.h"
-#include "openpmx_internal.h"
+#include "options.h"
 
 #ifdef __cplusplus
 extern "C" {

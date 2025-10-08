@@ -10,6 +10,14 @@
 		allmethods[[i]] <- list(data=nonmemlaplace,	name="LAPLACE",		col="lightblue",	lw=3)
 		i <- i + 1
 	}
+	if (exists("nonmemsaem")) {
+		allmethods[[i]] <- list(data=nonmemsaem,	name="NONMEM-SAEM",		col="lightblue",	lw=3)
+		i <- i + 1
+	}
+	if (exists("nonmemitsb")) {
+		allmethods[[i]] <- list(data=nonmemitsb,	name="NONMEM-ITSB",		col="gold",	lw=1)
+		i <- i + 1
+	}
 	if (exists("validate")) {
 		allmethods[[i]] <- list(data=validate, 	name="Validate",		col="lightgreen",	lw=5)
 		i <- i + 1

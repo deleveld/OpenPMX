@@ -38,6 +38,12 @@ R --vanilla --slave <<-RSCRIPT
 
 	nonmem <- readin("generate_results.nonmem.txt")
 
+	if (file.exists("generate_results.nonmemsaem.txt"))
+		nonmemsaem <- readin("generate_results.nonmemsaem.txt")
+
+	if (file.exists("generate_results.nonmemitsb.txt"))
+		nonmemitsb <- readin("generate_results.nonmemitsb.txt")
+
 	if (file.exists("generate_results.openpmx.txt"))
 		gronmem <- readin("generate_results.openpmx.txt")
 

@@ -24,6 +24,7 @@
 #include "ievaluate.h"
 #include "omegainfo.h"
 #include "print.h"
+#include "pmxstate.h"
 #include "advan/advan.h"
 #include "utils/c22.h"
 #include "utils/various.h"

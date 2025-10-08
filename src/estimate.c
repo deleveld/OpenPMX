@@ -31,10 +31,11 @@
 #include "defines.h"
 #include "checkout.h"
 #include "print.h"
+#include "options.h"
+#include "pmxstate.h"
 #include "advan/advan.h"
 #include "utils/c22.h"
 #include "utils/various.h"
-#include "openpmx_internal.h"
 
 #include "openpmx_compile_options.h"
 
@@ -248,7 +249,8 @@ static void encode_evaluate(ENCODE* const test,
 		.objfn = objfn(idata, omegainfo),
 		.type = OBJFN_CURRENT,
 		.nparam = 0,
-		.neval = 0 };
+		.neval = 0
+	};
 }
 
 static double focei_stage2_evaluate_population_objfn(const long int _xlength,

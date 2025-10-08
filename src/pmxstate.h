@@ -15,8 +15,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef OPENPMX_INTERNAL_H
-#define OPENPMX_INTERNAL_H
+#ifndef PMXSTATE_H
+#define PMXSTATE_H
 
 #include "popmodel.h"
 #include "idata.h"
@@ -28,23 +28,6 @@ extern "C" {
 #endif
 
 /*--------------------------------------------------------------------*/
-
-typedef struct {
-	int nthread;
-	ESTIMCONFIG estimate;
-	SIMCONFIG simulate;
-} OPTIONS;
-
-OPTIONS options_default(const OPTIONS* const opt1);
-
-STAGE1CONFIG stage1config_default(const STAGE1CONFIG* const stage1);
-SIMCONFIG simconfig_default(const SIMCONFIG* const simulate);
-ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate);
-OPTIONS options_init(const OPENPMX* const pmx);
-
-POPPARAM popparam_init(const POPMODEL* const popmodel,
-					   const ADVANFUNCS* const advanfuncs,
-					   const double eta[static OPENPMX_OMEGA_MAX]);
 
 typedef struct PMXSTATE {
 	const ADVANFUNCS* const advanfuncs;

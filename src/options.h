@@ -15,24 +15,36 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef OPENPMX_CHECKOUT_H
-#define OPENPMX_CHECKOUT_H
+#ifndef OPTIONS_H
+#define OPTIONS_H
 
-#include <stdio.h>
-
-#include "openpmx.h"
+#include "popmodel.h"
 #include "idata.h"
-#include "options.h"
+
+#include <gsl/gsl_rng.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void idata_checkout(const IDATA* const idata,
-					const ADVANFUNCS* const advanfuncs,
-					const POPMODEL* const popmodel,
-					const OPTIONS* const options,
-					FILE* logstream);
+/*--------------------------------------------------------------------*/
+
+typedef struct {
+	int nthread;
+	ESTIMCONFIG estimate;
+	SIMCONFIG simulate;
+} OPTIONS;
+
+OPTIONS options_default(const OPTIONS* const opt1);
+
+STAGE1CONFIG stage1config_default(const STAGE1CONFIG* const stage1);
+SIMCONFIG simconfig_default(const SIMCONFIG* const simulate);
+ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate);
+OPTIONS options_init(const OPENPMX* const pmx);
+
+POPPARAM popparam_init(const POPMODEL* const popmodel,
+					   const ADVANFUNCS* const advanfuncs,
+					   const double eta[static OPENPMX_OMEGA_MAX]);
 
 #ifdef __cplusplus
 }

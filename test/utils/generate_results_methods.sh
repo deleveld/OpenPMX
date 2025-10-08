@@ -34,7 +34,7 @@ nonmem()
 	\$DATA "simdata/data.${DATASET}.txt" IGNORE=@
 	${NONMEM_MODEL_CODE}
 	${NONMEM_MODEL_INITIAL}
-	\$ESTM SIG=6 MAX=5000 METHOD=1 INTERACT NOABORT POSTHOC PRINT=1
+	\$ESTM SIG=5 MAX=5000 METHOD=1 INTERACT NOABORT POSTHOC PRINT=1
 CONTROLFILE
 	cat control.${DATASET}.txt
 	${DO_NONMEM_SCRIPT} control.${DATASET}.txt
@@ -58,7 +58,57 @@ nonmemlaplace()
 	\$DATA "simdata/data.${DATASET}.txt" IGNORE=@
 	${NONMEM_MODEL_CODE}
 	${NONMEM_MODEL_INITIAL}
-	\$ESTM SIG=6 MAX=5000 METHOD=1 INTERACT NOABORT POSTHOC PRINT=1 LAPLACE
+	\$ESTM SIG=5 MAX=5000 METHOD=1 INTERACT NOABORT POSTHOC PRINT=1 LAPLACE NUMERICAL SLOW
+CONTROLFILE
+	cat control.${DATASET}.txt
+	${DO_NONMEM_SCRIPT} control.${DATASET}.txt
+	
+	ertert
+
+	# collect NONMEM results and cleanup
+	collect_final_estimate "${DATASET}" "control.${DATASET}.ext" "${SCRIPTNAME}.${RUNNAME}.txt"
+	rm control.*
+	rm gfortran.txt
+	rm nmpathlist.txt
+}
+
+###################
+# NONMEM estimation (SAEM)
+nonmemsaem()
+{
+	DATASET=${1}
+	RUNNAME=${FUNCNAME[0]}
+
+	cat >control.${DATASET}.txt <<-CONTROLFILE
+	${NONMEM_MODEL_PREFIX}
+	\$DATA "simdata/data.${DATASET}.txt" IGNORE=@
+	${NONMEM_MODEL_CODE}
+	${NONMEM_MODEL_INITIAL}
+	\$ESTIMATION METHOD=SAEM INTERACTION NBURN=2000 NITER=3000 ISAMPLE=2 PRINT=10 SEED=98765 AUTO=1
+CONTROLFILE
+	cat control.${DATASET}.txt
+	${DO_NONMEM_SCRIPT} control.${DATASET}.txt
+
+	# collect NONMEM results and cleanup
+	collect_final_estimate "${DATASET}" "control.${DATASET}.ext" "${SCRIPTNAME}.${RUNNAME}.txt"
+	rm control.*
+	rm gfortran.txt
+	rm nmpathlist.txt
+}
+
+###################
+# NONMEM estimation (ITSB)
+nonmemitsb()
+{
+	DATASET=${1}
+	RUNNAME=${FUNCNAME[0]}
+
+	cat >control.${DATASET}.txt <<-CONTROLFILE
+	${NONMEM_MODEL_PREFIX}
+	\$DATA "simdata/data.${DATASET}.txt" IGNORE=@
+	${NONMEM_MODEL_CODE}
+	${NONMEM_MODEL_INITIAL}
+	\$ESTIMATION METHOD=ITS INTERACTION MAXEVAL=9999 PRINT=1
 CONTROLFILE
 	cat control.${DATASET}.txt
 	${DO_NONMEM_SCRIPT} control.${DATASET}.txt

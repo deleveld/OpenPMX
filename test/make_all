@@ -11,15 +11,15 @@ do_run()
 ###	(cd "${1}"; ./analysis2 dataset; ./analysis2 nonmem; ./analysis2 openpmx; ./analysis2)
 	(cd "${1}"; ./analysis2 nonmem; ./analysis2 openpmx; ./analysis2)
 	
-	move_figures "${1}"	1	"${2}"
-	move_figures "${1}"	2	"${3}"
+	move_figures "${1}"	2	"${2}"
+	move_figures "${1}"	1	"${3}"
 	move_figures "${1}"	3	"${4}"
 }
-do_run schnider	1	supplement_1	supplement_2
-do_run sparse	2	supplement_3	supplement_4
-do_run warfarin	3	supplement_5	supplement_6
-do_run fentanyl	4	supplement_7	supplement_8
-do_run datasim	5	supplement_9	supplement_10
+do_run schnider	1	supplement_2	supplement_3
+do_run sparse	2	supplement_5	supplement_6
+do_run warfarin	3	supplement_8	supplement_9
+do_run fentanyl	4	supplement_11	supplement_12
+do_run datasim	5	supplement_14	supplement_15
 cp -v datasim/bias.csv	table_datasim_bias.csv
 cp -v datasim/rmse.csv	table_datasim_rmse.csv
 

@@ -45,7 +45,8 @@ elif [[ "${PLATFORM}" =~ MINGW64_NT-* ]]; then
 	fi
 fi
 
-SOURCEFILES="openpmx.c
+SOURCEFILES="pmxstate.c
+			options.c
 			ievaluate.c
 			predict.c
 			stage1.c
