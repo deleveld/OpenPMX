@@ -48,13 +48,16 @@ static void simulate_with_error_thread(INDIVID* const individ,
 		etacopy[i] = NAN;
 	memcpy(etacopy, individ->eta, nomega * sizeof(double));
 
-	let ievaluate_args = (IEVALUATE_ARGS) {
-		.record = individ->record,
-		.nrecord = individ->nrecord,
-		.advanfuncs = advanfuncs,
-		.popparam = popparam_init(popmodel, advanfuncs, etacopy),
-		.logstream = scatteroptions->logstream,
-	};
+	let ievaluate_args = ievaluate_args_init(individ->record,
+											 individ->nrecord,
+											 advanfuncs,
+											 popmodel->theta,
+											 popmodel->ntheta,
+											 etacopy,
+											 popmodel->nomega,
+											 popmodel->sigma,
+											 popmodel->nsigma,
+											 scatteroptions->logstream);
 
 	struct timespec t3;
 	clock_gettime(CLOCK_REALTIME, &t3);

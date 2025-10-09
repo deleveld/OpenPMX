@@ -18,8 +18,7 @@
 #ifndef OPENPMX_EVALUATE_H
 #define OPENPMX_EVALUATE_H
 
-#include <stdlib.h>
-#include <math.h>
+#include <stdio.h>
 
 #include "openpmx.h"
 
@@ -36,6 +35,17 @@ typedef struct {
 	const POPPARAM popparam;
 	FILE* logstream;
 } IEVALUATE_ARGS;
+
+IEVALUATE_ARGS ievaluate_args_init(const RECORD* const record,
+								   const int nrecord,
+								   const ADVANFUNCS* const advanfuncs,
+								   const double* const theta,
+								   const int ntheta,
+								   const double* const eta,
+								   const int nomega,
+								   const double* const sigma,
+								   const int nsigma,
+								   FILE* logstream);
 
 double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args);
 void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,

@@ -180,6 +180,9 @@
 
 		tallv <- allv
 		xlim <- range(c(trueval, allv), na.rm=TRUE)
+		dupper <- max(xlim)-trueval
+		dlower <- trueval-min(xlim)
+		xlim <- range(c(xlim), trueval+dlower, trueval-dupper)
 		ttt <- bquote(.(displayname) ~ .(units))
 
 		log <- ""
@@ -197,6 +200,11 @@
 				xlim[2] <- 100
 			if (min(allv) < -90)
 				xlim[1] <- -100
+		}
+		if (any(grepl("deter", ttt) == TRUE)) {
+			xaxs <- "i"
+			if (min(xlim) < 0)
+				xlim[1] <- 0
 		}
 		
 		d0 <- density(tallv, na.rm=TRUE)

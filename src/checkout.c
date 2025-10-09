@@ -47,13 +47,16 @@ static void idata_checkout_thread(INDIVID* const individ,
 	forcount(i, popmodel->nomega)
 		eta[i] = 0.;
 	
-	let ievaluate_args = (IEVALUATE_ARGS) {
-		.record = individ->record,
-		.nrecord = individ->nrecord,
-		.advanfuncs = advanfuncs,
-		.popparam = popparam_init(popmodel, advanfuncs, eta),
-		.logstream = scatteroptions->logstream,
-	};
+	let ievaluate_args = ievaluate_args_init(individ->record,
+											 individ->nrecord,
+											 advanfuncs,
+											 popmodel->theta,
+											 popmodel->ntheta,
+											 eta,
+											 popmodel->nomega,
+											 popmodel->sigma,
+											 popmodel->nsigma,
+											 scatteroptions->logstream);
 	individual_checkout(&ievaluate_args);
 
 	individ->ineval += 1;

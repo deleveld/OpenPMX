@@ -232,7 +232,7 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 		cholesky_decomposition(cholesky, "nonfixed");
 		gsl_matrix_transpose(cholesky);
 
-		/* https://mc-stan.org/docs/2_29/reference-manual/cholesky-factors-of-correlation-matrices-1.html */
+		/* https://mc-stan.org/docs/reference-manual/transforms.html#cholesky-factors-of-correlation-matrices */
 		/* The next step from the Cholesky factor w back to the array z of canonical partial correlations
 		 * (CPCs) is simplified by the ordering of the elements in the definition of w, which when inverted yields" */
 		var z = gsl_matrix_alloc(ndim, ndim);
@@ -399,7 +399,7 @@ void encode_update(ENCODE* encode, const double* x)
 			}
 		}
 
-		/* https://mc-stan.org/docs/2_29/reference-manual/correlation-matrix-transform.html */
+		/* https://mc-stan.org/docs/reference-manual/transforms.html#correlation-matrix-transform.section */
 		/* near the text "In Stan, the LKJ transform is reformulated in terms of a Cholesky
 		 * factor w of the final correlation matrix, defined for 1≤i,j≤K by */
 		var cholesky = gsl_matrix_alloc(ndim, ndim);

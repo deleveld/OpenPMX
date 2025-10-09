@@ -179,7 +179,6 @@ const RECORD data[] = {
 #include "advan/advan.c"
 #include "advan/diffeqn_libgsl.c"
 #include "print.c"
-#include "popmodel.c"
 #include "utils/vector.c"
 
 int main(void)
@@ -216,14 +215,8 @@ int main(void)
 	/* advanfuncs and arguments needed to iterate */
 	let advanfuncs = advanfuncs_alloc(&openpmx.data, &openpmx.advan);
 	double eta[OPENPMX_OMEGA_MAX] = { };
-	let popmodel = popmodel_init(&openpmx);
 	let popparam = (POPPARAM) { 
-		.theta = popmodel.theta,
-		.ntheta = popmodel.ntheta,
 		.eta = eta,
-		.nomega = popmodel.nomega,
-		.sigma = popmodel.sigma,
-		.nsigma = popmodel.nsigma,
 		.nstate = advanfuncs->nstate,
 	};
 	

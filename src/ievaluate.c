@@ -492,3 +492,31 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 	}
 	advanfuncs->destruct(advan);
 }
+
+IEVALUATE_ARGS ievaluate_args_init(const RECORD* const record,
+								   const int nrecord,
+								   const ADVANFUNCS* const advanfuncs,
+								   const double* const theta,
+								   const int ntheta,
+								   const double* const eta,
+								   const int nomega,
+								   const double* const sigma,
+								   const int nsigma,
+								   FILE* logstream)
+{	
+	return (IEVALUATE_ARGS) {
+		.record = record,
+		.nrecord = nrecord,
+		.advanfuncs = advanfuncs,
+		.popparam = { 
+			.theta = theta,
+			.ntheta = ntheta,
+			.eta = eta,
+			.nomega = nomega,
+			.sigma = sigma,
+			.nsigma = nsigma,
+			.nstate = advanfuncs->nstate 
+		},
+		.logstream = logstream,
+	};
+}

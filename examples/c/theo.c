@@ -124,13 +124,13 @@ int main(void)
 
 /* include sources directly instead of linking to library */
 #include "dataconfig/dataconfig.c"
-#include "dataconfig/recordinfo.c"
 #include "advan/advan.c"
 #include "advan/pred.c"
 #include "bobyqa/bobyqa.c"
-#include "openpmx.c"
+#include "pmxstate.c"
 #include "idata.c"
 #include "print.c"
+#include "options.c"
 #include "popmodel.c"
 #include "omegainfo.c"
 #include "linalg.c"

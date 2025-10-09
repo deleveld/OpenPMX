@@ -47,13 +47,16 @@ static void idata_predict_yhat_thread(INDIVID* const individ,
 		etaarray[i] = NAN;
 	memcpy(etaarray, individ->eta, popmodel->nomega * sizeof(double));
 
-	let ievaluate_args = (IEVALUATE_ARGS) {
-		.record = individ->record,
-		.nrecord = individ->nrecord,
-		.advanfuncs = advanfuncs,
-		.popparam = popparam_init(popmodel, advanfuncs, etaarray),
-		.logstream = scatteroptions ? scatteroptions->logstream : 0,
-	};
+	let ievaluate_args = ievaluate_args_init(individ->record,
+											 individ->nrecord,
+											 advanfuncs,
+											 popmodel->theta,
+											 popmodel->ntheta,
+											 etaarray,
+											 popmodel->nomega,
+											 popmodel->sigma,
+											 popmodel->nsigma,
+											 scatteroptions ? scatteroptions->logstream : 0);
 	struct timespec t3;
 	clock_gettime(CLOCK_REALTIME, &t3);
 
@@ -91,13 +94,16 @@ static void idata_predict_pred_thread(INDIVID* const individ,
 	forcount(i, popmodel->nomega)
 		etaarray[i] = 0.;
 
-	let ievaluate_args = (IEVALUATE_ARGS) {
-		.record = individ->record,
-		.nrecord = individ->nrecord,
-		.advanfuncs = advanfuncs,
-		.popparam = popparam_init(popmodel, advanfuncs, etaarray),
-		.logstream = scatteroptions ? scatteroptions->logstream : 0,
-	};
+	let ievaluate_args = ievaluate_args_init(individ->record,
+											 individ->nrecord,
+											 advanfuncs,
+											 popmodel->theta,
+											 popmodel->ntheta,
+											 etaarray,
+											 popmodel->nomega,
+											 popmodel->sigma,
+											 popmodel->nsigma,
+											 scatteroptions ? scatteroptions->logstream : 0);
 	struct timespec t3;
 	clock_gettime(CLOCK_REALTIME, &t3);
 

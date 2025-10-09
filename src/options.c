@@ -110,18 +110,3 @@ OPTIONS options_init(const OPENPMX* const pmx)
 	return options_default(&ret);
 }
 
-POPPARAM popparam_init(const POPMODEL* const popmodel,
-					   const ADVANFUNCS* const advanfuncs,
-					   const double eta[static OPENPMX_OMEGA_MAX])
-						{
-	return (POPPARAM) {
-		.theta = popmodel->theta,
-		.ntheta = popmodel->ntheta,
-		.eta = eta,
-		.nomega = popmodel->nomega,
-		.sigma = popmodel->sigma,
-		.nsigma = popmodel->nsigma,
-		.nstate = advanfuncs->nstate,
-	};
-}
-

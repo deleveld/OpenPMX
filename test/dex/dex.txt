@@ -1,6 +1,6 @@
 $PROB   DEX model
 $INPUT <fromdata>
-$DATA "data.csv" IGNORE=@
+$DATA "models/data.csv" IGNORE=@
 $SUBROUTINES ADVAN11 TRANS4
 $PK
     VSIZ=(WGT/70)

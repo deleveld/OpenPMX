@@ -42,10 +42,6 @@ SIMCONFIG simconfig_default(const SIMCONFIG* const simulate);
 ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate);
 OPTIONS options_init(const OPENPMX* const pmx);
 
-POPPARAM popparam_init(const POPMODEL* const popmodel,
-					   const ADVANFUNCS* const advanfuncs,
-					   const double eta[static OPENPMX_OMEGA_MAX]);
-
 #ifdef __cplusplus
 }
 #endif

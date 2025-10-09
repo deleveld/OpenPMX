@@ -10,46 +10,41 @@ function inform_error_state {
 }
 trap inform_error_state EXIT
 
-if [ "${1}" = "generate" ]; then
+METHODNAME="${1:-}"
+
+if [ "${METHODNAME}" != "" ]; then
 	(cd ../../; ./install)
-	./generate_results
+	./generate_results "${METHODNAME}"
 fi
 
 R --vanilla --slave <<-RSCRIPT
-	trueparams <- list(
-		c(tabname="THETA1", 	trueval=6.046010e-01,	label="V1",				logv=TRUE,		units="(l)"),
-		c(tabname="THETA2", 	trueval=3.326570e+00,	label="V2",				logv=TRUE,		units="(l)"),
-		c(tabname="THETA3", 	trueval=3.997030e+00, 	label="V3",				logv=TRUE,		units="(l)"),
-		c(tabname="THETA4", 	trueval=-3.641990e-01, 	label="CL",				logv=TRUE,		units="(l/min)"),
-		c(tabname="THETA5", 	trueval=1.178030e+00, 	label="Q2",				logv=TRUE,		units="(l/min)"),
-		c(tabname="THETA6", 	trueval=-3.720650e-01, 	label="Q3",				logv=TRUE,		units="(l/min)"),
-		c(tabname="OMEGA.1.1.", trueval=3.50E-02, 		label="var(V1)",		logv=FALSE,		units=""),
-		c(tabname="OMEGA.2.2.", trueval=2.73E-01, 		label="IO var(V1)",		logv=FALSE,		units=""),
-		c(tabname="OMEGA.4.4.", trueval=6.33E-02, 		label="var(V3)",		logv=FALSE,		units=""),
-		c(tabname="OMEGA.5.5.", trueval=2.76E-02, 		label="var(CL)",		logv=FALSE,		units=""),
-		c(tabname="SIGMA.1.1.", trueval=3.63E-02, 		label="var(residual)",	logv=FALSE,		units=""))
-
-	gronmem <- 		read.table(file="generate_results.openpmx.txt", header=TRUE)
-#	gronmemicov <-	read.table(file="generate_results.openpmxicov.txt", header=TRUE)
-#	gronmemtest <-	read.table(file="generate_results.openpmxtest.txt", header=TRUE)
-	nonmem <- 		read.table(file="generate_results.nonmem.txt", header=TRUE)
-#	nonmemlaplace <- read.table(file="generate_results.nonmemlaplace.txt", header=TRUE)
-
-#######################################################################
-
-	setup_par <- function()
-	{
-		par(mfrow=c(3, 4), mar=c(2,2,2,0), oma=c(0,0,1,1), cex=0.9)
-	}
-
 ########################################################################
+# problem specific models
+	source("models/_true_values.R")
+########################################################################
+
+	nonmem <- read.table("generate_results.nonmem.txt", header=TRUE)
+
+	if (file.exists("generate_results.openpmx.txt"))
+		gronmem <- read.table("generate_results.openpmx.txt", header=TRUE)
+
+	if (file.exists("generate_results.validate.txt"))
+		validate <- read.table("generate_results.validate.txt", header=TRUE)
+
+	if (file.exists("generate_results.openpmxicov.txt"))
+		gronmemicov <- read.table("generate_results.openpmxicov.txt", header=TRUE)
+	
+#	nonmemlaplace   <- read.table("generate_results.nonmemlaplace.txt", header=TRUE)
+#	gronmemtest 	<- read.table("generate_results.openpmxtest.txt", header=TRUE)
+
 	postscript(file="${TEMP}/${0}.ps", horizontal=TRUE)
 	source("../utils/analysis_tables_and_plots.R")
 	source("../utils/analysis_tables_and_plots2.R")
+
 RSCRIPT
 
-../utils/_write_figures.sh dex ${TEMP}/${0}.ps
-
+../utils/_write_figures.sh ${0} ${TEMP}/${0}.ps
+	
 # tell the user it worked when we exit
 COMPLETION_MESSAGE=""
 

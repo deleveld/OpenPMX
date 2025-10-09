@@ -119,15 +119,19 @@ int main(void)
 
 	/* advanfuncs and arguments needed to iterate */
 	let advanfuncs = advanfuncs_alloc(&openpmx.data, &openpmx.advan);
+	const double theta[] = { 
+		openpmx.theta[0].value,
+		openpmx.theta[1].value,
+		openpmx.theta[2].value,
+	};
 	double eta[OPENPMX_OMEGA_MAX] = { };
-	let popmodel = popmodel_init(&openpmx);
 	let popparam = (POPPARAM) { 
-		.theta = popmodel.theta,
-		.ntheta = popmodel.ntheta,
+		.theta = theta,
+		.ntheta = ARRAYSIZE(theta),
 		.eta = eta,
-		.nomega = popmodel.nomega,
-		.sigma = popmodel.sigma,
-		.nsigma = popmodel.nsigma,
+		.nomega = 0,
+		.sigma = 0,
+		.nsigma = 0,
 		.nstate = advanfuncs->nstate,
 	};
 	
