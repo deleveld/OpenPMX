@@ -79,8 +79,6 @@ const RECORD data[] = {
 #include "dataconfig/dataconfig.c"
 #include "advan/advan.c"
 #include "advan/pred.c"
-#include "print.c"
-#include "popmodel.c"
 #include "utils/vector.c"
 
 int main(void)

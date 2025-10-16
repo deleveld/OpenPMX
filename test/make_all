@@ -1,9 +1,26 @@
 set -eu
 
+
+# supplement model figures
+make_plots()
+{
+	dot -Tpdf ${1} >figure_${2}.pdf
+	dot -Tjpg -Gdpi=300 ${1} >figure_${2}.jpg
+	convert figure_${2}.jpg -trim figure_${2}.jpg	
+}
+
+make_plots schnider.dot		supplement_1
+make_plots sparse.dot		supplement_4
+make_plots fentanyl.dot		supplement_7
+make_plots warfarin.dot		supplement_10
+make_plots datasim.dot		supplement_13
+
 move_figures()
 {
 	mv -v ${1}/analysis2.pdf_${2}.pdf figure_${3}.pdf
 	mv -v ${1}/analysis2.pdf_${2}.jpg figure_${3}.jpg
+	convert figure_${3}.jpg -rotate 90 figure_${3}.jpg
+	convert figure_${3}.jpg -trim figure_${3}.jpg
 }
 
 do_run()
@@ -17,11 +34,9 @@ do_run()
 }
 do_run schnider	1	supplement_2	supplement_3
 do_run sparse	2	supplement_5	supplement_6
-do_run warfarin	3	supplement_8	supplement_9
-do_run fentanyl	4	supplement_11	supplement_12
+do_run fentanyl	3	supplement_8	supplement_9
+do_run warfarin	4	supplement_11	supplement_12
 do_run datasim	5	supplement_14	supplement_15
 cp -v datasim/bias.csv	table_datasim_bias.csv
 cp -v datasim/rmse.csv	table_datasim_rmse.csv
-
-
 

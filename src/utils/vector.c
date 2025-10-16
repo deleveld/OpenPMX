@@ -64,6 +64,7 @@ void _vector_remove(VECTOR_DATA * vect, const int dindex, int num, const size_t 
 	assert(vect);
 	assert(sizeofdata);
 	assert(dindex < vect->_size);
+	assert(num > 0);
 
 	int bytes;
 	unsigned char *begin = (unsigned char *) vect->_data + dindex * sizeofdata;

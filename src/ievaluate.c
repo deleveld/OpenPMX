@@ -274,6 +274,10 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	let popparam = &ievaluate_args->popparam;
 	let logstream = ievaluate_args->logstream;
 
+	/* if RATE exists but AMT does not it is an error */
+	if (advanfuncs->recordinfo.offsetRATE != -1 && advanfuncs->recordinfo.offsetAMT == -1) 
+		fatal(0, "error: RATE exists but AMT does not\n");
+
 	char advan_memory[advanfuncs->advan_size + 1000];
 	memset(advan_memory, 0, advanfuncs->advan_size + 1000);
 	var advan = (ADVAN*)advan_memory;

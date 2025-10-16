@@ -1,0 +1,60 @@
+$OUTFILE
+OpenPMX 0.0.1 3d2a92f
+config pthread 32
+data records 132 used 132 removed 0
+data individuals 12 observations 132
+data table offset false
+advan model pred
+optim FOCEI BOBYQA
+checkout begin
+nthread (32) limited to number of individuals (12)
+tpool: start 0 1 2 3 4 5 6 7 8 9 10 11
+warning: DV zero for observation: ID 11.000000 time 0.000000 record 0
+warning: AMT non-zero (4.920000) for observation: ID 11.000000 time 0.000000 record 0
+warning: DV zero for observation: ID 6.000000 time 0.000000 record 0
+warning: AMT non-zero (4.000000) for observation: ID 6.000000 time 0.000000 record 0
+warning: DV zero for observation: ID 3.000000 time 0.000000 record 0
+warning: AMT non-zero (4.530000) for observation: ID 3.000000 time 0.000000 record 0
+warning: AMT non-zero (5.500000) for observation: ID 10.000000 time 0.000000 record 0
+warning: DV zero for observation: ID 12.000000 time 0.000000 record 0
+warning: AMT non-zero (5.300000) for observation: ID 12.000000 time 0.000000 record 0
+warning: DV zero for observation: ID 8.000000 time 0.000000 record 0
+warning: AMT non-zero (4.530000) for observation: ID 8.000000 time 0.000000 record 0
+warning: AMT non-zero (4.950000) for observation: ID 7.000000 time 0.000000 record 0
+warning: DV zero for observation: ID 2.000000 time 0.000000 record 0
+warning: AMT non-zero (4.400000) for observation: ID 2.000000 time 0.000000 record 0
+warning: DV zero for observation: ID 9.000000 time 0.000000 record 0
+warning: AMT non-zero (3.100000) for observation: ID 9.000000 time 0.000000 record 0
+warning: DV zero for observation: ID 4.000000 time 0.000000 record 0
+warning: AMT non-zero (4.400000) for observation: ID 4.000000 time 0.000000 record 0
+warning: DV zero for observation: ID 5.000000 time 0.000000 record 0
+warning: AMT non-zero (5.860000) for observation: ID 5.000000 time 0.000000 record 0
+warning: AMT non-zero (4.020000) for observation: ID 1.000000 time 0.000000 record 0
+checkout end
+stabilize begin
+time 0.003 neval 1 objfn 439.569556
+stabilize iter 2
+time 0.004 neval 3 objfn 439.449169
+optim rho 0.2 0.05
+time 0.170 neval 306 objfn 92.091836
+optim rho 0.05 6.05545e-05
+time 0.232 neval 464 objfn 89.168840
+optim rho 0.05 6.05545e-05
+time 0.269 neval 557 objfn 89.118981
+optim rho 0.05 6.05545e-05
+time 0.319 neval 649 objfn 89.076696
+optim rho 0.05 6.05545e-05
+time 0.370 neval 729 objfn 89.076696
+optim rho 6.05545e-05
+popmodel final
+time 0.370 neval 729 objfn 89.076696 nparam 11
+THETA(3)
+      32.9566
+    0.0864983
+      1.50406
+OMEGA(3)
+    0.0115054 
+    0.0143185     0.0181988 
+     0.012202    0.00664705      0.458425 
+SIGMA(2)
+    0.0168402     0.0739119 

@@ -85,7 +85,7 @@
 		setup_par()
 		t <- "OpenPMX vs nonmem"
 		d <- performance_loss(gronmem, "OpenPMX", nonmem, "NONMEM")
-		title(paste0("Distribution of RSE ", t), outer=TRUE)
+###		title(paste0("Distribution of RSE ", t), outer=TRUE)
 		print(t)
 		print(d)
 	}

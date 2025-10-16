@@ -178,7 +178,6 @@ const RECORD data[] = {
 #include "dataconfig/dataconfig.c"
 #include "advan/advan.c"
 #include "advan/diffeqn_libgsl.c"
-#include "print.c"
 #include "utils/vector.c"
 
 int main(void)

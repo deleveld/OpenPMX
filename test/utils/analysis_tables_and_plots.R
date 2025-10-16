@@ -253,7 +253,7 @@
 			lw=alllw,
 			bty="n", cex=par()$cex*0.85)
 	}
-	title("Distribution of parameter estimates", outer=TRUE)
+###	title("Distribution of parameter estimates", outer=TRUE)
 	
 	print("bias")
 	print(bias)

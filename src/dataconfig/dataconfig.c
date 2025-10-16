@@ -22,13 +22,11 @@
 #include <stdio.h>
 
 #include "dataconfig.h"
-#include "print.h"
-#include "utils/c22.h"
 
 RECORDINFO recordinfo_init(const DATACONFIG* const dataconfig)
 {
-	let data = dataconfig->records;
-	let recordfields = &dataconfig->recordfields;
+	const RECORD* data = dataconfig->records;
+	const STRUCTINFO* recordfields = &dataconfig->recordfields;
 
 	/* construct an incomplete struct so we can use the assesor functions so that we can count the number
 	 * of individuals and observations in the data.
@@ -50,25 +48,21 @@ RECORDINFO recordinfo_init(const DATACONFIG* const dataconfig)
 		.nobs			= 0,
 	};
 	
-	/* if RATE exists but AMT does not it is an error */
-	if (temp.offsetRATE != -1 && temp.offsetAMT == -1) 
-		fatal(0, "error: RATE exists but AMT does not\n");
-
 	/* count the number of individuals and observations using the incompletely constructed RECORDINFO */
-	let nrecords = dataconfig->nrecords;
-	var i = 0;
-	var nusuable = 0;
-	var nobs = 0;
-	var nindivid = 0;
+	const int nrecords = dataconfig->nrecords;
+	int i = 0;
+	int nusuable = 0;
+	int nobs = 0;
+	int nindivid = 0;
 	while (i < nrecords) {
-		var nidata = 0;
-		let thisid = RECORDINFO_ID(&temp, RECORDINFO_INDEX(&temp, data, i));
+		int nidata = 0;
+		double thisid = RECORDINFO_ID(&temp, RECORDINFO_INDEX(&temp, data, i));
 		if (isnan(thisid))
 			break;
 		while (i+nidata < nrecords && RECORDINFO_ID(&temp, RECORDINFO_INDEX(&temp, data, i+nidata)) == thisid) {
-			let ri = RECORDINFO_INDEX(&temp, data, i+nidata);
-			let dv = RECORDINFO_DV(&temp, ri);
-			let evid = RECORDINFO_EVID(&temp, ri);
+			const RECORD* ri = RECORDINFO_INDEX(&temp, data, i+nidata);
+			const double dv = RECORDINFO_DV(&temp, ri);
+			const int evid = RECORDINFO_EVID(&temp, ri);
 			if (!isnan(dv) && evid == 0)
 				++nobs;
 			++nidata;
@@ -98,7 +92,7 @@ RECORDINFO recordinfo_init(const DATACONFIG* const dataconfig)
 
 int structinfo_find_offset(const char* name, const STRUCTINFO* const structinfo)
 {
-	forcount(i, OPENPMX_FIELDS_MAX) {
+	for (int i=0; i<OPENPMX_FIELDS_MAX; i++) {
 		if (structinfo->field[i].name[0] == '\0')
 			return -1;
 		if (strcasecmp(name, structinfo->field[i].name) == 0)
