@@ -75,9 +75,9 @@ SOURCEFILES="pmxstate.c
 			bobyqa/bobyqa.c"
 
 echo "clean"
-${RM} "${OPENPMXPATH}"/build/*
-${RM} "${OPENPMXPATH}"/bin/*
-${RM} "${OPENPMXPATH}"/lib/*
+${RM} "${OPENPMXPATH}"/build/*.o
+${RM} "${OPENPMXPATH}"/bin/openpmxtran
+${RM} "${OPENPMXPATH}"/lib/*.so "${OPENPMXPATH}"/lib/*.a 
 ${RM} "${OPENPMXPATH}/openpmx"
 ${RM} "${OPENPMXPATH}/src/openpmx_compile_options.h"
 if [ "${TARGET}" = "clean" ]; then
