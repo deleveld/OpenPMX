@@ -209,12 +209,6 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	};
 }
 
-int pmx_advan_initcount(const ADVANSTATE* const advanstate)
-{
-	var advan = advanstate->advan;
-	return advan->initcount;
-}
-
 void pmx_advan_amtlag(const ADVANSTATE* const advanstate, const int cmt, const double t)
 {
 	var advan = advanstate->advan;

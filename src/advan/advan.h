@@ -50,6 +50,14 @@ typedef struct ADVANFUNCS {
 	const int nstate;
 } ADVANFUNCS;
 
+ADVANFUNCS* advanfuncs_alloc(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
+void advanfuncs_free(ADVANFUNCS* advan);
+
+PREDICTSTATE advan_advance(ADVAN* const advan,
+						   IMODEL* const imodel,
+						   const RECORD* const record,
+						   const POPPARAM* const popparam);
+
 typedef struct {
 	int cmt;
 	double amt;
@@ -74,14 +82,6 @@ typedef struct ADVAN {
 
 void advan_base_construct(ADVAN* advanbase, const ADVANFUNCS* advanfuncs);
 void advan_base_destruct(ADVAN* advanbase);
-
-PREDICTSTATE advan_advance(ADVAN* const advan,
-						   IMODEL* const imodel,
-						   const RECORD* const record,
-						   const POPPARAM* const popparam);
-
-ADVANFUNCS* advanfuncs_alloc(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
-void advanfuncs_free(ADVANFUNCS* advan);
 
 /* Used by some ODE methods to send arguments to the user DIFFEQN function */
 typedef struct ADVANCER_DIFFEQN_CALLBACK_ARGS {

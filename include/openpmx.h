@@ -78,7 +78,7 @@ typedef struct {
 	const double* const state;
 } ADVANSTATE;
 
-int pmx_advan_initcount(const ADVANSTATE* const advanstate);
+/* changes to advancer within the IMODEL_INIT function */
 void pmx_advan_amtlag(const ADVANSTATE* const advanstate, const int cmt, const double t);
 void pmx_advan_bioaval(const ADVANSTATE* const advanstate, const int cmt, const double f);
 void pmx_advan_inittime(const ADVANSTATE* const advanstate, const double t);
@@ -148,17 +148,19 @@ typedef struct ADVANCONFIG {
 	} args;
 } ADVANCONFIG;
 
-/* advancer methods */
+/*---------------------------------------------------------------------*/
+/* advancer */
+/*---------------------------------------------------------------------*/
+/* analytic */
 ADVANFUNCS* pmx_advan_pred(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_onecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_onecomp_depot(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 
+/* differential equations */
 ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
-
 ADVANFUNCS* pmx_advan_diffeqn_test(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
-ADVANFUNCS* pmx_advan_wrapper(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 
 /*---------------------------------------------------------------------*/
 /* basic types */

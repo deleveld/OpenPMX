@@ -1,6 +1,9 @@
 *.o
 *.a
 *.so
+*.jpg
+*.pdf
+a.out
 openpmx
 bin/openpmxtran
 examples/schnider/schnider.gr.*
