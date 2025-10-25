@@ -89,7 +89,7 @@ static TABLE table_open(const IDATA* const idata,
 						const ADVANFUNCS* const advanfuncs,
 						const POPMODEL* const popmodel,
 						const char* pmx_filename,
-						int* tablenum,
+						int* tablecount,
 						const char* _fields,
 						const TABLECONFIG* const tableconfig)
 {
@@ -116,9 +116,9 @@ static TABLE table_open(const IDATA* const idata,
 
 	/* if no config then number the tables */
 	if (!filename) {
-		*tablenum += 1;
+		*tablecount += 1;
 		filename = pmx_filename;
-		sprintf(ext, "table.%i" OPENPMX_TABLEFILE, *tablenum);
+		sprintf(ext, "table.%i" OPENPMX_TABLEFILE, *tablecount);
 	}
 
 	char fname[PATH_MAX + NAME_MAX] = "";
