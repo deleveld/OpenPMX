@@ -45,6 +45,9 @@
 #define OPTIMIZER_OUTER_BOBYQA
 //#define OPTIMIZER_OUTER_GSL_NELDERMEAD
 //#define OPTIMIZER_OUTER_GSL_BFGS
+// TODO: Not working, sigsev when outer is libprima as well!
+// The data pointer getting passed to inner is invalid
+//#define OPTIMIZER_OUTER_LIBPRIMA
 
 static void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel)
 {
@@ -333,6 +336,21 @@ static void foce_stage2_fdf(const gsl_vector* const x,
 }
 #endif
 
+#ifdef OPTIMIZER_OUTER_LIBPRIMA
+#include "prima.h"
+static void outer_fun(const double x[], double* const f, const void* data)
+{
+//	info(0, "Outer data %p\n", data);
+//	fflush(stdout);
+
+	let params = (STAGE2_PARAMS*) data;
+	let objfn = focei_stage2_evaluate_population_objfn(params->test.nparam,
+													   x, 
+													   data);
+    *f = objfn;
+}
+#endif
+
 static const char* focei(STAGE2_PARAMS* const params)
 {
 	if (!params)
@@ -342,8 +360,8 @@ static const char* focei(STAGE2_PARAMS* const params)
 
 	let n = params->test.nparam;
 	var initial = mallocvar(double, n);
-	var upper = mallocvar(double, n);
 	var lower = mallocvar(double, n);
+	var upper = mallocvar(double, n);
 	forcount(i, n) {
 		initial[i] = 0.;
 		lower[i] = -DBL_MAX;
@@ -481,6 +499,80 @@ static const char* focei(STAGE2_PARAMS* const params)
 	info(params->outstream, "optim rho %g\n", rhoend);
 
 	free(w);
+#endif
+
+#ifdef OPTIMIZER_OUTER_LIBPRIMA
+	let best = &params->best;
+	var lastobjfn = best->result.objfn;
+	forcount(i, n)
+		initial[i] = 0.;
+	var neval = maxeval;
+	var rhobeg = step_initial;
+	var rhoend = step_refine;
+	info(params->outstream, "optim rho %g %g\n", rhobeg, rhoend);
+	
+	prima_problem_t problem;
+	prima_init_problem(&problem, n);
+	problem.x0 = initial;
+	problem.xl = lower;
+	problem.xu = upper;
+	problem.calfun = outer_fun;
+
+	// Set up the options
+	prima_options_t poptions;
+	prima_init_options(&poptions);
+	poptions.rhobeg = rhobeg;
+	poptions.rhoend = rhoend;
+	poptions.maxfun = neval;
+	poptions.data = (void*)params;
+	poptions.callback = 0;
+
+	// initial rough estimation
+#define PRIMA_METHOD PRIMA_BOBYQA
+#define PRIMA_METHOD PRIMA_LINCOA
+	prima_result_t result;
+	prima_rc_t retcode = prima_minimize(PRIMA_METHOD, problem, poptions, &result);
+    prima_free_result(&result);
+
+//	if (retcode != PRIMA_RESULT_INITIALIZED)
+//		warning(0, "initial BOBYQA(libprima) error code %i\n", retcode);
+
+	var timestamp = get_timestamp(params);
+	info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
+	lastobjfn = best->result.objfn;
+
+	// refine estimation
+	if (step_final < step_refine) {
+		var dobjfn = best->result.objfn - lastobjfn;
+		do {
+			encode_offset(&params->test, &params->best);
+			forcount(i, n)
+				initial[i] = 0.;
+
+			neval = maxeval - params->neval;
+			rhobeg = step_refine;
+			rhoend = step_final;
+			info(params->outstream, "optim rho %g %g\n", rhobeg, rhoend);
+
+			poptions.rhobeg = rhobeg;
+			poptions.rhoend = rhoend;
+			poptions.maxfun = neval;
+			retcode = prima_minimize(PRIMA_METHOD, problem, poptions, &result);
+			prima_free_result(&result);
+
+//			if (retcode != PRIMA_RESULT_INITIALIZED)
+//				warning(0, "refine BOBYQA(libprima) error code %i\n", retcode);
+
+			dobjfn = best->result.objfn - lastobjfn;
+			var timestamp = get_timestamp(params);
+			info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
+			lastobjfn = best->result.objfn;
+		}
+		while (dobjfn < -1.*fabs(options->estimate.dobjfn));
+	}
+	info(params->outstream, "optim rho %g\n", rhoend);
+
+    prima_free_result(&result);
 #endif
 
 	free(lower);

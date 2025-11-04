@@ -84,6 +84,16 @@ if [ "${TARGET}" = "clean" ]; then
 	exit 0
 fi
 
+########################################################################
+### echo "install libprima"
+### git clone --depth 1 https://github.com/libprima/prima.git
+### (cd prima; cmake -S . -B build -DCMAKE_INSTALL_PREFIX=install; cmake --build build --target install)
+### echo "copy libraries"
+### cp -v prima/build/fortran/libprimaf.so lib
+### cp -v prima/build/c/libprimac.so lib
+### cp -v prima/c/include/prima/prima.h src
+########################################################################
+
 # shared or static library
 if [ "${LIBTYPE}" = "shared" ]; then
 	echo "build ${LIBTYPE} library"
@@ -162,3 +172,4 @@ chmod a+x "${OPENPMXPATH}/openpmx"
 echo "success"
 echo "install ${TARGET} ${LIBTYPE} ${PLATFORM}"
 echo "path ${OPENPMXPATH}"
+

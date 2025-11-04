@@ -27,7 +27,7 @@ extern "C" {
 /*---------------------------------------------------------------------*/
 #define OPENPMX_VERSION_MAJOR			0
 #define OPENPMX_VERSION_MINOR			0
-#define OPENPMX_VERSION_RELEASE			1
+#define OPENPMX_VERSION_RELEASE			2
 
 #define OPENPMX_THETA_MAX				64
 #define OPENPMX_OMEGABLOCKSIZE_MAX		64
@@ -100,6 +100,7 @@ typedef void (*IMODEL_INIT)(IMODEL* const imodel,
 							ADVANSTATE* const advanstate,
 							const POPPARAM* const popparam);
 
+/* prediction function */
 typedef struct {
 	const double* const state;
 	const RECORD* const record;
@@ -112,6 +113,7 @@ typedef	double (*IMODEL_PREDICT)(const IMODEL* const imodel,
 								 const double* const err,
 								 PREDICTVARS* predparams);
 
+/* callback for differential equation solver */
 typedef void (*ADVAN_DIFFEQN)(double DADT[],
 							  const IMODEL* const imodel,
 							  const RECORD* const record,

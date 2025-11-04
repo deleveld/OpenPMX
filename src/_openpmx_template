@@ -38,6 +38,7 @@ fi
 
 # we have object files, so link now
 # echo "link \"${OBJFILE}\""
+###(${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} -lopenpmx -lprimac -lprimaf -lgsl -lgslcblas -lm)
 (${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm)
 
 # execute

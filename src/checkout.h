@@ -20,9 +20,9 @@
 
 #include <stdio.h>
 
-#include "openpmx.h"
 #include "idata.h"
 #include "options.h"
+#include "openpmx.h"
 
 #ifdef __cplusplus
 extern "C" {

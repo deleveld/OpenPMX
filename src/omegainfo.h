@@ -18,7 +18,6 @@
 #ifndef OPENPMX_OMEGAINFO_H
 #define OPENPMX_OMEGAINFO_H
 
-#include "openpmx.h"
 #include "nonzero.h"
 
 #include <gsl/gsl_matrix.h>

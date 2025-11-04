@@ -18,7 +18,6 @@
 #ifndef OPENPMX_IDATA_H
 #define OPENPMX_IDATA_H
 
-#include "openpmx.h"
 #include "dataconfig/dataconfig.h"
 
 #ifdef __cplusplus

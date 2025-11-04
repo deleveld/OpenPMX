@@ -20,7 +20,6 @@
 #include <unistd.h>
 
 #include "openpmx.h"
-#include "print.h"
 #include "scatter.h"
 #include "utils/c22.h"
 #include "advan/advan.h"
