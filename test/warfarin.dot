@@ -1,0 +1,37 @@
+digraph G {
+	size="5,4!"
+	overlap=false
+	splines=true
+#   newrank=true;
+
+	fontname="Helvetica,Arial,sans-serif"
+	fontsize=14
+	node [fontname="Helvetica,Arial,sans-serif"]
+	edge [fontname="Helvetica,Arial,sans-serif"]
+    node [shape=box];
+
+    dose -> v1
+	v1 -> v2 [label="KA"]
+	v2 -> elim [label="CL"]
+	v2 -> obs [style=dotted]
+	
+	v2 -> kin [label="Drug effect",style=dashed]
+	
+	kin -> indirect [weight=1000]
+	indirect -> kout [weight=1000]
+	indirect -> obs2 [label="additive\nerror",style=dotted]
+
+    kin [label="kin",color="white"]
+	kout [label="kout",color="white"]
+	indirect [label="Indirect\nresponse"]
+	obs [label="PK Prediction",color="white"]
+	obs2 [label="PD Prediction",color="white"]
+
+	dose [label="Dose",color="white"]
+	v1 [label="Depot"]
+	v2 [label="V"]
+	elim [style=invis]
+
+	{ rank=same; dose; v1; v2; indirect; }
+	{ rank=min; kin; }
+}
