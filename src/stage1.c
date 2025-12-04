@@ -41,108 +41,7 @@
 // The data pointer getting passed to inner is invalid
 //#define OPTIMIZER_INNER_LIBPRIMA 
 
-/* different ways to calculate sample min2ll */
-//#define SAMPLE_MIN2LL_FROM_INVERSE
-#define SAMPLE_MIN2LL_FROM_CHOLESKY
-
 /*--------------------------------------------------------------------*/
-static void reduce_eta(double* reta,
-					   const double fulleta[static OPENPMX_OMEGA_MAX],
-					   const NONZERO* const nonzero)
-{
-	forcount(i, nonzero->n) {
-		let col = nonzero->rowcol[i];
-		reta[i] = fulleta[col];
-	}
-}
-
-static void unreduce_eta(double fulleta[static OPENPMX_OMEGA_MAX],
-						 const double* reta,
-						 const NONZERO* const nonzero)
-{
-	memset(fulleta, 0, OPENPMX_OMEGA_MAX * sizeof(double));
-	forcount(i, nonzero->n) {
-		let col = nonzero->rowcol[i];
-		var v = reta[i];
-		fulleta[col] = v;
-	}
-}
-
-#ifdef SAMPLE_MIN2LL_FROM_CHOLESKY
-static double sample_min2ll_from_cholesky(const double* const data,
-										  const gsl_matrix* const chol)
-{
-	let n = chol->size1;
-	let x = gsl_vector_const_view_array(data, n);
-
-	/* Basically this 'decorrelates' the sample with respect to the covariance matrix
-	 (via its cholesky decomposition) which gives the independent samples. The sum of
-	 the square is the likelihood */
-	double rdata[OPENPMX_OMEGA_MAX];
-	var r = gsl_vector_view_array(rdata, n);
-	gsl_vector_memcpy(&r.vector, &x.vector);
-	gsl_blas_dtrsv(CblasLower, CblasNoTrans, CblasNonUnit, chol, &r.vector);
-
-	double sum = 0.;
-	forcount(i, n) {
-		let v = gsl_vector_get(&r.vector, i);
-		sum += v * v;
-	}
-	return sum;
-}
-#endif
-
-#ifdef SAMPLE_MIN2LL_FROM_INVERSE
-static double sample_min2ll_from_inverse(const double* const data,
-										 const gsl_matrix* const inverse)
-{
-	let n = inverse->size1;
-	double ydata[OPENPMX_OMEGA_MAX];
-	assert(n < OPENPMX_OMEGA_MAX);
-	var y = gsl_vector_view_array(ydata, n);
-	let x = gsl_vector_const_view_array(data, n);
-
-	gsl_blas_dgemv(CblasNoTrans, 1., inverse, &x.vector, 0., &y.vector);
-
-//	var lik = 0.;
-//	gsl_blas_ddot(&x.vector, &y.vector, &lik);
-//	return lik;
-	double sum = 0.;
-	forcount(i, n) {
-		let x = gsl_vector_get(&x.vector, i);
-		let y = gsl_vector_get(&y.vector, i);
-		sum += x * y;
-	}
-	return sum;
-}
-#endif
-
-/* functions for Bae and Yim objective function Term 3 */
-static double sample_min2ll(const int nreta,
-							const double reta[static nreta],
-							const NONZERO* const nonzero)
-{
-	assert(nreta == nonzero->n);
-	var term3 = 0.;
-#ifdef SAMPLE_MIN2LL_FROM_INVERSE
-	let omegainverse_data = nonzero->inversedata;
-	let omegainverse = gsl_matrix_const_view_array(omegainverse_data, nreta, nreta);
-	term3 += sample_min2ll_from_inverse(reta, &omegainverse.matrix);
-#endif
-#ifdef SAMPLE_MIN2LL_FROM_CHOLESKY
-	let omegacholesky_data = nonzero->choleskydata;
-	let omegacholesky = gsl_matrix_const_view_array(omegacholesky_data, nreta, nreta);
-	term3 += sample_min2ll_from_cholesky(reta, &omegacholesky.matrix);
-#endif
-
-#ifdef SAMPLE_MIN2LL_FROM_INVERSE
-#ifdef SAMPLE_MIN2LL_FROM_CHOLESKY
-	term3 /= 2.;
-#endif
-#endif
-//	assert(isfinite(term3) == 1);
-	return term3;
-}
 
 typedef struct {
 	double* const testeta;
@@ -186,19 +85,12 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 #endif
 
 #ifdef OPTIMIZER_INNER_LIBPRIMA
-#include "prima.h"
+//#include "prima.h"
 static void inner_fun(const double x[], double* const f, const void* data)
 {
 	let stage1_params = (STAGE1_PARAMS*) data;
 	var nonzero = stage1_params->nonzero;
 	let nreta = nonzero->n;
-
-//	info(0, "Inner data %p\n", data);
-//	fflush(stdout);
-//	let recordinfo = &stage1_params->ievaluate_args.advanfuncs->recordinfo;
-//	let id = RECORDINFO_ID(recordinfo, stage1_params->ievaluate_args.record);
-//	info(0, "Inner ID %f\n", id);
-
 	*f = stage1_evaluate_individual_iobjfn(nreta,
 										   x,
 										   data);

@@ -20,6 +20,7 @@
 
 #include "advan.h"
 #include "utils/c22.h"
+#include "print.h"
 
 typedef struct {
 	ADVAN advan;
@@ -93,12 +94,16 @@ static void advancer_onecomp_depot_advance_interval(ADVAN* advan,
 	double A1last = A1;
 	double A2last = A2;
 	const double Doserate = rates[0];
+	
+	if (Doserate != 0.)
+		fatal(0, "ADVANTABLE_ONECOMP_DEPOT fails with infusions, see GitHub issue. Use DIFFEQN.");
 
     A2last = A1last*KA/(KA-k10)*(exp(-t*k10)-exp(-t*KA))+A2last*exp(-t*k10);
     A1last = A1last*exp(-1.*t*KA);
 
     A2 = A2last;
-    A1 = A1last + Doserate;
+    A1 = A1last;
+    
 #pragma pop_macro("A1")
 #pragma pop_macro("A2")
 }

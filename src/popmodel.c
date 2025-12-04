@@ -246,9 +246,8 @@ void extfile_header(FILE * f,
 	fflush(f);
 }
 
-void extfile_append(FILE* f, const POPMODEL* const popmodel, const double runtime_s, const int ineval)
+void extfile_append(FILE* f, const POPMODEL* const popmodel, const double runtime_s, const int iter, const int ineval)
 {
-	let iter = popmodel->result.neval;
 	fprintf(f, OPENPMX_IFORMAT, iter);
 
 	let ntheta = popmodel->ntheta;
@@ -488,7 +487,7 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 	info_iteration(outstream, runtime_s, popmodel, suffix);
 
 	if (extstream) 
-		extfile_append(extstream, popmodel, runtime_s, neval);
+		extfile_append(extstream, popmodel, runtime_s, popmodel->result.neval, neval);
 }
 
 

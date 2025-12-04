@@ -81,6 +81,7 @@ The PK analysis example is:
 - Douglas Eleveld (deleveld@dds.nl) Initial release. 
 
 # Wish-list / TODO
+- Fix Issue that advan/onecomp_depot.c does not handle infusions properly. Added fatal error.
 - Some code for LLQ has been added via data coloum DVLLQ. IF exists and non-zero then objective function term is added
 	the -2LL that the prediction will be lower than the DV
 - During checkout, calculate paramater gradients to identify paramaters that may be numerically unidentifiable

@@ -36,6 +36,8 @@ typedef struct PMXSTATE {
 	gsl_rng* rng;
 } PMXSTATE;
 
+void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel);
+
 void pmxstate_ensure(OPENPMX* const pmx);
 
 #ifdef __cplusplus

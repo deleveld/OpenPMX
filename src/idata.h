@@ -89,7 +89,11 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 					  const int predictvars_size);
 void idata_destruct(IDATA* const idata);
 
+double idata_objfn(const IDATA* const idata,
+				   const double omega_nonzero_lndet);
 int idata_ineval(const IDATA* const idata, const bool reset);
+
+void idata_reset_eta(IDATA* const idata, const double* eta);
 
 double* idata_alloc_simerr(const IDATA* const idata);
 void idata_free_simerr(const IDATA* const idata);

@@ -26,6 +26,12 @@ extern "C" {
 
 int cholesky_decomposition(gsl_matrix* matrix, const char* matrixname);
 double matrix_lndet_from_cholesky(const gsl_matrix* const chol);
+
+double sample_min2ll_from_cholesky(const double* const data,
+								   const gsl_matrix* const chol);
+double sample_min2ll_from_inverse(const double* const data,
+								  const gsl_matrix* const inverse);
+
  
 #ifdef __cplusplus
 }

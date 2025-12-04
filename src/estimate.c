@@ -49,124 +49,6 @@
 // The data pointer getting passed to inner is invalid
 //#define OPTIMIZER_OUTER_LIBPRIMA
 
-static void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel)
-{
-	let theta = popmodel->theta;
-	let ntheta = popmodel->ntheta;
-	let thetaestim = popmodel->thetaestim;
-	forcount(i, ntheta) {
-		if (thetaestim[i] == ESTIMATE)
-			pmx->theta[i].value = theta[i];
-	}
-
-	let omega = popmodel->omega;
-	let omegafixed = popmodel->omegafixed;
-	var offset = 0;
-	forcount(k, popmodel->nblock) {
-		let ndim = popmodel->blockdim[k];
-		let type = popmodel->blocktype[k];
-
-		assert((int)pmx->omega[k].type == type);
-		assert(pmx->omega[k].ndim == ndim);
-
-		switch (type) {
-
-			case OMEGA_DIAG: {
-				forcount(i, ndim) {
-					double v = omega[offset + i][offset + i];
-					let f = omegafixed[offset + i][offset + i];
-					if (f != 0 && v != 0.)
-						v = -fabs(v);
-					pmx->omega[k].values[i] = v;
-				}
-				break;
-			}
-			case OMEGA_BLOCK: {
-				int blocki = 0;
-				forcount(i, ndim) {
-					forcount(j, i + 1) {
-						double v = omega[offset + i][offset + j];
-						let f = omegafixed[offset + i][offset + j];
-						if (f != 0 && v != 0.)
-							v = -fabs(v);
-						pmx->omega[k].values[blocki] = v;
-						blocki++;
-					}
-				}
-				break;
-			}
-			case OMEGA_SAME: {
-				/* we dont need to do anything here since the block is already */
-				break;
-			}
-			default:
-				fatal(0, "Invalid block type (%i) if size %i\n", type, ndim);
-				break;
-		}
-		offset += ndim;
-	}
-
-	let sigma = popmodel->sigma;
-	let nsigma = popmodel->nsigma;
-	let sigmafixed = popmodel->sigmafixed;
-	forcount(i, nsigma) {
-		var v = sigma[i];
-		var f = sigmafixed[i];
-		if (f == 0)
-			pmx->sigma[i] = v;
-	}
-
-	pmx->result = popmodel->result;
-}
-
-static double objfn(const IDATA* const idata,
-				    const OMEGAINFO* const omegainfo)
-{
-	let nindivid = idata->nindivid;
-
-	/* doing the sum by type makes sure we are adding numbers of comparable
-	 * magnitude which helps with accuracy */
-	double objfn1 = 0.;
-	double objfn2 = 0.;
-	double objfn3 = 0.;
-	double objfn4 = 0.;
-	double objfn5 = 0.;
-	forcount(k, nindivid) {
-		let individ = &idata->individ[k];
-
-		let term1 = individ->obs_lndet;
-		let term2 = individ->obs_min2ll;
-		let term3 = individ->eta_min2ll;
-		var term4 = omegainfo->omega_nonzero_lndet;
- 		let term5 = individ->icov_lndet;
-		if (individ->nobs == 0) {
-			assert(term1 == 0.);
-			assert(term2 == 0.);
-			assert(term3 == 0.);
-			term4 = 0.;				/* population term does not count if no observations in the individual */
-			assert(term5 == 0.);
-		}
-
-		assert(isfinite(term1) == 1);
-		assert(isfinite(term2) == 1);
-		assert(isfinite(term3) == 1);
-		assert(isfinite(term4) == 1);
-		assert(isfinite(term5) == 1);
-
-		let iobjfn = term1 + term2 + term3 + term4 + term5;
-		individ->iobjfn = iobjfn;
-
-		objfn1 += term1;
-		objfn2 += term2;
-		objfn3 += term3;
-		objfn4 += term4;
-		objfn5 += term5;
-	}
-	let objfn = objfn1 + objfn2 + objfn3 + objfn4 + objfn5;
-	assert(isfinite(objfn) == 1);
-	return objfn;
-}
-
 typedef struct {
 	IDATA* const idata;
 	const ADVANFUNCS* const advanfuncs;
@@ -214,10 +96,10 @@ static void update_best_imodel(const STAGE2_PARAMS* const params,
 	if (options->estimate.verbose)
 		improved_model = popmodel;
 	if (improved_model) {
-		let runtime_s = get_timestamp(params);
 		let ineval = idata_ineval(idata, false);
 		var outstream = (options->estimate.progress) ? (params->outstream) : 0;
 		var extstream = (options->estimate.progress) ? (params->extstream) : 0;
+		let runtime_s = get_timestamp(params);
 		popmodel_eval_information(improved_model,
 								  runtime_s,
 								  ineval,
@@ -226,13 +108,6 @@ static void update_best_imodel(const STAGE2_PARAMS* const params,
 								  extstream,
 								  0);
 	}
-}
-
-static void reset_eta(IDATA* const idata, const double* eta)
-{
-	assert(eta);
-	var firstindivid = &idata->individ[0];
-	memcpy(firstindivid->eta, eta, idata->nindivid * idata->nomega * sizeof(double));
 }
 
 static void encode_evaluate(ENCODE* const test,
@@ -249,7 +124,7 @@ static void encode_evaluate(ENCODE* const test,
 	scatter_threads(idata, advanfuncs, popmodel, nonzero, options, &scatteroptions, stage1_thread);
 
 	popmodel->result = (PMXRESULT) {
-		.objfn = objfn(idata, omegainfo),
+		.objfn = idata_objfn(idata, omegainfo->omega_nonzero_lndet),
 		.type = OBJFN_CURRENT,
 		.nparam = 0,
 		.neval = 0
@@ -270,7 +145,7 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 	let advanfuncs = params->advanfuncs;
 	let options = params->options;
 	let popmodel = &params->test.popmodel;
-	reset_eta(idata, params->besteta);
+	idata_reset_eta(idata, params->besteta);
 	encode_evaluate(&params->test, idata, advanfuncs, options);
 	params->neval += 1;
 	popmodel->result.neval = params->neval;
@@ -337,7 +212,7 @@ static void foce_stage2_fdf(const gsl_vector* const x,
 #endif
 
 #ifdef OPTIMIZER_OUTER_LIBPRIMA
-#include "prima.h"
+//#include "prima.h"
 static void outer_fun(const double x[], double* const f, const void* data)
 {
 //	info(0, "Outer data %p\n", data);
@@ -537,8 +412,8 @@ static const char* focei(STAGE2_PARAMS* const params)
 //	if (retcode != PRIMA_RESULT_INITIALIZED)
 //		warning(0, "initial BOBYQA(libprima) error code %i\n", retcode);
 
-	var timestamp = get_timestamp(params);
-	info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
+	var runtime_s = get_timestamp(params);
+	info(params->outstream, "time %.3f neval %i objfn %f\n", runtime_s, params->neval, best->result.objfn);
 	lastobjfn = best->result.objfn;
 
 	// refine estimation
@@ -564,8 +439,8 @@ static const char* focei(STAGE2_PARAMS* const params)
 //				warning(0, "refine BOBYQA(libprima) error code %i\n", retcode);
 
 			dobjfn = best->result.objfn - lastobjfn;
-			var timestamp = get_timestamp(params);
-			info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
+			var runtime_s = get_timestamp(params);
+			info(params->outstream, "time %.3f neval %i objfn %f\n", runtime_s, params->neval, best->result.objfn);
 			lastobjfn = best->result.objfn;
 		}
 		while (dobjfn < -1.*fabs(options->estimate.dobjfn));
@@ -582,7 +457,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 	return 0;
 }
 
-static void print_model(STAGE2_PARAMS* params)
+static void estimate_print_model(STAGE2_PARAMS* params)
 {
 	let idata = params->idata;
 	let popmodel = &params->test.popmodel;
@@ -592,10 +467,10 @@ static void print_model(STAGE2_PARAMS* params)
 //	if (popmodel->result.objfn != DBL_MAX && params->best.result.objfn != DBL_MAX)
 //		sprintf(message, " objfn %f", popmodel->result.objfn);
 
-	let runtime_s = get_timestamp(params);
 	let ineval = idata_ineval(idata, false);
 	var outstream = (options->estimate.progress) ? (params->outstream) : 0;
 	var extstream = (options->estimate.progress) ? (params->extstream) : 0;
+	let runtime_s = get_timestamp(params);
 	popmodel_eval_information(popmodel,
 							  runtime_s,
 							  ineval,
@@ -613,7 +488,7 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 	let popmodel = &params->test.popmodel;
 
 	info(params->outstream, "stabilize begin\n");
-	reset_eta(idata, params->besteta);
+	idata_reset_eta(idata, params->besteta);
 
 	/* very first evaluation */
 	encode_evaluate(&params->test, idata, advanfuncs, options);
@@ -623,6 +498,7 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 
 	var done = false;
 	var niter = 0;
+	let maxiter = 10;
 	while (!done) {
 		let lastobjfn = popmodel->result.objfn;
 		encode_evaluate(&params->test, idata, advanfuncs, options);
@@ -630,7 +506,7 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 		++niter;
 		popmodel->result.neval = params->neval;
 
-		print_model(params);
+		estimate_print_model(params);
 
 		/* are we stable? */
 		/* besteta we update later, individual eta values keep getting updated */
@@ -638,12 +514,13 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 		let dobjfn = popmodel->result.objfn - lastobjfn;
 		if (fabs(dobjfn) < 0.01) 
 			done = true;
-		else if (niter >= 10)
+		else if (niter >= maxiter) 
 			break;
-			
 		params->best = *popmodel;
 	}
 	info(params->outstream, "stabilize iter %i\n", niter);
+	if (niter == maxiter) 
+		warning(params->outstream, "stabilize failed\n");
 	timestamp = get_timestamp(params);
 	info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, popmodel->result.objfn);
 
@@ -655,8 +532,217 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 
 #if 0
 #include <gsl/gsl_spline.h>
+
+typedef struct {
+	double* point;
+	int dimnum;
+	double objfn;
+} COVPOINTS;
+
+#include "linalg.h"
+#include <gsl/gsl_linalg.h>
+#include <gsl/gsl_blas.h>
+
+void print_matrix(const gsl_matrix* const p)
+{
+	if (!p) {
+		printf("(null)\n");
+		return;
+	}
+	printf("matrix(%i,%i)\n", (int)p->size1, (int)p->size2);
+	forcount(i, p->size1) {
+		forcount(j, p->size2)
+			printf("%13e ", gsl_matrix_get(p, i, j));
+		printf("\n");
+	}
+}
+
+static void reconstruct(const double* _x, const int _xlength, const int n, const int nchol, gsl_matrix* chol2, double* mean2, double* offset)
+{
+	var i = 0;
+	*offset = _x[i++];
+	forcount(ii, n)
+		mean2[ii] = _x[i++];
+	gsl_matrix_set_zero(chol2);
+	var r = 0;
+	var c = 0;
+	assert(nchol == n);
+	forcount(ii, nchol) {
+		var v = _x[i++];
+		r = ii;
+		c = ii;
+		if (r == c)
+			v = exp(v);
+		gsl_matrix_set(chol2, r, c, v);
+	}
+	assert(i == _xlength);
+} 
+
+typedef struct {
+	const COVPOINTS* const covpoints;
+	const int ncovpoints;
+	const int n;
+	const int nchol;
+	double bestf;
+} COVINFO;
+
+static int foce_gradient_f(const gsl_vector* const x, void *data, gsl_vector * f)
+{
+	let covinfo = (COVINFO*) data;
+	let n = covinfo->n;
+	let nchol = covinfo->nchol;
+
+	var off2 = 0.;
+	var mean2 = callocvar(double, n);
+	var chol2 = gsl_matrix_alloc(n, n);
+	reconstruct(x->data, x->size, n, nchol, chol2, mean2, &off2);
+
+	let covpoints = covinfo->covpoints;
+	var ssqerr = 0.;
+	forcount(i, covinfo->ncovpoints) {
+		let p = covpoints[i].point;
+		double adj[n];
+		forcount(k, n)
+			adj[k] = p[k] - mean2[k];
+		let pobjfn = sample_min2ll_from_cholesky(adj, chol2) + off2;
+		let err = covpoints[i].objfn - pobjfn;
+		
+		gsl_vector_set(f, i, err);
+		ssqerr += pow(err, 2);
+	}
+	info(0, "ssqerr=%5f\n", ssqerr);
+	
+	gsl_matrix_free(chol2);
+	free(mean2);
+	
+	return GSL_SUCCESS;
+}
+
+static int foce_gradient_df(const gsl_vector * x, void *data, gsl_matrix * J)
+{
+	let n = J->size1;
+	let p = x->size;
+	gsl_vector *xx = gsl_vector_alloc(p);
+	gsl_vector *f_plus_h = gsl_vector_alloc(n);
+	gsl_vector *f_minus_h = gsl_vector_alloc(n);
+
+	forcount(j, p) {
+		let step_size = 0.1;
+
+		let v = gsl_vector_get(x, j);
+		let h = step_size;
+		let above = v + h;
+		let below = v - h;
+		let two_times_h = above - below;
+
+		gsl_vector_memcpy(xx, x);
+
+		gsl_vector_set(xx, j, above);
+		foce_gradient_f(xx, data, f_plus_h);
+
+		gsl_vector_set(xx, j, below);
+		foce_gradient_f(xx, data, f_minus_h);
+
+		forcount(i, n) {
+			let upper = gsl_vector_get(f_plus_h, i);
+			let lower = gsl_vector_get(f_minus_h, i);
+			let deriv = (upper - lower) / (two_times_h);
+			gsl_matrix_set(J, i, j, deriv);
+		}
+	}
+	gsl_vector_free(xx);
+	gsl_vector_free(f_plus_h);
+	gsl_vector_free(f_minus_h);
+	return GSL_SUCCESS;
+}
+
+#include <gsl/gsl_multifit_nlinear.h>
+static void foce_gradient_callback(const size_t iter, void * params, const gsl_multifit_nlinear_workspace * w)
+{
+	(void)w;
+	int* niter = (int*) params;
+	*niter = iter;
+}
+
+static void minimize_covpoints(const COVPOINTS* const covpoints, const int ncovpoints, const int n, const int nchol, double* x, double* mean2, gsl_matrix* chol2, double* off2)
+{
+	var covinfo = (COVINFO) {
+		.covpoints = covpoints,
+		.ncovpoints = ncovpoints,
+		.n = n,
+		.nchol = nchol,
+		.bestf = DBL_MAX,
+	};
+	let ndim = 1 + n + nchol;
+
+	var fdf = (gsl_multifit_nlinear_fdf) {
+		.f = foce_gradient_f,
+//		.df = foce_gradient_df, /* TODO: Can this be efficently done with step-size equal to stddev of observation? */
+		.df = NULL, /* TODO: Can this be efficently done with step-size equal to stddev of observation? */
+		.fvv = NULL,
+		.n = (size_t)ncovpoints,
+		.p = (size_t)ndim,
+		.params = (void*)&covinfo,
+		.nevalf = 0,
+		.nevaldf = 0,
+		.nevalfvv = 0,
+	};
+	
+	var fdf_params = gsl_multifit_nlinear_default_parameters();
+//	fdf_params.trs =  gsl_multifit_nlinear_trs_lm;
+	fdf_params.trs =  gsl_multifit_nlinear_trs_lmaccel;
+//	fdf_params.trs = gsl_multifit_nlinear_trs_dogleg;
+//	fdf_params.trs = gsl_multifit_nlinear_trs_ddogleg;
+//	fdf_params.trs = gsl_multifit_nlinear_trs_subspace2D;
+
+	fdf_params.scale = gsl_multifit_nlinear_scale_more;
+//	fdf_params.scale = gsl_multifit_nlinear_scale_levenberg;
+//	fdf_params.scale = gsl_multifit_nlinear_scale_marquardt;
+
+	fdf_params.solver = gsl_multifit_nlinear_solver_qr;
+//	fdf_params.solver = gsl_multifit_nlinear_solver_cholesky;
+//	fdf_params.solver = gsl_multifit_nlinear_solver_svd;
+
+//	fdf_params.fdtype = GSL_MULTIFIT_NLINEAR_FWDIFF;
+//	fdf_params.fdtype = GSL_MULTIFIT_NLINEAR_CTRDIFF;
+
+	fdf_params.h_df = 0.1;
+//		fdf_params.h_fvv = 0.1; // estimoptions->stage1_step_size;
+
+	fdf_params.avmax = 0.4;
+
+	let xtol = 1e-3;
+	let gtol = pow(GSL_DBL_EPSILON, 1./3.); 	/* based on https://www.gnu.org/software/gsl/manual/html_node/Nonlinear-Least_002dSquares-Testing-for-Convergence.html#Nonlinear-Least_002dSquares-Testing-for-Convergence */
+	let ftol = 0.;
+	let max_iter = 1000;
+
+	/* initialize solver with starting point and weights */
+	var niter = 0;
+	var w = gsl_multifit_nlinear_alloc(gsl_multifit_nlinear_trust, &fdf_params, ncovpoints, ndim);
+	let initial = gsl_vector_const_view_array(x, ndim);
+	gsl_multifit_nlinear_init(&initial.vector, &fdf, w);
+	var info = -1;
+	gsl_multifit_nlinear_driver(max_iter, 
+		xtol, gtol, ftol,
+		foce_gradient_callback, &niter,
+		&info, w);
+
+	/* final results */
+	let xfinal = gsl_multifit_nlinear_position(w);
+	forcount(i, ndim) 
+		x[i] = gsl_vector_get(xfinal, i);
+	reconstruct(x, ndim, n, nchol, chol2, mean2, off2);
+
+	gsl_multifit_nlinear_free(w);
+}
+
+#include <gsl/gsl_randist.h>
+#include <gsl/gsl_blas.h>
+
 static void evaluate_gradient(STAGE2_PARAMS* params)
 {
+	return;
+	
 	/* http://www.holoborodko.com/pavel/numerical-methods/numerical-derivative/smooth-low-noise-differentiators/#noiserobust_2 */
 	
 	let idata = params->idata;
@@ -665,88 +751,338 @@ static void evaluate_gradient(STAGE2_PARAMS* params)
 	let popmodel = &params->test.popmodel;
 	var test = &params->test;
 	let n = test->nparam;
+	var outstream = params->outstream;
+	var extstream = params->extstream;
 
-	info(params->outstream, "deriv:\n");
+	info(outstream, "deriv:\n");
 
-	let f0 = params->best.result.objfn;
+	let baseobjfn = params->best.result.objfn;
 
-	var step2 = params->options->estimate.step_initial;
-	var step1 = params->options->estimate.step_refine;
+	VECTOR(COVPOINTS) covpoints = { };
+	var basepoint = (COVPOINTS) {
+		.point = callocvar(double, n),
+		.dimnum = 999,
+		.objfn = baseobjfn
+	};
+	vector_append(covpoints, basepoint);
+	
+	let step0 = 0.02;
+	double stepsize[n];
+	forcount(i, n)
+		stepsize[i] = 0.;
 	forcount(k, n) {
-		double x[OPENPMX_THETA_MAX + OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX + OPENPMX_SIGMA_MAX] = { };
-		double xa[5] = { };
-		double ya[5] = { };
-		xa[2] = 0.;
-		ya[2] = 0.;
+		info(outstream, "paramater %i -------------------------\n", k);
+		VECTOR(COVPOINTS) dirpoints = { };
 
-		memset(x, 0, sizeof(x));
+		/* lower bound both sized of delta objfn */
+		var step = -1. * step0;
+		var niter = 0;
+		var delta = 0.;
+		while (delta < 10. && niter++ < 15) {
+			double x[OPENPMX_THETA_MAX + OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX + OPENPMX_SIGMA_MAX] = { };
+			x[k] = step;
+			encode_update(test, x);
+			idata_reset_eta(idata, params->besteta); 
+			encode_evaluate(test, idata, advanfuncs, options);
+			estimate_print_model(params);
+			params->neval += 1;
+			popmodel->result.neval = params->neval;
+			delta = popmodel->result.objfn - baseobjfn;
+			var thispoint = (COVPOINTS) {
+				.point = callocvar(double, n),
+				.dimnum = k,
+				.objfn = popmodel->result.objfn,
+			};
+			thispoint.point[k] = x[k];
+			vector_append(dirpoints, thispoint); 
 
-		x[k] = -1. * step2;
-		encode_update(test, x);
-		reset_eta(idata, params->besteta); 
-		encode_evaluate(test, idata, advanfuncs, options);
-		popmodel->result.neval = params->neval;
-		params->neval += 1;
-		popmodel->result.neval = params->neval;
-		let fm2 = popmodel->result.objfn;
-		print_model(params);
-		xa[0] = x[k];
-		ya[0] = fm2 - f0;
-		x[k] = 0.;
+			step *= 2.;
+		}
+		stepsize[k] = step / 2;
 
-		x[k] = -1. * step1;
-		encode_update(test, x);
-		reset_eta(idata, params->besteta); 
-		encode_evaluate(test, idata, advanfuncs, options);
-		params->neval += 1;
-		popmodel->result.neval = params->neval;
-		let fm1 = popmodel->result.objfn;
-		print_model(params);
-		xa[1] = x[k];
-		ya[1] = fm1 - f0;
-		x[k] = 0.;
+		/* upper bound both sized of delta objfn */
+		step = 1. * step0;
+		niter = 0;
+		delta = 0.;
+		while (delta < 10. && niter++ < 15) {
+			double x[OPENPMX_THETA_MAX + OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX + OPENPMX_SIGMA_MAX] = { };
 
-		xa[2] = 0.;
-		ya[2] = 0.;
+			x[k] = step;
+			encode_update(test, x);
+			idata_reset_eta(idata, params->besteta); 
+			encode_evaluate(test, idata, advanfuncs, options);
+			estimate_print_model(params);
+			params->neval += 1;
+			popmodel->result.neval = params->neval;
+			delta = popmodel->result.objfn - baseobjfn;
+			var thispoint = (COVPOINTS) {
+				.point = callocvar(double, n),
+				.dimnum = k,
+				.objfn = popmodel->result.objfn,
+			};
+			thispoint.point[k] = x[k];
+			vector_append(dirpoints, thispoint); 
 
-		x[k] = 1. * step1;
-		encode_update(test, x);
-		reset_eta(idata, params->besteta); 
-		encode_evaluate(test, idata, advanfuncs, options);
-		params->neval += 1;
-		popmodel->result.neval = params->neval;
-		let fp1 = popmodel->result.objfn;
-		print_model(params);
-		xa[3] = x[k];
-		ya[3] = fp1 - f0;
-		x[k] = 0.;
+			step *= 2.;
+		}
+		stepsize[k] = (stepsize[k] + step / 2.) / 2.;
 
-		x[k] = 1. * step2;
-		encode_update(test, x);
-		reset_eta(idata, params->besteta); 
-		encode_evaluate(test, idata, advanfuncs, options);
-		params->neval += 1;
-		popmodel->result.neval = params->neval;
-		let fp2 = popmodel->result.objfn;
-		print_model(params);
-		xa[4] = x[k];
-		ya[4] = fp2 - f0;
-		x[k] = 0.;
-
-		var interp = gsl_spline_alloc(gsl_interp_cspline, 5);
-		var accelp = gsl_interp_accel_alloc();
-		gsl_spline_init(interp, xa, ya, 5);
-
-		let deriv = gsl_spline_eval_deriv(interp, 0., accelp);
-		let deriv2 = gsl_spline_eval_deriv2(interp, 0., accelp);
-		info(params->outstream, "param %i deriv %g %g (%g)\n", k, deriv, deriv2, deriv / deriv2);
-
-		gsl_interp_accel_free(accelp);
-		gsl_spline_free(interp);
+		let npoints = vector_size(dirpoints);
+		vector_appendn(covpoints, dirpoints.rawptr, npoints);
+		vector_free(dirpoints);
 	}
-	/* TODO : add warnings here for decreases in objfn and zero gradient and second deriv */
+
+	var m = gsl_matrix_alloc(n, n);
+	gsl_matrix_set_zero(m);
+	forcount(j, n)
+		gsl_matrix_set(m, j, j, 0.1);
+	var chol = gsl_matrix_alloc(n, n);
+	gsl_matrix_memcpy(chol, m);
+	gsl_linalg_cholesky_decomp1(chol);
+
+	print_matrix(m);
+	print_matrix(chol);
+
+//	let nchol = n * (n + 1) / 2;
+	let nchol = n;
+	let ndim = 1 + n + nchol;
+	var offset = baseobjfn;
+	var x = callocvar(double, ndim);
+	var r = 0;
+	var c = 0;
+	var i = 0;
+	x[i++] = offset;
+	forcount(ii, n)			/* mean */
+		x[i++] = 0.;
+	forcount(ii, nchol) {	/* cholesky */
+		r = ii;
+		c = ii;
+		var v = gsl_matrix_get(chol, r, c);
+		if (r == c)
+			v = log(v);
+		x[i++] = v;
+	}
+	assert(i == 1 + n + nchol);
+	assert(i == ndim);
+
+	var off2 = 0.;
+	var mean2 = callocvar(double, n);
+	var chol2 = gsl_matrix_alloc(n, n);
+	reconstruct(x, ndim, n, nchol, chol2, mean2, &off2);
+	
+	var f0 = 0.;
+	forvector(i, covpoints) {
+		let p = covpoints.ptr[i].point;
+		double adj[n];
+		forcount(k, n)
+			adj[k] = p[k] - mean2[k];
+		let pobjfn = sample_min2ll_from_cholesky(adj, chol2) + off2;
+		let err = covpoints.ptr[i].objfn - pobjfn;
+		f0 += (err * err);
+		info(outstream, "dim %i objfn=%g pobjfn=%g err=%f\n",
+			covpoints.ptr[i].dimnum,
+			covpoints.ptr[i].objfn,
+			pobjfn, err);  
+	}
+	info(0, "initial f0 = %g\n", f0);
+	
+	minimize_covpoints(covpoints.ptr,
+		vector_size(covpoints),
+		n, nchol,
+		x, mean2, chol2, &off2);
+
+	let npoints = 100;
+	forcount(i, npoints) {
+		static unsigned long int seed = 0;
+		static gsl_rng* rng;
+		if (seed == 0) {
+			rng = gsl_rng_alloc(gsl_rng_mt19937);
+			seed = 200501041406;
+			gsl_rng_set(rng, seed);
+		}
+		var v = gsl_vector_alloc(n);
+		forcount(j, n) {
+			var x = gsl_ran_gaussian(rng, 0.5);
+			if (i == npoints - 1)
+				x = 0.;
+			gsl_vector_set(v, j, x);
+		}
+		var s = gsl_vector_alloc(n);
+		gsl_blas_dgemv(CblasNoTrans, 1., chol2, v, 0., s);
+		var newsample = mallocvar(double, n);
+		forcount(j, n) {
+			let x = gsl_vector_get(s, j);
+			newsample[j] = x + mean2[j]; 
+		}
+		gsl_vector_free(s);
+		gsl_vector_free(v);
+
+		encode_update(test, newsample);
+		idata_reset_eta(idata, params->besteta); 
+		encode_evaluate(test, idata, advanfuncs, options);
+		estimate_print_model(params);
+		params->neval += 1;
+		popmodel->result.neval = params->neval;
+		var newpoint = (COVPOINTS) {
+			.point = callocvar(double, n),
+			.dimnum = -1,
+			.objfn = popmodel->result.objfn,
+		};
+		forcount(k, n)
+			newpoint.point[k] = newsample[k];
+		free(newsample);
+		if (i == npoints - 1)
+			newpoint.dimnum = -2;
+		vector_append(covpoints, newpoint);
+
+		info(0, "... solved this point\n");
+		let timestamp = get_timestamp(params);
+		popmodel_information(outstream, popmodel, timestamp);
+
+		info(0, "... remove bad points\n");
+		var minobjfn = DBL_MAX;
+		forvector(j, covpoints) {
+			var v = &covpoints.ptr[j];
+			if (v->objfn < minobjfn)
+				minobjfn = v->objfn;
+		}
+		printf("minobjfn = %f\n", minobjfn);
+		forvector(j, covpoints) {
+			var v = &covpoints.ptr[j];
+			if (vector_size(covpoints) <= n + nchol + 20)
+				break;
+			if (v->objfn - minobjfn > 10.) {
+				printf("remove = %i\n", j);
+				vector_remove(covpoints, j, 1);
+				--j;
+			}
+		}
+
+		info(0, "... minimize\n");
+		minimize_covpoints(covpoints.ptr,
+			vector_size(covpoints),
+			n, nchol,
+			x, mean2, chol2, &off2);
+			
+		info(0, "... points during minimize\n");
+		forvector(j, covpoints) {
+			let p = covpoints.ptr[j].point;
+			double adj[n];
+			forcount(k, n)
+				adj[k] = p[k] - mean2[k];
+			let pobjfn = sample_min2ll_from_cholesky(adj, chol2) + off2;
+			let err = covpoints.ptr[j].objfn - pobjfn;
+			info(outstream, "%i dim %i objfn=%g pobjfn=%g err=%f\n",
+				j,
+				covpoints.ptr[j].dimnum,
+				covpoints.ptr[j].objfn,
+				pobjfn, 
+				err);  
+		}
+	}
+	info(0, "... points after minimize\n");
+	forvector(j, covpoints) {
+		let p = covpoints.ptr[j].point;
+		double adj[n];
+		forcount(k, n)
+			adj[k] = p[k] - mean2[k];
+		let pobjfn = sample_min2ll_from_cholesky(adj, chol2) + off2;
+		let err = covpoints.ptr[j].objfn - pobjfn;
+		info(outstream, "%i dim %i objfn=%g pobjfn=%g err=%f\n",
+			j,
+			covpoints.ptr[j].dimnum,
+			covpoints.ptr[j].objfn,
+			pobjfn, 
+			err);  
+	}
+	
+	info(0, "offset %f\nmean", off2);
+	forcount(i, n)
+		info(0, " %g", mean2[i]);
+	info(0, "\ncov\n");
+	gsl_blas_dgemm(CblasNoTrans, CblasTrans,
+				   1.0, chol2, chol2,
+				   0.0, m);
+	print_matrix(m);
+	
+	var s = fopen("o.dat", "w");
+	assert(s);
+	fprintf(s, "DIMN\tOBJFN\tPOBJFN");
+	forcount(j, n)
+		fprintf(s, "\tX%i", j);
+	fprintf(s, "\n");
+	forvector(i, covpoints) {
+		let p = covpoints.ptr[i].point;
+		double adj[n];
+		forcount(k, n)
+			adj[k] = p[k] - mean2[k];
+		let pobjfn = sample_min2ll_from_cholesky(adj, chol2) + off2;
+		let err = covpoints.ptr[i].objfn - pobjfn;
+		fprintf(s, "%i\t%f\t%f", 
+			covpoints.ptr[i].dimnum,
+			covpoints.ptr[i].objfn, 
+			pobjfn);  
+		forcount(j, n)
+			fprintf(s, "\t%f", p[j]);
+		fprintf(s, "\n");
+	}
+	fclose(s);
+	
+	s = fopen("o.R", "w");
+	assert(s);
+	fprintf(s, 
+		"postscript(file=\"o.ps\", horizontal=TRUE)\n"
+		"f <- read.table(file=\"o.dat\", header=TRUE)\n"
+		"print(head(f))\n"
+		"print(tail(f))\n"
+		"plot(x=f$OBJFN,y=f$POBJFN)\n"
+		"fsel<-f$DIMN==-1\n"
+		"points(x=f$OBJFN[fsel],y=f$POBJFN[fsel], pch=19, cex=2, col=\"lightblue\")\n"
+		"fsel<-f$DIMN==-2\n"
+		"points(x=f$OBJFN[fsel],y=f$POBJFN[fsel], pch=19, cex=2, col=\"lightgreen\")\n"
+		"par(mfrow=c(2,3))\n"
+		"\n");
+	forcount(i, n) {
+		fprintf(s, 
+			"fmin<-min(f$OBJFN)\n"
+			"fsel<-f$DIMN==%i|f$DIMN==999\n"
+			"ff<-f[fsel,]\n"
+			"ylim<-range(fmin, fmin+10)\n"
+			"plot(x=ff$X%i,y=ff$OBJFN,ylim=ylim)\n"
+			"title(\"Dim %i\")\n"
+			"points(x=ff$X%i,y=ff$OBJFN, pch=2)\n"
+			"xextra<-f[f$DIMN==-1,]\n"
+			"points(x=xextra$X%i,y=xextra$OBJFN, pch=19, cex=2, col=\"lightblue\")\n"
+			"xextra<-f[f$DIMN==-2,]\n"
+			"points(x=xextra$X%i,y=xextra$OBJFN, pch=19, cex=2, col=\"lightgreen\")\n",
+			i, i, i, i, i, i);
+	} 
+	fclose(s);
+	system("Rscript o.R");
+	exit(8);
+
+	encode_update(test, mean2);
+	idata_reset_eta(idata, params->besteta); 
+	encode_evaluate(test, idata, advanfuncs, options);
+	estimate_print_model(params);
+	params->neval += 1;
+	popmodel->result.neval = params->neval;
+	let timestamp = get_timestamp(params);
+	popmodel_information(outstream, popmodel, timestamp);
+	
+
+	free(x);
+	free(mean2);
+	gsl_matrix_free(chol2);
+	gsl_matrix_free(chol);
+	gsl_matrix_free(m);
+	
+	forvector(i, covpoints)
+		free(covpoints.rawptr[i].point);
+	vector_free(covpoints);
 	
 	params->best.result.neval = params->neval;
+	/* TODO : add warnings here for decreases in objfn and zero gradient and second deriv */
 }
 #endif
 	
@@ -793,10 +1129,6 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 		/* at end we encode the best so far */
 		encode_offset(&params->test, &params->best);
 	}
-
-	/* posthoc evaluation of derivates */
-//	if (!options->estimate.posthoc.gradient.omit) 
-//		evaluate_gradient(params);
 }
 
 typedef enum {
@@ -945,7 +1277,13 @@ static void estimate_popmodel(const char* filename,
 		if (options->estimate.stage1.icov_resample)
 			table_icov_resample_idata(filename, idata, _offset1);
 	}
-
+	
+	/* posthoc evaluation of derivates */
+#if 0
+//	if (!options->estimate.posthoc.gradient.omit) 
+		evaluate_gradient(&params);
+#endif
+	
 	/* cleanup */
 	stage2_params_cleanup(&params);
 }

@@ -7,7 +7,7 @@
 //	 - changed CP name to DV
 //
 $DATA("data.csv")
-$ADVAN(threecomp)
+$ADVAN(threecomp) 
 	.firstonly = 1,
 $IMODEL(V1, V2, V3, CL, Q2, Q3)
 	const double SIZE = WT/70.;
@@ -15,8 +15,10 @@ $IMODEL(V1, V2, V3, CL, Q2, Q3)
 	V2 = THETA(2) * SIZE * exp(ETA(2));
 	V3 = THETA(3) * SIZE * exp(ETA(3));
 	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4));
-	Q2 = THETA(5) * pow(SIZE, 0.75) * exp(ETA(5));
-	Q3 = THETA(6) * pow(SIZE, 0.75) * exp(ETA(6));
+//	Q2 = THETA(5) * pow(SIZE, 0.75) * exp(ETA(5));
+//	Q3 = THETA(6) * pow(SIZE, 0.75) * exp(ETA(6));
+	Q2 = THETA(5) * pow(V2/THETA(2), 0.75) * exp(ETA(5));
+	Q3 = THETA(6) * pow(V3/THETA(3), 0.75) * exp(ETA(6));
 $PREDICT(IPRED)
 	IPRED = A(1)/V1;
 	Y = IPRED*(1 + ERR(1));
@@ -27,10 +29,11 @@ $THETA
 	{   0.1,   2,   5,  ESTIMATE     },
 	{   0.1,   2,   5,  ESTIMATE     },
 	{   0.1,   1,   5,  ESTIMATE     },
-$OMEGA(0.1, 0.1, 0.1, 0.1, 0.1, 0.1)
+$OMEGA(0.1, 0.1, 0.1, 0.1, 0., 0.)
 $SIGMA(0.1)
 $MAIN
-	estimate(.maxeval=5000);
+	estimate(.maxeval=100);
 	predict_pred();
 //	table("ID,AGE,WT,HT,M1F2", .name="covariates");
 //	table("ID,TIME,DV,IPRED,PRED,yhat,yhatvar", .name="pred");
+

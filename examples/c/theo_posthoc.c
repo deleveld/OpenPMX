@@ -78,6 +78,7 @@ extern RECORD data[11]; /* forward declaration */
 #include "popmodel.c"
 #include "pmxstate.c"
 #include "omegainfo.c"
+#include "nonzero.c"
 #include "linalg.c"
 #include "ievaluate.c"
 #include "predict.c"

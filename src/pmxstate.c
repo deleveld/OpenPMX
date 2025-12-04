@@ -23,6 +23,7 @@
 #include "scatter.h"
 #include "utils/c22.h"
 #include "advan/advan.h"
+#include "print.h"
 #include "pmxstate.h"
 
 static PMXSTATE* pmxstate_alloc(const OPENPMX* const pmx)
@@ -91,5 +92,75 @@ void pmx_cleanup(OPENPMX* pmx)
 {
 	pmxstate_free(pmx->state);
 	pmx->state = 0;
+}
+
+void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel)
+{
+	let theta = popmodel->theta;
+	let ntheta = popmodel->ntheta;
+	let thetaestim = popmodel->thetaestim;
+	forcount(i, ntheta) {
+		if (thetaestim[i] == ESTIMATE)
+			pmx->theta[i].value = theta[i];
+	}
+
+	let omega = popmodel->omega;
+	let omegafixed = popmodel->omegafixed;
+	var offset = 0;
+	forcount(k, popmodel->nblock) {
+		let ndim = popmodel->blockdim[k];
+		let type = popmodel->blocktype[k];
+
+		assert((int)pmx->omega[k].type == type);
+		assert(pmx->omega[k].ndim == ndim);
+
+		switch (type) {
+
+			case OMEGA_DIAG: {
+				forcount(i, ndim) {
+					double v = omega[offset + i][offset + i];
+					let f = omegafixed[offset + i][offset + i];
+					if (f != 0 && v != 0.)
+						v = -fabs(v);
+					pmx->omega[k].values[i] = v;
+				}
+				break;
+			}
+			case OMEGA_BLOCK: {
+				int blocki = 0;
+				forcount(i, ndim) {
+					forcount(j, i + 1) {
+						double v = omega[offset + i][offset + j];
+						let f = omegafixed[offset + i][offset + j];
+						if (f != 0 && v != 0.)
+							v = -fabs(v);
+						pmx->omega[k].values[blocki] = v;
+						blocki++;
+					}
+				}
+				break;
+			}
+			case OMEGA_SAME: {
+				/* we dont need to do anything here since the block is already */
+				break;
+			}
+			default:
+				fatal(0, "Invalid block type (%i) if size %i\n", type, ndim);
+				break;
+		}
+		offset += ndim;
+	}
+
+	let sigma = popmodel->sigma;
+	let nsigma = popmodel->nsigma;
+	let sigmafixed = popmodel->sigmafixed;
+	forcount(i, nsigma) {
+		var v = sigma[i];
+		var f = sigmafixed[i];
+		if (f == 0)
+			pmx->sigma[i] = v;
+	}
+
+	pmx->result = popmodel->result;
 }
 

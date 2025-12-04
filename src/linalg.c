@@ -76,3 +76,48 @@ double matrix_lndet_from_cholesky(const gsl_matrix* const chol)
 	return sum;
 }
 
+double sample_min2ll_from_cholesky(const double* const data,
+								   const gsl_matrix* const chol)
+{
+	let n = chol->size1;
+	let x = gsl_vector_const_view_array(data, n);
+
+	/* Basically this 'decorrelates' the sample with respect to the covariance matrix
+	 (via its cholesky decomposition) which gives the independent samples. The sum of
+	 the square is the likelihood */
+	double rdata[n];
+	var r = gsl_vector_view_array(rdata, n);
+	gsl_vector_memcpy(&r.vector, &x.vector);
+	gsl_blas_dtrsv(CblasLower, CblasNoTrans, CblasNonUnit, chol, &r.vector);
+
+	double sum = 0.;
+	forcount(i, n) {
+		let v = gsl_vector_get(&r.vector, i);
+		sum += v * v;
+	}
+	return sum;
+}
+
+double sample_min2ll_from_inverse(const double* const data,
+								  const gsl_matrix* const inverse)
+{
+	let n = inverse->size1;
+	double ydata[n];
+	var y = gsl_vector_view_array(ydata, n);
+	let x = gsl_vector_const_view_array(data, n);
+
+	gsl_blas_dgemv(CblasNoTrans, 1., inverse, &x.vector, 0., &y.vector);
+
+//	var lik = 0.;
+//	gsl_blas_ddot(&x.vector, &y.vector, &lik);
+//	return lik;
+	double sum = 0.;
+	forcount(i, n) {
+		let _x = gsl_vector_get(&x.vector, i);
+		let _y = gsl_vector_get(&y.vector, i);
+		sum += _x * _y;
+	}
+	return sum;
+}
+
+

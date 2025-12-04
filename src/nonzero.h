@@ -31,6 +31,18 @@ typedef struct NONZERO {
 	double inversedata[OPENPMX_OMEGA_MAX*OPENPMX_OMEGA_MAX];
 } NONZERO;
 
+void reduce_eta(double* reta,
+				const double fulleta[static OPENPMX_OMEGA_MAX],
+				const NONZERO* const nonzero);
+void unreduce_eta(double fulleta[static OPENPMX_OMEGA_MAX],
+				  const double* reta,
+				  const NONZERO* const nonzero);
+
+double sample_min2ll(const int nreta,
+					 const double reta[static nreta],
+					 const NONZERO* const nonzero);
+
+
 #ifdef __cplusplus
 }
 #endif

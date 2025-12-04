@@ -53,6 +53,7 @@ SOURCEFILES="pmxstate.c
 			checkout.c
 			popmodel.c
 			encode.c
+			nonzero.c
 			omegainfo.c
 			linalg.c
 			print.c

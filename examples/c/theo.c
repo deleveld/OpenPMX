@@ -134,6 +134,7 @@ int main(void)
 #include "popmodel.c"
 #include "omegainfo.c"
 #include "linalg.c"
+#include "nonzero.c"
 #include "ievaluate.c"
 #include "stage1.c"
 #include "scatter.c"
