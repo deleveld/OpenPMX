@@ -149,6 +149,7 @@ double* idata_alloc_simerr(const IDATA* const idata)
 		let ndata = idata->ndata;
 		let nsigma = idata->nsigma;
 		var simerr = mallocvar(double, ndata * nsigma);
+		assert(simerr);
 
 		let nindivid = idata->nindivid;
 		var ioffset = 0;

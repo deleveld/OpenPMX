@@ -1,6 +1,6 @@
 #!/bin/sh
 set -ex
-./install pthread static
+./install
 
 (cd examples/schnider; ../../openpmx schnider.gr)
 (cd examples/theo; ../../openpmx theo.gr)

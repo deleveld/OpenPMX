@@ -1,4 +1,4 @@
-	#!/bin/sh
+#!/bin/sh
 ########################################################################
 #
 # This file is part of OpenPMX (https://github.com/deleveld/openpmx).
@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-TARGET="${1:-pthread}"
+PARALLEL="${1:-pthread}"
 LIBTYPE="${2:-shared}"
 UNAME="$(uname -s)"
 PLATFORM="${3:-${UNAME}}"
@@ -24,7 +24,7 @@ OPENPMXPATH=$(cd "$(dirname "${0}")" && pwd)
 
 set -eu
 
-echo "install ${TARGET} ${LIBTYPE} ${PLATFORM}"
+echo "install ${PARALLEL} ${LIBTYPE} ${PLATFORM}"
 echo "path ${OPENPMXPATH}"
 
 # general build flags 
@@ -81,7 +81,7 @@ ${RM} "${OPENPMXPATH}"/bin/openpmxtran
 ${RM} "${OPENPMXPATH}"/lib/*.so "${OPENPMXPATH}"/lib/*.a 
 ${RM} "${OPENPMXPATH}/openpmx"
 ${RM} "${OPENPMXPATH}/src/openpmx_compile_options.h"
-if [ "${TARGET}" = "clean" ]; then
+if [ "${PARALLEL}" = "clean" ]; then
 	exit 0
 fi
 
@@ -95,15 +95,19 @@ fi
 ### cp -v prima/c/include/prima/prima.h src
 ########################################################################
 
+echo '#define OPENPMX_INSTALL_PATH	' "\"${OPENPMXPATH}\"" >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
+
 # shared or static library
 if [ "${LIBTYPE}" = "shared" ]; then
 	echo "build ${LIBTYPE} library"
 	AR="gcc -shared -o lib/lib${LIBNAME}.so"
 	LFLAGS="-flto"
+	echo '#define OPENPMX_LIBTYPE_SHARED' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 elif [ "${LIBTYPE}" = "static" ]; then
 	echo "build ${LIBTYPE} library"
 	AR="ar rcs lib/lib${LIBNAME}.a"
 	LFLAGS="-flto -static"
+	echo '#define OPENPMX_LIBTYPE_STATIC' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 else
 	echo "error: install: \"${LIBTYPE}\" must be static or shared"
 	exit 1
@@ -111,31 +115,31 @@ fi
 
 # install flag for OpenMP target
 echo "write compile options"
-if [ "${TARGET}" = "openmp" ]; then
+if [ "${PARALLEL}" = "openmp" ]; then
 	CFLAGS="${CFLAGS} -fopenmp"
 	LFLAGS="${LFLAGS} -fopenmp -lgomp"
-	echo '#define OPENPMX_PARALLEL_OPENMP' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_PARALLEL_OPENMP' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # install flag for pthreads target
-elif [ "${TARGET}" = "pthread" ]; then
+elif [ "${PARALLEL}" = "pthread" ]; then
 	CFLAGS="${CFLAGS} -pthread"
 	LFLAGS="${LFLAGS} -pthread"
-	echo '#define OPENPMX_PARALLEL_PTHREADS' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_PARALLEL_PTHREADS' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # install flag for sanitize target
-elif [ "${TARGET}" = "sanitize" ]; then
+elif [ "${PARALLEL}" = "sanitize" ]; then
 	CFLAGS="${CFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
 	LFLAGS="${LFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
-	echo '#define OPENPMX_PARALLEL_PTHREADS' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_PARALLEL_PTHREADS' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 	echo '#define OPENPMX_SANATIZE' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # install flags for single threaded
-elif [ "${TARGET}" = "singlethread" ]; then
-	echo '#define OPENPMX_PARALLEL_SINGLETHREAD' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
+elif [ "${PARALLEL}" = "singlethread" ]; then
+	echo '#define OPENPMX_PARALLEL_SINGLETHREAD' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # unknown install flag
 else
-	echo "error: install: target \"${TARGET}\" not recognized"
+	echo "error: install: target \"${PARALLEL}\" not recognized"
 	exit 1
 fi
 
@@ -171,6 +175,6 @@ cat "${OPENPMXPATH}/src/_openpmx_template"	>>"${OPENPMXPATH}/openpmx"
 chmod a+x "${OPENPMXPATH}/openpmx"
 
 echo "success"
-echo "install ${TARGET} ${LIBTYPE} ${PLATFORM}"
+echo "install ${PARALLEL} ${LIBTYPE} ${PLATFORM}"
 echo "path ${OPENPMXPATH}"
 

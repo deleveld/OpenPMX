@@ -27,71 +27,82 @@
 #include "openpmx_compile_options.h"
 
 /* --------------------------------------------------------------------*/
+static bool mutex_init = false;
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 #include <pthread.h>
+static pthread_mutex_t mutex;
 #elif defined(OPENPMX_PARALLEL_OPENMP)
 #include <omp.h>
-#endif
-
-/* mutex to syncronize printing from threads */
-#if defined(OPENPMX_PARALLEL_PTHREADS)
-#define MUTEX_TYPE pthread_mutex_t
-#elif defined(OPENPMX_PARALLEL_OPENMP)
-#define MUTEX_TYPE omp_lock_t
+static omp_lock_t mutex;
 #elif defined(OPENPMX_PARALLEL_SINGLETHREAD)
-#define MUTEX_TYPE int
+/* nothing for single threaded install */
 #endif
 
-static MUTEX_TYPE* thread_print_mutex = 0;
+static void lock_print_mutex(void)
+{
+	if (mutex_init) {
+#if defined(OPENPMX_PARALLEL_PTHREADS)
+		pthread_mutex_lock(&mutex);
+#elif defined(OPENPMX_PARALLEL_OPENMP)
+		omp_set_lock(&mutex);	
+#else
+		/* do nothing for single threaded install */
+#endif
+	}
+}
+
+static void unlock_print_mutex(void)
+{
+	if (mutex_init) {
+#if defined(OPENPMX_PARALLEL_PTHREADS)
+		pthread_mutex_unlock(&mutex);
+#elif defined(OPENPMX_PARALLEL_OPENMP)
+		omp_unset_lock(&mutex);	
+#else
+		/* do nothing for single threaded install */
+#endif
+	}
+}
 
 void print_serialize(const bool serial)
 {
-	/* create and initialize print mutex */
+	/* start serializing, make sure mutex exists and is unlocked */
 	if (serial) {
-		assert(thread_print_mutex == 0);
-		MUTEX_TYPE* mutex = mallocvar(MUTEX_TYPE, 1);
-		assert(mutex != 0);
-
+		if (mutex_init) 
+			fatal(0, "recursive print serialize\n");
 #if defined(OPENPMX_PARALLEL_PTHREADS)
-		pthread_mutex_init(mutex, NULL);
-		pthread_mutex_lock(mutex);
-		thread_print_mutex = mutex;
-		pthread_mutex_unlock(mutex);
+		pthread_mutex_init(&mutex, NULL);
+		pthread_mutex_lock(&mutex);
+		mutex_init = true;
+		pthread_mutex_unlock(&mutex);
 #elif defined(OPENPMX_PARALLEL_OPENMP)
-		omp_init_lock(mutex);	/* initial state is unlocked */
-		thread_print_mutex = mutex;
+		omp_init_lock(&mutex);	
+		omp_set_lock(&mutex);
+		mutex_init = true;
+		omp_unset_lock(&mutex);
 #endif
-
-	/* destroy print mutex */
+					
+	/* stop serializing */
 	} else {
-		assert(thread_print_mutex != 0);
-		MUTEX_TYPE* mutex = thread_print_mutex;
-
+		if (!mutex_init) 
+			fatal(0, "unpaired print unserialize\n");
 #if defined(OPENPMX_PARALLEL_PTHREADS)
-		pthread_mutex_lock(mutex);
-		thread_print_mutex = 0;
-		pthread_mutex_unlock(mutex);
-		pthread_mutex_destroy(mutex);
-		
+		pthread_mutex_lock(&mutex);
+		mutex_init = false;
+		pthread_mutex_unlock(&mutex);
+		pthread_mutex_destroy(&mutex);
 #elif defined(OPENPMX_PARALLEL_OPENMP)
-		omp_set_lock(mutex);
-		thread_print_mutex = 0;
-		omp_unset_lock(mutex);
-		omp_destroy_lock(mutex);
+		omp_set_lock(&mutex);
+		mutex_init = false;
+		omp_unset_lock(&mutex);
+		omp_destroy_lock(&mutex);
 #endif
-		free(mutex);
 	}
 }
 
 void openpmx_fputs(FILE* stream1, FILE* stream2, const char* prefix, const char* v)
 {
-	if (thread_print_mutex) {
-#if defined(OPENPMX_PARALLEL_PTHREADS)
-		pthread_mutex_lock(thread_print_mutex);
-#elif defined(OPENPMX_PARALLEL_OPENMP)
-		omp_set_lock(thread_print_mutex);
-#endif
-	}
+	lock_print_mutex();
 
 	/* actually send the string */
 	if (stream1) {
@@ -105,13 +116,7 @@ void openpmx_fputs(FILE* stream1, FILE* stream2, const char* prefix, const char*
 		fputs(v, stream2);
 	}
 
-	if (thread_print_mutex) {
-#if defined(OPENPMX_PARALLEL_PTHREADS)
-		pthread_mutex_unlock(thread_print_mutex);
-#elif defined(OPENPMX_PARALLEL_OPENMP)
-		omp_unset_lock(thread_print_mutex);
-#endif
-	}
+	unlock_print_mutex();
 }
 
 static void openpmx_vprintf(FILE* stream1, FILE* stream2, const char* prefix, const char* format, va_list args1)

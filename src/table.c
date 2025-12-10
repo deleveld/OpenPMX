@@ -296,6 +296,10 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	if (strcmp(name, "cwres") == 0 ||
 		strcmp(name, "CWRES") == 0) {
 		let dv = RECORDINFO_DV(recordinfo, table->record);
+		if (table->yhatvar <= 0.) {
+			warning(0, "table value yhatvar produces NAN for CWRES\n");
+			return NAN;
+		}
 		return (table->yhat - dv) / sqrt(table->yhatvar);
 	}
 

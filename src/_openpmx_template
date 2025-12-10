@@ -21,14 +21,14 @@ set -eu
 FILE="${1}"
 BASE=$(basename "${FILE}")
 
-TEMP=$(mktemp -d)
-trap "rm -rf ${TEMP}" EXIT
-
-OBJFILE="${TEMP}/${BASE}.o"
-EXECFILE="${TEMP}/a.out"
+# temporary files
+OBJFILE="${BASE}.o"
+EXECFILE="a.out"
+trap "echo cleanup; rm -v ${OBJFILE} ${EXECFILE}" EXIT
 
 # translate control file to C code
 if [ "${FILE##*.}" != "c" ]; then
+	echo "translate \"${FILE}\""
 	"${OPENPMXPATH}/bin/openpmxtran" "${FILE}"
 	FILE="${FILE}.c"
 fi
@@ -45,9 +45,9 @@ fi
 # echo "execute \"${EXECFILE}\""
 if [ -f "${EXECFILE}" ]; then
 	if [ "${LIBTYPE}" = "shared" ]; then
-		env LD_LIBRARY_PATH=${OPENPMXPATH}/lib:${LD_LIBRARY_PATH:-} "${EXECFILE}"
+		env LD_LIBRARY_PATH=${OPENPMXPATH}/lib:${LD_LIBRARY_PATH:-} "./${EXECFILE}"
 	elif [ "${LIBTYPE}" = "static" ]; then
-		"${EXECFILE}"
+		"./${EXECFILE}"
 	else
 		echo "error: \"${LIBTYPE}\" must be static or shared"
 		exit 1
