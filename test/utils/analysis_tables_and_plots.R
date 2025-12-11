@@ -294,7 +294,7 @@
 		tabbias[["avgrank"]] <<- tabbias_rank[["avgrank"]]
 		tabrmse[["avgrank"]] <<- tabrmse_rank[["avgrank"]]
 	}
-	calculate_performance_rank()
+###	calculate_performance_rank()
 
 	calculate_performance_score <- function(tabv)
 	{
