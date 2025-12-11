@@ -85,25 +85,20 @@ if [ "${TARGET}" = "clean" ]; then
 	exit 0
 fi
 
-########################################################################
-### echo "install libprima"
-### git clone --depth 1 https://github.com/libprima/prima.git
-### (cd prima; cmake -S . -B build -DCMAKE_INSTALL_PREFIX=install; cmake --build build --target install)
-### echo "copy libraries"
-### cp -v prima/build/fortran/libprimaf.so lib
-### cp -v prima/build/c/libprimac.so lib
-### cp -v prima/c/include/prima/prima.h src
-########################################################################
+echo '#define OPENPMX_INSTALL_PATH	' \"${OPENPMXPATH}\" >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
+echo '#define OPENPMX_INSTALL_PLATFORM	' \"${PLATFORM}\" >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # shared or static library
 if [ "${LIBTYPE}" = "shared" ]; then
 	echo "build ${LIBTYPE} library"
 	AR="gcc -shared -o lib/lib${LIBNAME}.so"
 	LFLAGS="-flto"
+	echo '#define OPENPMX_LIBTYPE_SHARED' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 elif [ "${LIBTYPE}" = "static" ]; then
 	echo "build ${LIBTYPE} library"
 	AR="ar rcs lib/lib${LIBNAME}.a"
 	LFLAGS="-flto -static"
+	echo '#define OPENPMX_LIBTYPE_STATIC' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 else
 	echo "error: install: \"${LIBTYPE}\" must be static or shared"
 	exit 1
@@ -114,24 +109,24 @@ echo "write compile options"
 if [ "${TARGET}" = "openmp" ]; then
 	CFLAGS="${CFLAGS} -fopenmp"
 	LFLAGS="${LFLAGS} -fopenmp -lgomp"
-	echo '#define OPENPMX_PARALLEL_OPENMP' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_PARALLEL_OPENMP' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # install flag for pthreads target
 elif [ "${TARGET}" = "pthread" ]; then
 	CFLAGS="${CFLAGS} -pthread"
 	LFLAGS="${LFLAGS} -pthread"
-	echo '#define OPENPMX_PARALLEL_PTHREADS' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_PARALLEL_PTHREADS' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # install flag for sanitize target
 elif [ "${TARGET}" = "sanitize" ]; then
 	CFLAGS="${CFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
 	LFLAGS="${LFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
-	echo '#define OPENPMX_PARALLEL_PTHREADS' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_PARALLEL_PTHREADS' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 	echo '#define OPENPMX_SANATIZE' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # install flags for single threaded
 elif [ "${TARGET}" = "singlethread" ]; then
-	echo '#define OPENPMX_PARALLEL_SINGLETHREAD' >"${OPENPMXPATH}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_PARALLEL_SINGLETHREAD' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # unknown install flag
 else

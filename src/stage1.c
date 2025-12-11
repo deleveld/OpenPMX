@@ -37,9 +37,6 @@
 /*--------------------------------------------------------------------*/
 /* different optimizers */
 #define OPTIMIZER_INNER_BOBYQA
-// TODO: Not working, sigsev when outer is libprima as well!
-// The data pointer getting passed to inner is invalid
-//#define OPTIMIZER_INNER_LIBPRIMA 
 
 /*--------------------------------------------------------------------*/
 
@@ -149,7 +146,7 @@ static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 		if (retcode != BOBYQA_SUCCESS) {
 			let recordinfo = &stage1_params->ievaluate_args.advanfuncs->recordinfo;
 			let id = RECORDINFO_ID(recordinfo, stage1_params->ievaluate_args.record);
-			warning(0, "BOBYQA ID %f eta (initial) not successful (%i)\n", id, retcode);
+			warning(0, "BOBYQA error %i: ID %f eta (initial) not successful\n", retcode, id);
 		}
 	}
 
@@ -166,52 +163,9 @@ static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 	if (retcode != BOBYQA_SUCCESS) {
 		let recordinfo = &stage1_params->ievaluate_args.advanfuncs->recordinfo;
 		let id = RECORDINFO_ID(recordinfo, stage1_params->ievaluate_args.record);
-		warning(0, "BOBYQA ID %f eta (refine) not successful (%i)\n", id, retcode);
+		warning(0, "BOBYQA error %i: ID %f eta (refine) not successful\n", retcode, id);
 	}
 	free(w);
-#endif
-
-#ifdef OPTIMIZER_INNER_LIBPRIMA
-	prima_problem_t problem;
-	prima_init_problem(&problem, n);
-	problem.x0 = reta;
-	problem.xl = lower;
-	problem.xu = upper;
-	problem.calfun = inner_fun;
-	prima_options_t poptions;
-	prima_init_options(&poptions);
-	poptions.rhobeg = stage1->step_initial;
-	poptions.rhoend = stage1->step_refine;
-	poptions.maxfun = neval;
-	poptions.data = (void*)stage1_params;
-	poptions.callback = 0;
-
-#define PRIMA_METHOD PRIMA_BOBYQA
-	if (all_eta_zero) {
-		prima_result_t initial_result;
-		let res = prima_minimize(PRIMA_METHOD, problem, poptions, &initial_result);
-		forcount(i, n)
-			reta[i] = initial_result.x[i];
-		if (0) {
-			let recordinfo = &stage1_params->ievaluate_args.advanfuncs->recordinfo;
-			let id = RECORDINFO_ID(recordinfo, stage1_params->ievaluate_args.record);
-			warning(0, "BOBYQA(libprima) ID %f eta (initial) not successful status=%i [%s]\n", id, initial_result.status, initial_result.message);
-		}
-		prima_free_result(&initial_result);
-	}
-
-	poptions.rhobeg = stage1->step_refine;
-	poptions.rhoend = stage1->step_final;
-	prima_result_t result;
-	let res = prima_minimize(PRIMA_METHOD, problem, poptions, &result);
-	forcount(i, n)
-		reta[i] = result.x[i];
-	if (0) {
-		let recordinfo = &stage1_params->ievaluate_args.advanfuncs->recordinfo;
-		let id = RECORDINFO_ID(recordinfo, stage1_params->ievaluate_args.record);
-		warning(0, "BOBYQA(libprima) ID %f eta (initial) not successful status=%i [%s]\n", id, result.status, result.message);
-	}
-	prima_free_result(&result);
 #endif
 
 	/* final results, i.e. the etas of the reduced matrix, get expanded */
