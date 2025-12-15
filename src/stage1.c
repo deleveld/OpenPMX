@@ -526,11 +526,11 @@ void stage1_thread(INDIVID* const individ,
 	gsl_linalg_cholesky_decomp1(reducedicov);
 	individ->icov_lndet = matrix_lndet_from_cholesky(reducedicov);
 
-	if (!isfinite(individ->icov_lndet)) {
+	if (!gsl_finite(individ->icov_lndet)) {
 		warning(0, "individual lndet is not finite\n"); /* TODO: add info about ID and eta */
 		individ->icov_lndet = 100.;
 	}
-//	assert(isfinite(individ->icov_lndet) == 1);
+//	assert(gsl_finite(individ->icov_lndet) == 1);
 	gsl_linalg_cholesky_invert(reducedicov);
 
 	/* Here we refine the covariance matrix by taking samples at the
@@ -545,7 +545,7 @@ void stage1_thread(INDIVID* const individ,
 													   reta,
 													   base_iobjfn,
 													   &stage1_params);
-		if (isfinite(icov_resample_lndet))
+		if (gsl_finite(icov_resample_lndet))
 			individ->icov_lndet = icov_resample_lndet;
 		else
 			warning(0, "icov resample lndet is not finite, ignoring\n");

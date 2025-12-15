@@ -3,6 +3,13 @@
 NONMEMDIR=~/nm760
 NONMEMFE=nmfe76
 
+if [ ! -f "${NONMEMDIR}/run/${NONMEMFE}" ]; then
+	NONMEMDIR=~/NM751
+	NONMEMFE=nmfe75
+fi
+
+NUMBERNODES=$(($(nproc --all) - 4))
+
 ########################################################################
 set -e
 TEMP=$(mktemp -d)
@@ -53,7 +60,7 @@ cp --parents ${DATAFILE} ${TEMP}
 cp ${NONMEMDIR}/run/beolaunch.sh ${TEMP}
 cp ${NONMEMDIR}/run/fpi.pnm ${TEMP}
 
-(cd ${TEMP}; ${NONMEMDIR}/run/${NONMEMFE} ${CONTROL} ${BASENAME}.out -parafile="fpi.pnm")
+(cd ${TEMP}; ${NONMEMDIR}/run/${NONMEMFE} ${CONTROL} ${BASENAME}.out -parafile="fpi.pnm" [nodes]=${NUMBERNODES})
 ### (cd ${TEMP}; ${NONMEMDIR}/run/${NONMEMFE} ${CONTROL} ${BASENAME}.out)
 
 cp -v --preserve ${TEMP}/PRDERR .			| true

@@ -26,6 +26,8 @@
 #include "utils/c22.h"
 #include "utils/various.h"
 
+#include <gsl/gsl_math.h>
+
 IDATA idata_construct(const RECORDINFO* const recordinfo,
 					  const int ntheta,
 					  const int nomega,
@@ -381,11 +383,11 @@ double idata_objfn(const IDATA* const idata,
 			assert(term5 == 0.);
 		}
 
-		assert(isfinite(term1) == 1);
-		assert(isfinite(term2) == 1);
-		assert(isfinite(term3) == 1);
-		assert(isfinite(term4) == 1);
-		assert(isfinite(term5) == 1);
+		assert(gsl_finite(term1) == 1);
+		assert(gsl_finite(term2) == 1);
+		assert(gsl_finite(term3) == 1);
+		assert(gsl_finite(term4) == 1);
+		assert(gsl_finite(term5) == 1);
 
 		let iobjfn = term1 + term2 + term3 + term4 + term5;
 		individ->iobjfn = iobjfn;
@@ -397,7 +399,7 @@ double idata_objfn(const IDATA* const idata,
 		objfn5 += term5;
 	}
 	let objfn = objfn1 + objfn2 + objfn3 + objfn4 + objfn5;
-	assert(isfinite(objfn) == 1);
+	assert(gsl_finite(objfn) == 1);
 	return objfn;
 }
 

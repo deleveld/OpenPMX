@@ -85,6 +85,10 @@ typedef struct {
 	const double* err;
 } TABLE;
 
+#ifndef NAME_MAX
+#define NAME_MAX 256
+#endif
+
 static TABLE table_open(const IDATA* const idata,
 						const ADVANFUNCS* const advanfuncs,
 						const POPMODEL* const popmodel,

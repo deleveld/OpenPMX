@@ -18,13 +18,6 @@ trap inform_error_state EXIT
 
 METHODNAME="${1:-}"
 
-if [ "${METHODNAME}" = "nlmixr2" ]; then
-	echo You must run
-	echo conda activate nlmixr2
-	echo before this, and then comment out this
-#	exit
-fi
-
 if [ "${METHODNAME}" != "" ]; then
 	(cd ../../; ./install)
 	./generate_results "${METHODNAME}"
@@ -37,24 +30,17 @@ R --vanilla --slave <<-RSCRIPT
 ########################################################################
 
 	nonmem <- readin("generate_results.nonmem.txt")
+	nonmem_ms <- read.table("generate_results.nonmem.runtime_ms.txt", header=FALSE)
 
-	if (file.exists("generate_results.nonmemsaem.txt"))
-		nonmemsaem <- readin("generate_results.nonmemsaem.txt")
-
-	if (file.exists("generate_results.nonmemitsb.txt"))
-		nonmemitsb <- readin("generate_results.nonmemitsb.txt")
-
-	if (file.exists("generate_results.openpmx.txt"))
+	if (file.exists("generate_results.openpmx.txt")) {
 		gronmem <- readin("generate_results.openpmx.txt")
+		gronmem_ms <- read.table("generate_results.openpmx.runtime_ms.txt", header=FALSE)
+	}
 
-	if (file.exists("generate_results.validate.txt"))
+	if (file.exists("generate_results.validate.txt")) {
 		validate <- readin("generate_results.validate.txt")
-
-	if (file.exists("generate_results.openpmxicov.txt"))
-		gronmemicov <- readin("generate_results.openpmxicov.txt")
-	
-#	nonmemlaplace   <- readin("generate_results.nonmemlaplace.txt")
-#	gronmemtest 	<- readin("generate_results.openpmxtest.txt")
+		validate_ms <- read.table("generate_results.validate.runtime_ms.txt", header=FALSE)
+	}
 
 	postscript(file="${TEMP}/${0}.ps", horizontal=TRUE)
 	source("../utils/analysis_tables_and_plots.R")

@@ -28,6 +28,8 @@
 #include "utils/c22.h"
 #include "utils/various.h"
 
+#include <gsl/gsl_math.h>
+
 POPMODEL popmodel_init(const OPENPMX* const pmx)
 {
 	let theta = pmx->theta;
@@ -66,9 +68,9 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 			break;
 		ret.ntheta = i + 1;
 
-		if (!isfinite(theta[i].lower) ||
-			!isfinite(theta[i].value) ||
-			!isfinite(theta[i].upper))
+		if (!gsl_finite(theta[i].lower) ||
+			!gsl_finite(theta[i].value) ||
+			!gsl_finite(theta[i].upper))
 			fatal(0, "THETA invalid { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
 		
 		ret.lower[i] = theta[i].lower;
@@ -198,7 +200,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 	forcount(i, ret.nsigma) {
 		let v = sigma[i];
 
-		if (!isfinite(v))
+		if (!gsl_finite(v))
 			fatal(0, "invalid sigma %g\n", v);
 		
 		ret.sigma[i] = fabs(v);

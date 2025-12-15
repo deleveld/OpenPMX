@@ -14,6 +14,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+ 
+/// This file performs the encoding and decoding of a POPMODEL to and 
+/// from an unbounded vector. This is a part of the Stage 2 of 
+/// optimization.
 
 #include <assert.h>
 #include <math.h>
@@ -178,6 +182,9 @@ static void scale_to_match_diagonal(gsl_matrix* matrix, const gsl_matrix* ref)
 	gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1., &temp.matrix, &scale.matrix, 0., matrix);
 }
 
+/// Calling encode_offset() makes such that a zero-initialized vector 
+/// will reproduce the given POPMODEL. 
+
 /* encode the popmodel, setting the offsets */
 void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 {
@@ -192,6 +199,8 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 	var x = encode->offset;
 	encode->has_offsets = true;
 	
+/// Different transformations are possible to address theta bounds but 
+/// the default is to use tanh/atanh.. 
 	var n = 0;
 	let etheta = popmodel->theta;
 	let ntheta = popmodel->ntheta;
@@ -205,6 +214,8 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 			++n;
 		}
 	}
+
+/// Sigma is log-transformed. 
 	let sigma = popmodel->sigma;
 	let nsigma = popmodel->nsigma;
 	let sigmafixed = popmodel->sigmafixed;
@@ -220,6 +231,11 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 		}
 	}
 
+/// The diagonal of omega is log-transformed. The off-diagonals of 
+/// omega are encoded as a specialized Cholesky decomposition of a 
+/// correlation matrix. Only the lower triangular is encoded. The 
+/// approach is described in: <https://mc-stan.org/docs/reference-manual/transforms.html#cholesky-factors-of-correlation-matrices>
+/// and also: <https://mc-stan.org/docs/reference-manual/transforms.html#correlation-matrix-transform.section>
 	let nonfixed = &omegainfo->nonfixed;
 	var ndim = nonfixed->n;
 	if (ndim) {

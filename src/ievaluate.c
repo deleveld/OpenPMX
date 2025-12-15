@@ -27,6 +27,8 @@
 #include "dataconfig/dataconfig.h"
 #include "utils/c22.h"
 
+#include <gsl/gsl_math.h>
+
 /* NOTE: these functions must be thread safe on the level of an individual */
 
 __attribute__ ((hot))
@@ -90,14 +92,14 @@ static bool check_state(const double* const a, const int n, FILE* logstream, con
 	/* all state should be finite */
 	int i;
 	for (i=0; i<n; i++) {
-		if (!isfinite(a[i])) {
+		if (!gsl_finite(a[i])) {
 			warning(logstream, "compartment %i state %f is not finite\n", i + record_offset, a[i]);
 			return true;
 		}
 	}
 	/* outside the used state should be NAN because we set that */
 	for (i=n; i<OPENPMX_STATE_MAX; i++) {
-		if (isfinite(a[i])) {
+		if (gsl_finite(a[i])) {
 			warning(logstream, "compartment %i state %f should be NAN\n", i + record_offset, a[i]);
 			return true;
 		}
@@ -327,15 +329,15 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 				warning(logstream, "DV zero for observation: ID %f time %f record %i\n", id, time, i + record_offset);
 
 			/* observation should be finite */
-			if (!isfinite(dv))
+			if (!gsl_finite(dv))
 				fatal(logstream, "DV not finite for observation: ID %f time %f record %i\n", id, time, i + record_offset);
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
-			if (isfinite(amt) && amt != 0.)
+			if (gsl_finite(amt) && amt != 0.)
 				warning(logstream, "AMT non-zero (%f) for observation: ID %f time %f record %i\n", amt, id, time, i + record_offset);
 
 			let rate = RECORDINFO_RATE(recordinfo, ptr);
-			if (isfinite(rate) && rate != 0.)
+			if (gsl_finite(rate) && rate != 0.)
 				warning(logstream, "RATE non-zero (%f) for observation: ID %f time %f record %i\n", rate, id, time, i + record_offset);
 
 		/* dose or reset-and-dose event */
@@ -349,7 +351,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			}
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
-			if (!isfinite(amt))
+			if (!gsl_finite(amt))
 				fatal(logstream, "AMT not finite (%f): ID %f time %f record %i\n", amt, id, time, i + record_offset);
 			if (amt <= 0.)
 				fatal(logstream, "AMT less than or equal to zero (%f): ID %f time %f record %i \n", amt, id, time, i + record_offset);
@@ -357,31 +359,31 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			if (rate < 0.)
 				fatal(logstream, "RATE less than zero (%f): ID %f record %i\n", rate, id, i + record_offset);
 
-			if (!isfinite(amt)|| amt == 0.)
+			if (!gsl_finite(amt)|| amt == 0.)
 				warning(logstream, "AMT missing (%f) assumed 0 for dose: ID %f time %f record %i\n", amt, id, time, i + record_offset);
-			if (!isfinite(rate))
+			if (!gsl_finite(rate))
 				warning(logstream, "RATE missing (%f) assumed 0 for dose: ID %f time %f record %i\n", rate, id, time, i + record_offset);
 
-			if (isfinite(dv) == 1 && dv != 0.)
+			if (gsl_finite(dv) == 1 && dv != 0.)
 				warning(logstream, "DV non-zero (%f) for dose: ID %f time %f record %i\n", dv, id, time, i + record_offset);
 
 		/* reset event */
 		} else if (evid == 3) {
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
-			if (isfinite(amt) && amt != 0.)
+			if (gsl_finite(amt) && amt != 0.)
 				warning(logstream, "AMT non-zero (%f) for reset: ID %f time %f record %i\n", amt, id, time, i + record_offset);
 
 			let rate = RECORDINFO_RATE(recordinfo, ptr);
-			if (isfinite(rate) && rate != 0.)
+			if (gsl_finite(rate) && rate != 0.)
 				warning(logstream, "RATE non-zero (%f) for reset: ID %f time %f record %i\n", rate, id, time, i + record_offset);
 
-			if (isfinite(dv) && dv != 0.)
+			if (gsl_finite(dv) && dv != 0.)
 				warning(logstream, "DV non-zero (%f) for reset: ID %f time %f record %i\n", dv, id, time, i + record_offset);
 
 		/* other event type */
 		} else {
-			if (!isfinite(dv) && dv != 0.)
+			if (!gsl_finite(dv) && dv != 0.)
 				warning(logstream, "non-zero DV (%f) for non-observation: ID %f time %f record %i\n", dv, id, time, i + record_offset);
 		}
 
@@ -409,7 +411,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		var yhat = 0.;
 		if (evid == 0 || predictall) {
 			yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
-			if (!isfinite(yhat))
+			if (!gsl_finite(yhat))
 				fatal(logstream, "YHAT non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
 		}
 
@@ -418,7 +420,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 
 			/* prediction variance of observations should be finite and positive */
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
-			if (!isfinite(yhatvar))
+			if (!gsl_finite(yhatvar))
 				fatal(logstream, "YHATVAR non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
 
 			/* predictions with zero error are an error */
