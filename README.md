@@ -43,7 +43,7 @@ This library is distributed in the hope that it will be useful, but WITHOUT ANY 
 	1. Install [MSYS2](https://www.msys2.org/)
 	2. Install [gcc](https://gcc.gnu.org), I used `pacman -S mingw-w64-x86_64-gcc`
 	3. Install [GSL](https://www.gnu.org/software/gsl/), I used `pacman -S mingw-w64-x86_64-gsl`
-		4. Run `./install pthread static` or `./install openmp static`
+	4. Run `./install pthread static` or `./install openmp static`
 * Windows WSL:
 	1. ... under construction ...
 
