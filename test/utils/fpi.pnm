@@ -1,20 +1,20 @@
 $DEFAULTS
 ; User may specify their own variables with bracketed words at the nmfe72 script command line:
-; nmfe72 myprog.ctl myres.res "-parafile=fpilinux8.pnm" "[nodes]=3"
-; which will over-ride default settings of variables listed here (variables must be defined one
-; variable per line).  If the file defaults.pnm exists, and it defines [nodes], this can also
+; nmfe72 myprog.ctl myres.res "-parafile=mpilinux8.pnm" "[nodes]=3"
+; which will over-ride default settings of variables listed here (variables must be defined one 
+; variable per line).  If the file defaults.pnm exists, and it defines [nodes], this can also 
 ; over-ride defaults listed in the parafile.
-; Order of over-ride is Command line on nmfe72 script over-rides defaults.pnm,
+; Order of over-ride is Command line on nmfe72 script over-rides defaults.pnm, 
 ; which over-rides defaults defined in parafile.
 ; The advantage to this ordering is that, a generic parafile file can be created for most environments.
-; A user may then over-ride defaults specified in this generic parafile with his own in defaults.pnm,
+; A user may then over-ride defaults specified in this generic parafile with his own in defaults.pnm, 
 ; that may be more suitable to his environment.  Finally, a user can temporarily over-ride his own defaults
 ; by giving an alternative value as an nmfe72 script command option.
-[nodes]=4
+[nodes]=8
 
 $GENERAL
 ; [nodes] is a User defined variable
-NODES=[nodes] PARSE_TYPE=4 PARSE_NUM=50 TIMEOUTI=500 TIMEOUT=2000 PARAPRINT=0 TRANSFER_TYPE=0
+NODES=[nodes] PARSE_TYPE=2 PARSE_NUM=200 TIMEOUTI=600 TIMEOUT=10000 PARAPRINT=0 TRANSFER_TYPE=1
 ;SINGLE node: NODES=1
 ;MULTI node: NODES>1
 ;WORKER node: NODES=0
@@ -33,19 +33,27 @@ NODES=[nodes] PARSE_TYPE=4 PARSE_NUM=50 TIMEOUTI=500 TIMEOUT=2000 PARAPRINT=0 TR
 
 ;THE EXCLUDE/INCLUDE may be used to selectively use certain nodes, out of a large list.
 ;$EXCLUDE 5-7 ; exclude nodes 5-7
-;$EXCLUDE ALL
+;$EXCLUDE ALL 
 ;$INCLUDE 1,4-6
 
 
-$COMMANDS ;each worker node gets a command line, used to launch the node session
-1:NONE
-2-[nodes]:./beolaunch.sh worker{#-1}/ ./nonmem >worker1.out
+$COMMANDS ;each node gets a command line, used to launch the node session
+; $* sends all arguments on the user's command line to the manager process
+1:mpirun -wdir "$PWD" -n 1 ./nonmem  $*
+; Only specific arguments from command line should be sent to the workers, which are identified by reserved variable names
+2-[nodes]:-wdir "$PWD/worker{#-1}" -n 1 ./nonmem
 
 $DIRECTORIES
 1:NONE ; FIRST DIRECTORY IS THE COMMON DIRECTORY
 2-[nodes]:worker{#-1} ; NEXT SET ARE THE WORKER directories
 
 $IDRANGES ; USED IF PARSE_TYPE=3
-1:1,50
-2:51,100
+1:1,7
+2:8,14
+3:15,20
+4:21,26
+5:27,32
+6:33,38
+7:39,44
+8:45,50
 

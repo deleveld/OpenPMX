@@ -28,6 +28,10 @@ nonmem()
 {
 	DATASET=${1}
 	RUNNAME=${FUNCNAME[0]}
+	
+	MAXNUMBERNODES=$(($(nproc --all) - 4))
+	NUMBERNODES="${DO_NONMEM_RUN_NODES:-${MAXNUMBERNODES}}"
+	echo nnodes ${NUMBERNODES} >openpmx_nodes.txt
 
 	cat >control.${DATASET}.txt <<-CONTROLFILE
 	${NONMEM_MODEL_PREFIX}
@@ -38,7 +42,7 @@ nonmem()
 CONTROLFILE
 	cat control.${DATASET}.txt
 	start=$(date +%s%3N)
-	${DO_NONMEM_SCRIPT} control.${DATASET}.txt
+	${DO_NONMEM_SCRIPT} "control.${DATASET}.txt" "${NUMBERNODES}"
 	end=$(date +%s%3N)
 	runtime=$((end - start))
 	echo "${DATASET} $runtime" >> "${SCRIPTNAME}.${RUNNAME}.runtime_ms.txt"
@@ -57,9 +61,14 @@ openpmx()
 	DATASET=${1}
 	RUNNAME=${FUNCNAME[0]}
 
+	MAXNUMBERNODES=$(($(nproc --all) - 4))
+	NUMBERNODES="${DO_NONMEM_RUN_NODES:-${MAXNUMBERNODES}}"
+	echo nnodes ${NUMBERNODES} >openpmx_nodes.txt
+
 	cat >control.${DATASET}.gr <<-CONTROLFILE
 	\$DATA("simdata/data.${DATASET}.txt")
 	${OPENPMX_MODEL_INITIAL}
+	openpmx.nthread = ${NUMBERNODES};
 	estimate();
 CONTROLFILE
 	cat control.${DATASET}.gr
@@ -81,9 +90,14 @@ validate()
 	DATASET=${1}
 	RUNNAME=${FUNCNAME[0]}
 
+	MAXNUMBERNODES=$(($(nproc --all) - 4))
+	NUMBERNODES="${DO_NONMEM_RUN_NODES:-${MAXNUMBERNODES}}"
+	echo nnodes ${NUMBERNODES} >openpmx_nodes.txt
+
 	cat >control.${DATASET}.gr <<-CONTROLFILE
 	\$DATA("simdata/data.${DATASET}.txt")
 	${OPENPMX_MODEL_INITIAL}
+	openpmx.nthread = ${NUMBERNODES};
 	estimate();
 CONTROLFILE
 	cat control.${DATASET}.gr

@@ -8,15 +8,19 @@ if [ ! -f "${NONMEMDIR}/run/${NONMEMFE}" ]; then
 	NONMEMFE=nmfe75
 fi
 
-NUMBERNODES=$(($(nproc --all) - 4))
-
 ########################################################################
 set -e
 TEMP=$(mktemp -d)
 trap "rm -rf ${TEMP}" EXIT
 
+# First argument is the control file
 CONTROL=$1
 echo "control is: " ${CONTROL}
+
+# Second argument is optional, is the number of cores
+MAXNUMBERNODES=$(($(nproc --all) - 4))
+NUMBERNODES="${DO_NONMEM_RUN_NODES:-${MAXNUMBERNODES}}"
+echo nnodes ${NUMBERNODES} >nonmem_nodes.txt
 
 # extract datafile name from the control file
 get_datafile() {
