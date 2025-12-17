@@ -22,7 +22,7 @@ UNAME="$(uname -s)"
 PLATFORM="${3:-${UNAME}}"
 OPENPMXPATH=$(cd "$(dirname "${0}")" && pwd)
 
-set -eu
+set -e
 
 echo "install ${TARGET} ${LIBTYPE} ${PLATFORM}"
 echo "path ${OPENPMXPATH}"
