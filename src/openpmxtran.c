@@ -237,7 +237,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 	/* https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c */
 	char* buffer = NULL;
 	size_t len = 0;
-	ssize_t bytes_read = getdelim(&buffer, &len, '\0', stream);
+	ssize_t bytes_read = _getdelim(&buffer, &len, '\0', stream);
 	fclose(stream);
 	if (bytes_read == -1)
 		fatal("could not read from data");

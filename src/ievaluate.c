@@ -14,6 +14,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+ 
+/// This file uses the advan to evaluate each individial, advancing the
+/// model over the data records. This is done for various reasons:
+/// during optimization to calculate the objective function, for 
+/// prediction of PREDICTVARS after Stage 1, to checkout the data before
+/// estimation to detect errors, and to perform simulations.
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -56,7 +62,9 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
 {
 	/* the errarray should be already set to zero and we preserve this
 	 * across calls to this function */
-
+	 
+/// The variance of y prediction (yhatvar) is estimated by central 
+/// differences around err=0.
 	/* Do error propagation to get the variance of the prediction
 	 * https://en.wikipedia.org/wiki/Propagation_of_uncertainty#Simplification */
 	var yhatvar = 0.;

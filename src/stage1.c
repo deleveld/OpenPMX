@@ -473,6 +473,11 @@ void stage1_thread(INDIVID* const individ,
 	} else {
 		/* start with current value TODO: make this same across runs via besteta */ 
 		memcpy(testeta, ieta, nomega * sizeof(double));
+		
+/// The inner (Stage 1) optimization only optimizes the first, second, 
+/// and third terms in the obvjective function. The fourth term is not
+/// dependant on the individual and the fifth term is calculated at the
+/// minimum of the first three terms.
 
 		/* optimize the individual eta, the result is written into stage1_params.testeta
 		 * (which points to testeta right now) and is also written in reta as well and

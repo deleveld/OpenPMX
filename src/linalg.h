@@ -24,7 +24,7 @@
 extern "C" {
 #endif
 
-int cholesky_decomposition(gsl_matrix* matrix, const char* matrixname);
+int cholesky_decomposition(gsl_matrix* matrix);
 double matrix_lndet_from_cholesky(const gsl_matrix* const chol);
 
 double sample_min2ll_from_cholesky(const double* const data,

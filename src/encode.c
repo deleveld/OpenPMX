@@ -245,8 +245,9 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 		/* because we scale matrix to 1 on diagonal it becomes a correlation matrix */
 		reduced_omega_init(cholesky, popmodel->omega, nonfixed->rowcol, nonfixed->n);
 		scale_to_match_diagonal(cholesky, 0);
-		cholesky_decomposition(cholesky, "nonfixed");
-		gsl_matrix_transpose(cholesky);
+		cholesky_decomposition(cholesky);
+		let fail = gsl_matrix_transpose(cholesky);
+		assert(!fail);
 
 		/* https://mc-stan.org/docs/reference-manual/transforms.html#cholesky-factors-of-correlation-matrices */
 		/* The next step from the Cholesky factor w back to the array z of canonical partial correlations

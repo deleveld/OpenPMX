@@ -14,6 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+ 
+/// This file does the outer (stage 2) estimation.
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -81,11 +83,16 @@ static void update_best_imodel(const STAGE2_PARAMS* const params,
 		*best = *popmodel;
 		improved_model = best;
 
+/// Each time the objective function improves during estimation the eta
+/// values are saved. They will be used as initial values for subsequent
+/// optimization.
 		/* save the best eta so we can keep restarting there for speed and hopefully some consistancy */
 		let firstindivid = &idata->individ[0];
 		memcpy(params->besteta, firstindivid->eta, params->neta * sizeof(double));
 	}
 
+/// If the progress flag is set then each time the model fit is improved 
+/// then the results are appended to the ext file.
 	/* update the user */
 	if (options->estimate.verbose)
 		improved_model = popmodel;
@@ -204,6 +211,9 @@ static const char* focei(STAGE2_PARAMS* const params)
 	let wsize = (npt+5)*(npt+n)+3*n*(n+5)/2 + 10; /* a little bit extra room to be sure */
 	let w = mallocvar(double, wsize);
 
+/// Model estimation begins with an intial optimization with large 
+/// changes to paramater values with BOBYQA rho values from 
+/// step_initial, stopping at step_refine. 
 	let best = &params->best;
 	var lastobjfn = best->result.objfn;
 	forcount(i, n)
@@ -223,6 +233,9 @@ static const char* focei(STAGE2_PARAMS* const params)
 	info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
 	lastobjfn = best->result.objfn;
 
+/// After initial optimization, a smaller search space is used from 
+/// rho_refine to rho_final. This is repeated until the change in 
+/// objective function between restarts is less than dobjfn.
 	if (step_final < step_refine) {
 		var dobjfn = best->result.objfn - lastobjfn;
 		do {
@@ -299,7 +312,15 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 	params->neval += 1;
 	var timestamp = get_timestamp(params);
 	info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, popmodel->result.objfn);
-
+	
+/// At initial objective function calculation the results may not be 
+/// stable with recalculating resulting in a different objective 
+/// function value. This seems likely due to the changing of the 
+/// initial conditions for each Stage 1 due to updating of the best eta 
+/// value. So for the first evaluation, the objective function value is
+/// recalculated until it is stabel to 0.01 or 10 iterations. If this
+/// stabilization phase fails or requires many iterations then there may
+/// be numerical stability issues with the model and data. 
 	var done = false;
 	var niter = 0;
 	let maxiter = 10;
@@ -503,6 +524,7 @@ static void estimate_popmodel(const char* filename,
 	var params = stage2_params(filename, idata, advanfuncs, popmodel, options);
 	popmodel->result.nparam = params.test.nparam;
 
+/// At start of estimation the header of the ext file is written.
 	/* do some logging */
 	/* start extfile and other headers, rest will be saved during iterations */
 	outfile_header(params.outstream, advanfuncs, idata, options, outfile_type);
@@ -524,6 +546,8 @@ static void estimate_popmodel(const char* filename,
 	let timestamp = get_timestamp(&params);
 	popmodel_information(params.outstream, popmodel, timestamp);
 
+/// At the end of estimation the phi file is written and a trailer is 
+/// put onto the ext file. 
 	/* update results in tables */
 	if (filename) {
 		table_phi_idata(filename, idata, _offset1);
@@ -560,6 +584,8 @@ void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 
 	pmx_update_from_popmodel(pmx, &popmodel);
 }
+
+/// Evaluation is the same as estimation but with maxeval=0.
 
 void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 {

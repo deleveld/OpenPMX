@@ -14,6 +14,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+ 
+/// This file contains linear algebra functions for Cholesky 
+/// decomposition. calculating log(det()) of a covariance matrix, and
+/// calculating the sample likelihood.
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -26,11 +30,8 @@
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_blas.h>
 
-int cholesky_decomposition(gsl_matrix* matrix, const char* matrixname)
+int cholesky_decomposition(gsl_matrix* matrix)
 {
-	/* TODO: finish this */
-	(void)matrixname;
-	
 	let n = matrix->size1;
 	assert(n == matrix->size2);
 

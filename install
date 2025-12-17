@@ -42,6 +42,7 @@ elif [[ "${PLATFORM}" =~ MINGW64_NT-* ]]; then
 	LFLAGS="${LFLAGS} -L\"${OPENPMXPATH}/lib\" -L/mingw64/lib"
 	if [ "${LIBTYPE}" != "static" ]; then
 		echo "error: mingw64 platform requires static"
+		exit 1
 	fi
 fi
 
