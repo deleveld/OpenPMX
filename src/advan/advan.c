@@ -14,13 +14,28 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+ 
+/// The user creates an ADVANFUNCS object via a method named something 
+/// like: 
+/// `ADVANFUNCS* pmx_advan_FOO(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig)`
+/// This function allocates and constructs an object containing function 
+/// pointers to construct, advance across records, and destruct an 
+/// advancer object. This is used in ievaluate.c.
+	
+/// This file is the base class ADVAN which contains information that 
+/// all of the advancer objects have in common, for example: time, 
+/// state, lag, bioavailability, and the infusions running at that 
+/// moment. Probably the most important function is `advan_advance()` 
+/// which handles the infusion AMT, RATE, EVID and the various special 
+/// flags like CMT. 
 
 #include <string.h>
 #include <assert.h>
 #include <math.h>
 #include <float.h>
 
-#include "advan.h"
+#include "print.h"
+#include "advan/advan.h"
 #include "utils/c22.h"
 
 void advan_base_construct(ADVAN* advan, const ADVANFUNCS* advanfuncs)
@@ -67,6 +82,13 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	var state = advan->state;
 	let nstate = advanfuncs->nstate;
 
+/// ### Advancing through an individuals records
+
+/// While advancing the init() function is called (which calls the users
+/// IMODEL() code in openpmxtran) when:
+///
+/// + First record of an individual
+/// + EVID is 3 (reset event) or EVID is 4 (reset-and-dose event)
 	/* reset the state on first start or on EVID==3 or EVID==4 events */
 	let evid = RECORDINFO_EVID(recordinfo, record);
 	let reset_state = (advan->initcount == 0 || evid == 3 || evid == 4);
@@ -90,14 +112,24 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		advanconfig->init(imodel,
 						  &(ADVANSTATE) {
 							.advan = advan,
-							.statetime = advan->time,
-							.record = record,
-							.state = state },
-						  popparam);
+							.current = {
+								.statetime = advan->time,
+								.record = record,
+								.state = state,
+								.popparam = popparam,
+							},
+						  });
 		++advan->initcount;
 	}
 
-	/* now handle any doses, if this is a dose add it to the list */
+/// + For dose records EVID is 1 or EVID is 4 
+/// + At the time given by a call to `pmx_advan_inittime()` which is 
+/// `INITTIME()` in openpmxtran
+///
+/// The moment a dose record is encountered it is saved in a buffer with
+/// the time of the RECORD and the lag valid at the moment of 
+/// processing. Subsequent changes in lag do not change the moment when 
+/// the dose is actually applied.
 	if (evid == 1 || evid == 4) {
 		let amt = RECORDINFO_AMT(recordinfo, record);
 		if (amt > 0.) {
@@ -133,6 +165,13 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			}
 		}
 
+/// Advancing is done in "steps" to the earliest of:
+///
+/// + The next RECORD time is achieved
+/// + A previous infusion starts or stopped
+/// + A bolus dose is given
+/// + If `pmx_advan_inittime()` has been called, which is INITTIME() in 
+/// openpmxtran
 		/* find the first place we have to stop at going to the next record */
 		let recordtime = RECORDINFO_TIME(recordinfo, record);
 		double intervalstop = recordtime;
@@ -164,7 +203,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 
 		/* are any bolus needed to be given right now */
 		/* we take them off the infusion list so they wont be seen again */
-		/* a fake boilus with cmt == -1 means an extra call to init */
+		/* a fake bolus with cmt == -1 means an extra call to init */
 		bool need_reset_now = false;
 		bool need_init_now = false;
 		forvector(i, advan->infusions) {
@@ -190,13 +229,15 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		/* extra call to init */
 		if (need_init_now) {
 			advanconfig->init(imodel,
-							  &(ADVANSTATE) {
+							&(ADVANSTATE) {
 								.advan = advan,
-								.statetime = advan->time,
-								.record = record,
-								.state = state,
-							  },
-							  popparam);
+								.current = {
+									.statetime = advan->time,
+									.record = record,
+									.state = state,
+									.popparam = popparam,
+								},
+							});
 		}
 
 	/* keep going till we have the state equal to the required record time */
@@ -204,17 +245,24 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 
 	/* return the state useful for calling predict */
 	return (PREDICTSTATE) {
+		.statetime = advan->time,
 		.state = state,
 		.record = record,
+		.popparam = popparam,
 	};
 }
 
-void pmx_advan_amtlag(const ADVANSTATE* const advanstate, const int cmt, const double t)
+/* We dont have to worry that this function might be called outside of
+ * init function because the ADVANSTATE is only available there */
+void pmx_advan_amtlag(const ADVANSTATE* advanstate, const int cmt, const double t)
 {
 	var advan = advanstate->advan;
 	let advanfuncs = advan->advanfuncs;
 	let nstate = advanfuncs->nstate;
-
+	
+/// Calling `pmx_advan_amtlag()` (in openpmxtran this is `ALAG()`) 
+/// delays the application of subsequent dosing. It does not change the 
+/// moment of application of doses that are already in the buffer.
 	assert(!isnan(t));
 	assert(cmt >= 0);
 	assert(cmt < nstate);
@@ -222,7 +270,9 @@ void pmx_advan_amtlag(const ADVANSTATE* const advanstate, const int cmt, const d
 	advan->amtlag[cmt] = t;
 }
 
-void pmx_advan_bioaval(const ADVANSTATE* const advanstate, const int cmt, const double f)
+/* We dont have to worry that this function might be called outside of
+ * init function because the ADVANSTATE is only available there */
+void pmx_advan_bioaval(const ADVANSTATE* advanstate, const int cmt, const double f)
 {
 	var advan = advanstate->advan;
 	let advanfuncs = advan->advanfuncs;
@@ -235,7 +285,9 @@ void pmx_advan_bioaval(const ADVANSTATE* const advanstate, const int cmt, const 
 	advan->bioavail[cmt] = f;
 }
 
-void pmx_advan_inittime(const ADVANSTATE* const advanstate, const double t)
+/* We dont have to worry that this function might be called outside of
+ * init function because the ADVANSTATE is only available there */
+void pmx_advan_inittime(const ADVANSTATE* advanstate, const double t)
 {
 	var advan = advanstate->advan;
 
@@ -266,7 +318,7 @@ void pmx_advan_inittime(const ADVANSTATE* const advanstate, const double t)
 	}
 }
 
-void pmx_advan_state_init(const ADVANSTATE* const advanstate, const int cmt, const double v)
+void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const double v)
 {
 	var advan = advanstate->advan;
 	let advanfuncs = advan->advanfuncs;

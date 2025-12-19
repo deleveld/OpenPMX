@@ -15,6 +15,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file implements the high-level checkout functions. The actual
+/// checkout function is individual_checkout() which is implemented in
+/// ievaluate.c. It advances the individual records with ETA zet to 0
+/// and has lots of checks to detect errors. This is important because
+/// the other advancing of the individual records for objective function
+/// calculation, prediction, etc do not have any check to maximize
+/// speed.
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

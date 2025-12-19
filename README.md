@@ -75,8 +75,7 @@ The PK analysis example is:
 
 # Contributors
 - Your name here (your@email.com) Massively important thing elegantly coded.
-### Version 0.01
-- Douglas Eleveld (deleveld@dds.nl) Initial release. 
+- Douglas Eleveld (deleveld@dds.nl) Initial codebase. 
 
 # Wish-list / TODO
 - Fix Issue that advan/onecomp_depot.c does not handle infusions properly. Added fatal error.

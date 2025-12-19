@@ -17,8 +17,8 @@
 
 #include <stdio.h>
 #include <string.h>
-#include "c22.h"
-#include "various.h"
+#include "utils/c22.h"
+#include "utils/various.h"
 
 FILE* results_fopen(const char* name, const char* ext, const char* mode)
 {

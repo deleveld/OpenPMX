@@ -15,6 +15,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file define the file extenstions and numeric formats used.
+
 #ifndef OPENPMX_DEFINES_H
 #define OPENPMX_DEFINES_H
 

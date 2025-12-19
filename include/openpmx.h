@@ -25,9 +25,13 @@ extern "C" {
 #endif
 
 /*---------------------------------------------------------------------*/
+/// This defines the version number and the various maximum size of
+/// theta, omega, and sigma. Also the number of fields in a record,
+/// the number of state variables etc. If these are too low they can
+/// be adjusted here and the library must be recompiled.
 #define OPENPMX_VERSION_MAJOR			0
 #define OPENPMX_VERSION_MINOR			0
-#define OPENPMX_VERSION_RELEASE			2
+#define OPENPMX_VERSION_RELEASE			3
 
 #define OPENPMX_THETA_MAX				64
 #define OPENPMX_OMEGABLOCKSIZE_MAX		64
@@ -66,24 +70,6 @@ typedef struct {
 /*---------------------------------------------------------------------*/
 /* advan */
 /*---------------------------------------------------------------------*/
-typedef struct ADVAN ADVAN;
-typedef struct {
-	/* opaque pointer into the ADVAN so we can change setting in init
-	 * and predict functions */
-	ADVAN* advan;
-	
-	/* info about the record being processed */
-	const RECORD* const record;
-	const double statetime;
-	const double* const state;
-} ADVANSTATE;
-
-/* changes to advancer within the IMODEL_INIT function */
-void pmx_advan_amtlag(const ADVANSTATE* const advanstate, const int cmt, const double t);
-void pmx_advan_bioaval(const ADVANSTATE* const advanstate, const int cmt, const double f);
-void pmx_advan_inittime(const ADVANSTATE* const advanstate, const double t);
-void pmx_advan_state_init(const ADVANSTATE* const advanstate, const int cmt, const double v);
-
 typedef	struct {
 	const double* const theta;
 	const int ntheta;
@@ -94,22 +80,36 @@ typedef	struct {
 	const int nstate;
 } POPPARAM;
 
+/* info about the record being processed */
+typedef struct {
+	const double statetime;
+	const double* const state;
+	const RECORD* const record;
+	const POPPARAM* const popparam;
+} PREDICTSTATE;
+
+/* info about the state of the advancer, only available in the init */
+typedef struct ADVAN ADVAN;
+typedef struct {
+	ADVAN* const advan;
+	const PREDICTSTATE current;
+} ADVANSTATE;
+
 /* must be initialized in IMODEL_INIT */
 typedef struct IMODEL IMODEL;
 typedef void (*IMODEL_INIT)(IMODEL* const imodel,
-							ADVANSTATE* const advanstate,
-							const POPPARAM* const popparam);
+							ADVANSTATE* advanstate);
+
+/* changes to advancer within the IMODEL_INIT function */
+void pmx_advan_amtlag(const ADVANSTATE* advanstate, const int cmt, const double t);
+void pmx_advan_bioaval(const ADVANSTATE* advanstate, const int cmt, const double f);
+void pmx_advan_inittime(const ADVANSTATE* advanstate, const double t);
+void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const double v);
 
 /* prediction function */
-typedef struct {
-	const double* const state;
-	const RECORD* const record;
-} PREDICTSTATE;
-
 typedef struct PREDICTVARS PREDICTVARS;
 typedef	double (*IMODEL_PREDICT)(const IMODEL* const imodel,
 								 const PREDICTSTATE* const predictstate,
-								 const POPPARAM* const popparam,
 								 const double* const err,
 								 PREDICTVARS* predparams);
 

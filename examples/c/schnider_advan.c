@@ -30,15 +30,13 @@ typedef struct RECORD {
 } RECORD;
 
 static void imodel_init(IMODEL* const _imodel,
-						ADVANSTATE* const _advanstate,
-						const POPPARAM* const _popparam)
+						ADVANSTATE* const _advanstate)
 {
-	const RECORD* const _record = _advanstate->record;
+	const RECORD* const _record = _advanstate->current.record;
 	const double WGT = _record->WT;
 	const double AGE = _record->AGE;
 	const double HGT = _record->HT;
 	const double M1F2 = _record->M1F2;
-	(void)_popparam;
 
 /* james equation */
     const double LBMM=1.1 *WGT-128*(WGT/HGT)*(WGT/HGT);
@@ -99,12 +97,9 @@ static void imodel_diffeqn(double _dadt[],
 
 static double imodel_predict(const IMODEL* const _imodel,
 							 const PREDICTSTATE* const _predictstate,
-							 const POPPARAM* const _popparam,
 							 const double* const _err,
 							 PREDICTVARS* _predparams)
 {
-	(void)_popparam;
-	
 	const double* const _state = _predictstate->state;
 	double Y = NAN;
 	const double V1 = _imodel->V1;
@@ -213,11 +208,6 @@ int main(void)
 
 	/* advanfuncs and arguments needed to iterate */
 	let advanfuncs = advanfuncs_alloc(&openpmx.data, &openpmx.advan);
-	double eta[OPENPMX_OMEGA_MAX] = { };
-	let popparam = (POPPARAM) { 
-		.eta = eta,
-		.nstate = advanfuncs->nstate,
-	};
 	
 	/* get memory needed to iterate, and construct advancer */
 	ADVAN* advan = calloc(advanfuncs->advan_size, 1);	
@@ -231,8 +221,8 @@ int main(void)
 	let predict = openpmx.advan.predict;
 	forcount(i, ARRAYSIZE(data)) {
 		let ptr = &data[i];
-		let predictstate = advan_advance(advan, &imodel, ptr, &popparam);
-		let yhat = predict(&imodel, &predictstate, &popparam, errarray, &predictvars);
+		let predictstate = advan_advance(advan, &imodel, ptr, 0);
+		let yhat = predict(&imodel, &predictstate, errarray, &predictvars);
 		
 		printf("%f %f %f %f %f A1=%f A2=%f A3=%f\n", ptr->ID, ptr->TIME, ptr->DV, yhat, predictvars.IPRED,
 													predictstate.state[0],

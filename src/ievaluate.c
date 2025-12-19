@@ -40,7 +40,6 @@
 __attribute__ ((hot))
 static inline double evaluate_yhat(const IMODEL* const imodel,
 								   const PREDICTSTATE* const predictstate,
-								   const POPPARAM* const popparam,
 								   const IMODEL_PREDICT predict,
 								   const double errarray[static OPENPMX_SIGMA_MAX],
 								   PREDICTVARS* predictvars)
@@ -49,13 +48,12 @@ static inline double evaluate_yhat(const IMODEL* const imodel,
 		
 	/* the errarray should be already set to zero for a normal call but
 	 * it could be non-zero if we are simulating with residual error */
-	return predict(imodel, predictstate, popparam, errarray, predictvars);
+	return predict(imodel, predictstate, errarray, predictvars);
 }
 
 __attribute__ ((hot))
 static double evaluate_yhatvar(const IMODEL* const imodel,
 							   const PREDICTSTATE* const predictstate,
-							   const POPPARAM* const popparam,
 							   const IMODEL_PREDICT predict,
 							   double errarray[static OPENPMX_SIGMA_MAX],
 							   PREDICTVARS* predictvars)
@@ -68,19 +66,19 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
 	/* Do error propagation to get the variance of the prediction
 	 * https://en.wikipedia.org/wiki/Propagation_of_uncertainty#Simplification */
 	var yhatvar = 0.;
-	let sigma = popparam->sigma;
-	let nsigma = popparam->nsigma;
+	let sigma = predictstate->popparam->sigma;
+	let nsigma = predictstate->popparam->nsigma;
 	forcount(j, nsigma) {
 		if (sigma[j] != 0.) {
 			let g = sqrt(sigma[j]);
 
 			let above = g;
 			errarray[j] = above;
-			let ya1 = evaluate_yhat(imodel, predictstate, popparam, predict, errarray, predictvars);
+			let ya1 = evaluate_yhat(imodel, predictstate, predict, errarray, predictvars);
 
 			let below = -g;
 			errarray[j] = below;
-			let ya2 = evaluate_yhat(imodel, predictstate, popparam, predict, errarray, predictvars);
+			let ya2 = evaluate_yhat(imodel, predictstate, predict, errarray, predictvars);
 
 			/* preserve zero errarray across function calls so we dont have
 			 * to zero the entire errarray each time we call this */
@@ -91,28 +89,6 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
 		}
 	}
 	return yhatvar;
-}
-
-static bool check_state(const double* const a, const int n, FILE* logstream, const bool _offset1)
-{
-	let record_offset = _offset1 ? 1 : 0;
-
-	/* all state should be finite */
-	int i;
-	for (i=0; i<n; i++) {
-		if (!gsl_finite(a[i])) {
-			warning(logstream, "compartment %i state %f is not finite\n", i + record_offset, a[i]);
-			return true;
-		}
-	}
-	/* outside the used state should be NAN because we set that */
-	for (i=n; i<OPENPMX_STATE_MAX; i++) {
-		if (gsl_finite(a[i])) {
-			warning(logstream, "compartment %i state %f should be NAN\n", i + record_offset, a[i]);
-			return true;
-		}
-	}
-	return false;
 }
 
 /* For how this is used see PAGE poster:
@@ -160,8 +136,8 @@ double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 	forcount(i, nrecord) {
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
 		if (RECORDINFO_EVID(recordinfo, ptr) == 0) {
-			let yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
-			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
+			let yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
+			let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 
 			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
 			if (dvlow == 0.) {
@@ -229,7 +205,7 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 		let evid = RECORDINFO_EVID(recordinfo, ptr);
 		var yhat = 0.;
 		if (evid == 0 || predictall) 
-			yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
+			yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 		if (YHAT)
 			YHAT[i] = yhat;
 
@@ -246,7 +222,7 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 		
 		/* objective function only for observations */
 		if (evid == 0) {
-			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
+			let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 			if (YHATVAR)
 				YHATVAR[i] = yhatvar;
 
@@ -276,6 +252,31 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 		*ret_obs_lndet = obs_lndet;
 }
 
+static bool check_state(const double* const a, const int n, FILE* logstream, const bool _offset1)
+{
+	let record_offset = _offset1 ? 1 : 0;
+
+	/* all state should be finite */
+	int i;
+	for (i=0; i<n; i++) {
+		if (!gsl_finite(a[i])) {
+			warning(logstream, "compartment %i state %f is not finite\n", i + record_offset, a[i]);
+			return true;
+		}
+	}
+	/* outside the used state should be NAN because we set that */
+	for (i=n; i<OPENPMX_STATE_MAX; i++) {
+		if (gsl_finite(a[i])) {
+			warning(logstream, "compartment %i state %f should be NAN\n", i + record_offset, a[i]);
+			return true;
+		}
+	}
+	return false;
+}
+
+/// ### Checkout
+///
+/// Before estimation a data checkout is done to detect various errors.
 void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 {
 	let advanfuncs = ievaluate_args->advanfuncs;
@@ -284,10 +285,10 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	let popparam = &ievaluate_args->popparam;
 	let logstream = ievaluate_args->logstream;
 
-	/* if RATE exists but AMT does not it is an error */
+	/// + If RATE exists but AMT does not it is an error 
 	if (advanfuncs->recordinfo.offsetRATE != -1 && advanfuncs->recordinfo.offsetAMT == -1) 
 		fatal(0, "error: RATE exists but AMT does not\n");
-
+	
 	char advan_memory[advanfuncs->advan_size + 1000];
 	memset(advan_memory, 0, advanfuncs->advan_size + 1000);
 	var advan = (ADVAN*)advan_memory;
@@ -308,6 +309,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	let no_dvlow_present = recordinfo->offsetDVLOW == -1;
 	const RECORD* ptr = record;
 	let id = RECORDINFO_ID(recordinfo, ptr);
+	/// + Non-integer ID is an error.
 	if (id != floor(id))
 		warning(logstream, "ID (%f) should probably be an integer\n", id);
 	let _offset1 = recordinfo->_offset1;
@@ -317,26 +319,27 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		let dv = RECORDINFO_DV(recordinfo, ptr);
 		let evid = RECORDINFO_EVID(recordinfo, ptr);
 
+		/// + Non-integer CMT is an error.
 		let cmt = RECORDINFO_CMT(recordinfo, ptr);
 		if (cmt != floor(cmt))
-			warning(logstream, "CMT (%f) should probably be an integer: ID %f time %f record %i\n", cmt, id, time, i + record_offset);
+			fatal(logstream, "CMT (%f) should probably be an integer: ID %f time %f record %i\n", cmt, id, time, i + record_offset);
 
-		/* time must increase except for reset events */
+		/// + Time must increase except for reset events.
 		if (time < lasttime && evid != 3 && evid != 4)
 			fatal(logstream, "TIME not monotonic: ID %f time %f record %i previous %f\n", id, time, i + record_offset, lasttime);
 		lasttime = time;
 
-		/* state should not be accessed outside of its limits */
+		/// + Some checking is done that state is not accessed outside of its limits.
 		for (int j=advanfuncs->nstate; j<OPENPMX_STATE_MAX; j++)
 			advan->state[j] = NAN;
 
 		/* check record before advance */
-		/* observations */
+		/// + Observations are given when EVID is 0.
 		if (evid == 0) {
+			/// + A warning is given if DV is 0 for an observation.
 			if (dv == 0.)
 				warning(logstream, "DV zero for observation: ID %f time %f record %i\n", id, time, i + record_offset);
 
-			/* observation should be finite */
 			if (!gsl_finite(dv))
 				fatal(logstream, "DV not finite for observation: ID %f time %f record %i\n", id, time, i + record_offset);
 
@@ -402,7 +405,6 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 				fatal(logstream, "DVLOW (%f) present for non-observation: ID %f record %i\n", dvlow, id, i + record_offset);
 		}
 
-		/* state always should remain finite */
 		if (check_state(advan->state, advanfuncs->nstate, logstream, _offset1)) 
 			fatal(logstream, "non-finite state before advance: ID %f time %f record %i\n", id, time, i + record_offset);
 
@@ -411,14 +413,14 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 
 		/* now check record after advance */
 
-		/* state always should remain finite */
+		/// + If any state values become non-finite is an error.
 		if (check_state(advan->state, advanfuncs->nstate, logstream, _offset1)) 
 			fatal(logstream, "non-finite state after advance: ID %f time %f record %i\n", id, time, i + record_offset);
 
 		/* predictions should be finite */
 		var yhat = 0.;
 		if (evid == 0 || predictall) {
-			yhat = evaluate_yhat(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
+			yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 			if (!gsl_finite(yhat))
 				fatal(logstream, "YHAT non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
 		}
@@ -427,7 +429,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		if (evid == 0) {
 
 			/* prediction variance of observations should be finite and positive */
-			let yhatvar = evaluate_yhatvar(imodel, &predictstate, popparam, predict, advanmem.errarray, predictvars);
+			let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 			if (!gsl_finite(yhatvar))
 				fatal(logstream, "YHATVAR non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
 
@@ -477,7 +479,7 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 		/* we dont to all predictions, otherwise it will be non-zero for infusions */
 		var yhat = 0.;
 		if (RECORDINFO_EVID(recordinfo, ptr) == 0)
-			yhat = evaluate_yhat(imodel, &advanstate, popparam, predict, advanmem.errarray, predictvars);
+			yhat = evaluate_yhat(imodel, &advanstate, predict, advanmem.errarray, predictvars);
 		individ_yhat[i] = yhat;
 		individ_yhatvar[i] = 0.;
 
@@ -487,7 +489,7 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 		let errarray = &isimerr[i * nsigma];
 		var pred = 0.;
 		if (RECORDINFO_EVID(recordinfo, ptr) == 0)
-			pred = evaluate_yhat(imodel, &advanstate, popparam, predict, errarray, predictvars);
+			pred = evaluate_yhat(imodel, &advanstate, predict, errarray, predictvars);
 		individ_pred[i] = pred;
 
 		/* save imodel, predictvars and state */

@@ -19,13 +19,13 @@ typedef struct RECORD {
 } RECORD;
 
 static void imodel_init(IMODEL* const _imodel,
-						ADVANSTATE* const _advanstate,
-						const POPPARAM* const _popparam)
+						ADVANSTATE* const _advanstate)
 {
+	const POPPARAM* _popparam = _advanstate->current.popparam;
 	const double* theta = _popparam->theta;
 	const double* eta = _popparam->eta;
 
-	const RECORD* record = _advanstate->record;
+	const RECORD* record = _advanstate->current.record;
 	const double BWT = record->BWT;
 
 	const double V  = theta[0]*exp(eta[0]) * pow(BWT/70., 1);
@@ -43,11 +43,9 @@ typedef struct PREDICTVARS {
 
 static double imodel_predict(const IMODEL* const _imodel,
 							 const PREDICTSTATE* const _predictstate,
-							 const POPPARAM* const _popparam,
 							 const double* const err,
 							 PREDICTVARS* _predparams)
 {
-	(void)_popparam;
 	(void)_predparams;
 	
 	const RECORD* record = _predictstate->record;

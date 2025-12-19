@@ -15,10 +15,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file implements an advancer for a one compartment model.
+
 #include <assert.h>
 #include <math.h>
 
-#include "advan.h"
+#include "advan/advan.h"
 #include "utils/c22.h"
 
 typedef struct {

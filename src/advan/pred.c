@@ -15,10 +15,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file implements a simple predictor without state.
+
 #include <assert.h>
 #include <string.h>
 
-#include "advan.h"
+#include "advan/advan.h"
 #include "utils/c22.h"
 
 typedef struct {

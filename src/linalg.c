@@ -16,8 +16,8 @@
  */
  
 /// This file contains linear algebra functions for Cholesky 
-/// decomposition. calculating log(det()) of a covariance matrix, and
-/// calculating the sample likelihood.
+/// decomposition. This is necessary for calculating log(det()) of a 
+/// covariance matrix, and calculating the sample likelihood.
 
 #include <stdlib.h>
 #include <stdio.h>

@@ -267,7 +267,6 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 			ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
 		}
 	}
-	
 	/* we made J such that tJ*J is tGi*invVi*Gi in Term 5 from Bae and Yim */
 	/* multiply and accumulate omega inverse, all in one command */
 	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1., J, J, 1., reducedicov);
@@ -386,12 +385,11 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		let eivar = gsl_vector_get(eval, i);
 
 		/* weighting via SD */
-		if (1) {
+		if (0) {
 			let eisd1 = sqrt(eivar);						/* distance in positive direction */
 			let eisd2 = sqrt(eivar); 						/* distance in negative direction */
 			let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
-//			sumlogeval += 2.*log(eiwgtsd);
-			sumlogeval += log(eiwgtsd*eiwgtsd);
+			sumlogeval += 2.*log(eiwgtsd);
 			
 		/* weighting via variance */
 		} else {

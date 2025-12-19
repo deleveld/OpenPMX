@@ -15,11 +15,13 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file implements the ODE solvers inplemented in libGSL.
+
 #include <assert.h>
 #include <math.h>
 #include <math.h>
 
-#include "advan.h"
+#include "advan/advan.h"
 #include "utils/c22.h"
 
 #include <gsl/gsl_errno.h>
@@ -193,14 +195,13 @@ ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const A
 	retinit.reltol = advanconfig->args.diffeqn.reltol;
 	memset(retinit.steptype_name, 0, sizeof(retinit.steptype_name));
 
-#define DIFFEQN_STEPPING_HSTART			1
-#define DIFFEQN_ABSTOL 					1e-9
-#define DIFFEQN_RELTOL 					1e-9
-#define DIFFEQN_STEPPING_FUNCTION		gsl_odeiv2_step_rk8pd
+/// The default setting are:
+///
+/// - ODE stepping function `gsl_odeiv2_step_rk8pd`
 
 	let steptype = advanconfig->args.diffeqn.steptype;
 	if (steptype == 0)
-		retinit.steptype = DIFFEQN_STEPPING_FUNCTION;
+		retinit.steptype = gsl_odeiv2_step_rk8pd;
 	else if (strcmp(steptype, "msadams") == 0)
 		retinit.steptype = gsl_odeiv2_step_msadams;
 	else if (strcmp(steptype, "rkf45") == 0)
@@ -224,12 +225,14 @@ ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const A
 	else
 		strncpy(retinit.steptype_name, TOSTR(DIFFEQN_STEPPING_FUNCTION), STEPTYPE_NAME_LENGTH-1);
 
+/// - Absolute tolerance `abstol` 1e-9
+/// - Relative tolerance `reltol` 1e-9
 	if (retinit.hstart == 0.)
-		retinit.hstart = DIFFEQN_STEPPING_HSTART;
+		retinit.hstart = 1.;
 	if (retinit.abstol == 0.)
-		retinit.abstol = DIFFEQN_ABSTOL;
+		retinit.abstol = 1e-9;
 	if (retinit.reltol == 0.)
-		retinit.reltol = DIFFEQN_RELTOL;
+		retinit.reltol = 1e-9;
 
 	ADVANTABLE_LIBGSL* ret = malloc(sizeof(ADVANTABLE_LIBGSL));
 	assert(ret);

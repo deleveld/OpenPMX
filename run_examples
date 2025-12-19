@@ -1,14 +1,14 @@
 #!/bin/sh
 set -ex
-./install
+./install pthread static
+
+(cd examples/c; rm a.out | true; gcc -W -Wall -Wextra -O2 schnider_advan.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out)
+(cd examples/c; rm a.out | true; gcc -W -Wall -Wextra -O2 theo.c           -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out)
+(cd examples/c; rm a.out | true; gcc -W -Wall -Wextra -O2 theo_advan.c     -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out)
+(cd examples/c; rm a.out | true; gcc -W -Wall -Wextra -O2 theo_posthoc.c   -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out)
 
 (cd examples/schnider; ../../openpmx schnider.gr)
 (cd examples/theo; ../../openpmx theo.gr)
 (cd examples/schnider; ../../openpmx schnider_diffeqn.gr)
 (cd examples/warfarin; ../../openpmx warfarin.gr)
-
-(cd examples/c; rm a.out | true; gcc -W -Wall -Wextra -O2 theo.c           -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out)
-(cd examples/c; rm a.out | true; gcc -W -Wall -Wextra -O2 theo_advan.c     -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out)
-(cd examples/c; rm a.out | true; gcc -W -Wall -Wextra -O2 theo_posthoc.c   -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out)
-(cd examples/c; rm a.out | true; gcc -W -Wall -Wextra -O2 schnider_advan.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./a.out)
 

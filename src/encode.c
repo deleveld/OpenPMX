@@ -200,7 +200,7 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 	encode->has_offsets = true;
 	
 /// Different transformations are possible to address theta bounds but 
-/// the default is to use tanh/atanh.. 
+/// the default is to use tanh/atanh. 
 	var n = 0;
 	let etheta = popmodel->theta;
 	let ntheta = popmodel->ntheta;
@@ -231,8 +231,9 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 		}
 	}
 
-/// The diagonal of omega is log-transformed. The off-diagonals of 
-/// omega are encoded as a specialized Cholesky decomposition of a 
+/// The diagonal of omega is log-transformed.
+///
+/// The off-diagonals of omega are encoded as a specialized Cholesky decomposition of a 
 /// correlation matrix. Only the lower triangular is encoded. The 
 /// approach is described in: <https://mc-stan.org/docs/reference-manual/transforms.html#cholesky-factors-of-correlation-matrices>
 /// and also: <https://mc-stan.org/docs/reference-manual/transforms.html#correlation-matrix-transform.section>
@@ -300,6 +301,10 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 	assert(n == encode->nparam);
 }
 
+/// If an OMEGA_SAME block is used then (OMEGASAME() in openpmxtran)
+/// then omega is filled by block transposed by its size. Basically it
+/// reproduces a block of omega by a lower block. This allows two eta
+/// values with the same variances to be estimated.
 static void fill_in_OMEGA_SAME_blocks(POPMODEL* const popmodel)
 {
 	/* correct for OMEGA_SAME blocks */
@@ -337,8 +342,6 @@ static void popmodel_omega_update(POPMODEL* const popmodel,
 			popmodel->omega[r][c] = v;
 		}
 	}
-
-	/* fill in the OMEGA_SAME blocks to complete the omega matrix */
 	fill_in_OMEGA_SAME_blocks(popmodel);
 }
 

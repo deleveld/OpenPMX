@@ -15,6 +15,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file implements a threadpool of waiting processes to process
+/// an individual. The task must be of a THREADTASK type and should only
+/// touch the data of the individual passed. 
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -28,6 +32,8 @@
 #include "openpmx_compile_options.h"
 
 /* --------------------------------------------------------------------*/
+/// The threadpool is implemented by pthreads or OpenMP. A
+/// single-threaded scatter is also possible.
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 #include <pthread.h>
 #elif defined(OPENPMX_PARALLEL_OPENMP)
@@ -153,9 +159,9 @@ void scatter_threads(const IDATA* const idata,
 	let individ = idata->individ;
 	let nindivid = idata->nindivid;
 
-	/* sort individuals based on thier expected runtime, doing slowest
-	   first so we are the most efficient because of lower risk of one
-	   long process slowing down finishing the last task */
+/// When scattering tasks, sort individuals based on thier expected
+/// runtime, doing slowest first so we are the most efficient because of
+/// lower risk of one long process slowing down finishing the last task.
 	var index_time = mallocvar(INDIVID_TASK, nindivid);
 	forcount(i, nindivid) {
 		index_time[i].individ = &individ[i];
@@ -167,8 +173,8 @@ void scatter_threads(const IDATA* const idata,
 		individs[i] = index_time[i].individ;
 	free(index_time);
 
-	/* it does not make sense to start more threads than individuals
-	 * otherwise threads will always be waiting and do nothing */
+/// It does not make sense to start more threads than individuals
+/// otherwise threads will always be waiting and do nothing.
 	int nthreads = options->nthread;
 	if (nthreads < 0)
 		nthreads = abs(nthreads);
@@ -214,7 +220,7 @@ void scatter_threads(const IDATA* const idata,
 	pthread_mutex_unlock(&tpool.mutex);
 	print_serialize(true);
 
-	/* do work here until there is nothing left to start */
+/// The main thread does work was well while its waiting.
 	/* passing non-zero pointer means we are the main thread, its a bit hacky, I know */
 	run_threadpool_task(&ttasks);
 

@@ -14,11 +14,18 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+ 
+/// This file implements an advancer for a two compartment mammilary 
+/// model.
+///
+/// The equations were obtained from: Abuhelwa AY, Foster DJ, Upton RN.
+/// ADVAN-style analytical solutions for common pharmacokinetic imodels.
+/// Journal of pharmacological and toxicological methods. 2015 Jun 30;73:42-8.
 
 #include <assert.h>
 #include <math.h>
 
-#include "advan.h"
+#include "advan/advan.h"
 #include "utils/c22.h"
 
 typedef struct {

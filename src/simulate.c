@@ -15,6 +15,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file implements the top-level function for simulation.
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -73,6 +75,8 @@ static void simulate_with_error_thread(INDIVID* const individ,
 	timespec_duration(&t3, &individ->eval_msec);
 }
 
+/// For simulation random observation residuals are chosen according to
+/// sigma. 
 static void idata_resample_err(const IDATA* const idata,
 							   const POPMODEL* const popmodel,
 							   gsl_rng * const rng)
@@ -92,6 +96,8 @@ static void idata_resample_err(const IDATA* const idata,
 	}
 }
 
+/// For simulation andom ETA values are chosen according to the omega
+/// matrix
 static void idata_resample_eta(IDATA* const idata,
 							   const POPMODEL* const popmodel,
 							   gsl_rng * const rng)
@@ -105,7 +111,8 @@ static void idata_resample_eta(IDATA* const idata,
 	 * (i.e. corrected) one */
 	var omegainfo = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed);
 
-	/* first zero everything */
+/// Upon simulation the individualized values (ETA and objective
+/// function components) are set to zero.
 	let nomega = idata->nomega;
 	forcount(i, idata->nindivid) {
 		let individ = &idata->individ[i];
@@ -157,10 +164,9 @@ static void idata_resample_eta(IDATA* const idata,
 	gsl_vector_free(s);
 }
 
-/* after idata_predict_dv then DV in thet dataset is replaced by observation
- * simulation with noise. pred is set to zero and yhat is the observation
- * without noise. If the error has not been resampled yet by calling
- * idata_resample_err then the error will be zero */
+/// After simulation a prediction occurs and the DV in the dataset is
+/// replaced by observation with noise. PRED is set to zero and yhat is
+/// the observation without noise. 
 static void idata_predict_dv(IDATA* const idata,
 							 const ADVANFUNCS* const advanfuncs,
 							 const POPMODEL* popmodel,
@@ -171,8 +177,6 @@ static void idata_predict_dv(IDATA* const idata,
 	idata_alloc_simerr(idata);
 
 	/* simulation writes into pred (with error) and yhat (without error) */
-	/* TODO: we have to not write non-DV objects in simulation. You mean PREDICTVARS?
-	 * why not? */
 	SCATTEROPTIONS scatteroptions = { };
 	scatter_threads(idata, advanfuncs, popmodel, 0, options, &scatteroptions, simulate_with_error_thread);
 
@@ -201,14 +205,6 @@ static void idata_predict_dv(IDATA* const idata,
 	}
 }
 
-static void idata_resample(IDATA* const idata,
-						   const POPMODEL* popmodel,
-						   gsl_rng* rng)
-{
-	idata_resample_err(idata, popmodel, rng);
-	idata_resample_eta(idata, popmodel, rng);
-}
-
 void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig)
 {
 	pmxstate_ensure(pmx);
@@ -227,7 +223,8 @@ void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig)
 	}
 	assert(pstate->rng);
 
-	idata_resample(&pstate->idata, &popmodel, pstate->rng);
+	idata_resample_eta(&pstate->idata, &popmodel, pstate->rng);
+	idata_resample_err(&pstate->idata, &popmodel, pstate->rng);
 
 	idata_predict_dv(&pstate->idata, pstate->advanfuncs, &popmodel, &options);
 }

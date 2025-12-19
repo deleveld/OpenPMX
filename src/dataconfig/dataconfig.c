@@ -14,6 +14,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+ 
+/// This file initializes a RECORDINFO object from a DATACONFIG object.
+/// In this way the offsets of some important RECORD fields are cached
+/// for rapid access, 
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -21,7 +25,7 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "dataconfig.h"
+#include "dataconfig/dataconfig.h"
 
 RECORDINFO recordinfo_init(const DATACONFIG* const dataconfig)
 {

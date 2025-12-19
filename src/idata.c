@@ -15,7 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
  
-/// This file handels the individualized data of a population. This 
+/// This file handles the individualized data of a population. This 
 /// include the pointers to the individual data records, to the 
 /// initialized models (IMDOEL), state, etas, predictions (PREDICTVARS),
 /// It also keeps track of 4 of the 5 terms in the objective function.
@@ -156,7 +156,6 @@ double* idata_alloc_simerr(const IDATA* const idata)
 		let ndata = idata->ndata;
 		let nsigma = idata->nsigma;
 		var simerr = mallocvar(double, ndata * nsigma);
-		assert(simerr);
 
 		let nindivid = idata->nindivid;
 		var ioffset = 0;

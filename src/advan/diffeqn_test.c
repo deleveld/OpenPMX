@@ -15,10 +15,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file implements a very simple fixed-step size Runge-Kutta 
+/// fourth order ODE solver. This is for testing purposes and shouldnt
+/// be used for serious models.
+
 #include <assert.h>
 #include <math.h>
 
-#include "advan.h"
+#include "advan/advan.h"
 #include "utils/c22.h"
 
 typedef struct {
@@ -48,7 +52,10 @@ static void advancer_diffeqn_info(const struct ADVANFUNCS* const advanfuncs, FIL
 }
 
 __attribute__ ((hot))
-static void advancer_diffeqn_wrapper(double TIME, const double* const A, double* DADT, const ADVANCER_DIFFEQN_CALLBACK_ARGS *args)
+static void advancer_diffeqn_wrapper(double TIME,
+									 const double* const A,
+									 double* DADT,
+									 const ADVANCER_DIFFEQN_CALLBACK_ARGS* const args)
 {
 	let diffeqn = args->diffeqn;
 	let imodel = args->imodel;

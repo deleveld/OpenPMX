@@ -15,6 +15,10 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file implements a translation program for structured control
+/// files into compilable C source to perform model
+/// estimation/simulation etc.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -412,6 +416,8 @@ static char* match_brackets(char* p, int level)
 	return 0;
 }
 
+/// For the $DATA() identifier the string in the brackets is the data
+/// filename.
 static void parse_data(PARSERESULT* res, char* p)
 {
 	if (vector_size(res->data) ||
@@ -431,10 +437,13 @@ static void parse_data(PARSERESULT* res, char* p)
 
 	load_datafile_write_dataconfig(p, &res->data, &res->record_field_names, &res->dataconfig);
 
+/// In the $DATA() block is code called for each row of the data.
 	strip_firstlast_space(endvars + 1);
 	string_append(&res->data_preprocess_code, endvars + 1);
 }
 
+/// For the $ADVAN() identifier the name in the brackets is the
+/// advancer method.
 static void parse_advan_init(PARSERESULT* res, char* p)
 {
 	if (vector_size(res->advan_init))
@@ -451,20 +460,30 @@ static void parse_advan_init(PARSERESULT* res, char* p)
 
 	res->predict_state_maybe_unused = "";
 	res->needs_diffeqn = false;
+	/// + `pred` calls `pmx_advan_pred()` a simple predictor
 	if (streq(p, "pred")) {
 		res->advan_method = "pmx_advan_pred";
 		res->predict_state_maybe_unused = "	(void)_state;\n";
+	/// + `onecomp` calls `pmx_advan_onecomp()` a one-compartment model.
 	} else if (streq(p, "onecomp")) 
 		res->advan_method = "pmx_advan_onecomp";
+	/// + `onecomp_depot` calls `pmx_advan_onecomp_depot()` a
+	/// one-compartment model with a depot compartment.
 	else if (streq(p, "onecomp_depot"))
 		res->advan_method = "pmx_advan_onecomp_depot";
+	/// + `twocomp` calls `pmx_advan_twocomp()` a
+	/// two-compartment model mammilary model.
 	else if (streq(p, "twocomp"))
 		res->advan_method = "pmx_advan_twocomp";
+	/// + `threecomp` calls `pmx_advan_threecomp()` a
+	/// three-compartment model mammilary model.
 	else if (streq(p, "threecomp"))
 		res->advan_method = "pmx_advan_threecomp";
 	else if (streq(p, "diffeqn_test")) {
 		res->advan_method = "pmx_advan_diffeqn_test";
 		res->needs_diffeqn = true;
+	/// + `diffeqn` calls `pmx_advan_diffeqn_libgsl()` a
+	/// ODE solver from LibGSL.
 	} else if (streq(p, "diffeqn_libgsl")) {
 		res->advan_method = "pmx_advan_diffeqn_libgsl";
 		res->needs_diffeqn = true;
@@ -475,6 +494,9 @@ static void parse_advan_init(PARSERESULT* res, char* p)
 	string_append(&res->advan_init, endvars + 1);
 }
 
+/// For the $IMODEL() itentifier the names in the brackets are the
+/// individual model parameters. The list is tokenized with comma or
+/// space.
 static void parse_imodel(PARSERESULT* res, char* p)
 {
 	if (vector_size(res->imodel_field_names) ||
@@ -499,11 +521,16 @@ static void parse_imodel(PARSERESULT* res, char* p)
 		vector_append(res->imodel_field_names, s);
 	}
 
+/// In the $IMODEL() block is code called to initialize each
+/// individual model.
 	/* after field names is code */
 	strip_firstlast_space(endvars + 1);
 	string_append(&res->imodel_fields_code, endvars + 1);
 }
 
+/// For the $PREDICT() itentifier the names in the brackets are the
+/// variables needing prediction for each record. The list is tokenized
+/// with comma or space.
 static void parse_predict(PARSERESULT* res, char* p)
 {
 	if (vector_size(res->predict_field_names) ||
@@ -528,11 +555,15 @@ static void parse_predict(PARSERESULT* res, char* p)
 		vector_append(res->predict_field_names, s);
 	}
 
+/// In the $PREDICT() block is code called to calculate the prediction
+/// variables and the observation prediction Y.
 	/* after field names is code */
 	strip_firstlast_space(endvars + 1);
 	string_append(&res->predict_fields_code, endvars + 1);
 }
 
+/// In the $DIFFEQN() block is code called to calculate the
+/// compartment differential equation for the ODE solver.
 static void parse_diffeqn(PARSERESULT* res, char* p)
 {
 	if (vector_size(res->imodel_diffeqn_code))
@@ -542,6 +573,7 @@ static void parse_diffeqn(PARSERESULT* res, char* p)
 	string_append(&res->imodel_diffeqn_code, p);
 }
 
+/// In the $THETA() block is a initializer for a THETA struct.
 static void parse_theta(PARSERESULT* res, char* p)
 {
 	if (vector_size(res->theta_init))
@@ -563,6 +595,8 @@ static int count_elements(const char* p)
 	return n;
 }
 
+/// In the $OMEGA() block is a initializer for a diagonal block in the
+/// omega matrix.
 static void parse_omega(PARSERESULT* res, char* p)
 {
 	var endvars = match_brackets(p, 1);
@@ -578,6 +612,8 @@ static void parse_omega(PARSERESULT* res, char* p)
 	string_appendf(&res->omega_init, "\t\t{ OMEGA_DIAG, %i, { %s } },", n, p);
 }
 
+/// In the $OMEGA() block is a initializer for a lower triangular block
+/// in the omega matrix.
 static void parse_omegablock(PARSERESULT* res, char* p)
 {
 	var endvars = match_brackets(p, 1);
@@ -598,6 +634,9 @@ static void parse_omegablock(PARSERESULT* res, char* p)
 	string_appendf(&res->omega_init, "\t\t{ OMEGA_BLOCK, %i, { %s } },", ndim, p);
 }
 
+/// An $OMEGASAME() block is a initializer for a block in omega that is
+/// filled by block transposed by its size. Basically it reproduces a
+/// block of omega by a lower block.
 static void parse_omegasameblock(PARSERESULT* res, char* p)
 {
 	var endvars = match_brackets(p, 1);
@@ -612,6 +651,8 @@ static void parse_omegasameblock(PARSERESULT* res, char* p)
 	string_appendf(&res->omega_init, "\t\t{ OMEGA_SAME, %s, { } },", p);
 }
 
+/// In the $SIGMA() block is a initializer for an array of residual
+/// variances.
 static void parse_sigma(PARSERESULT* res, char* p)
 {
 	if (vector_size(res->sigma_init))
@@ -636,6 +677,7 @@ static void parse_sigma(PARSERESULT* res, char* p)
 		fatal("Unknown text \"%s\" in $SIGMA", after);
 }
 
+/// The $MAIN block contains the C code for the main analysis.
 static void parse_main(PARSERESULT* res, char* p)
 {
 	if (vector_size(res->analysis_code))
@@ -673,6 +715,9 @@ int main(int argc, char* argv[])
 	var grfile = read_file(grfilename);
 	string_append(&res.filename, grfilename);
 
+/// Everything in a control file before the first block starting with $
+/// is just ignored. This is useful for a description of the intent of
+/// the control file.
 	/* everything up to first valid marker is a the preamble */
 	var i = find_marker(grfile);
 	char* begin = grfile + i;
@@ -927,6 +972,8 @@ extern char openpmxtran_template[];
 	return EXIT_SUCCESS;
 }
 
+/// The variables and code defined in the block is placed into a
+/// template of an OpenPMX analysis.
 char openpmxtran_template[] =
 "/*\n"
 " * Code below this message is generated by openpmx (https://github.com/deleveld/openpmx).\n"
@@ -967,12 +1014,11 @@ char openpmxtran_template[] =
 "} IMODEL;\n"
 "\n"
 "static void imodel_init(IMODEL* const _imodel,\n"
-"						 ADVANSTATE* const _advanstate,\n"
-"						 const POPPARAM* const _popparam)\n"
+"						 ADVANSTATE* const _advanstate)\n"
 "{\n"
-"	const double* _theta = _popparam->theta;\n"
-"	const double* _eta = _popparam->eta;\n"
-"	const RECORD* const _record = _advanstate->record;\n"
+"	const double* _theta = _advanstate->current.popparam->theta;\n"
+"	const double* _eta = _advanstate->current.popparam->eta;\n"
+"	const RECORD* const _record = _advanstate->current.record;\n"
 "\n"
 "	/* allow access to RECORD fields */\n"
 "${OPENPMXTRAN_RECORD_FIELDS_DEFINE}\n"
@@ -982,11 +1028,11 @@ char openpmxtran_template[] =
 "\n"
 "#define THETA(i) 		((const double)_theta[(i)-1])\n"
 "#define ETA(i) 		((const double)_eta[(i)-1])\n"
-"#define A(i) 			((const double)_advanstate->state[(i)-1])\n"
+"#define A(i) 			((const double)_advanstate->current.state[(i)-1])\n"
 "#define INITCOUNT 		pmx_advan_initcount(_advanstate)\n"
 "#define ALAG(i,t) 		pmx_advan_amtlag(_advanstate, (i)-1, (t))\n"
 "#define BIOAVAIL(i,f)	pmx_advan_bioavail(_advanstate, (i)-1, (f))\n"
-"#define STATETIME 		((const double)_advanstate->statetime)\n"
+"#define STATETIME 		((const double)_advanstate->current,statetime)\n"
 "#define INITTIME(t) 	pmx_advan_inittime(_advanstate, (t))\n"
 "#define A_0(i,v) 		pmx_advan_state_init(_advanstate, (i)-1, (v))\n"
 "\n"
@@ -1052,14 +1098,12 @@ char openpmxtran_template[] =
 "}\n"
 "\n"
 "static double imodel_predict(const IMODEL* const _imodel,\n"
-"							 const PREDICTSTATE* const _predictstate,\n"
-"							 const POPPARAM* const _popparam,\n"
+"							 const PREDICTSTATE* const _current,\n"
 "							 const double* const _err,\n"
 "							 PREDICTVARS* _predparams)\n"
 "{\n"
-"	const RECORD* const _record = _predictstate->record;\n"
-"	const double* const _state = _predictstate->state;\n"
-"	(void) _popparam;\n"
+"	const RECORD* const _record = _current->record;\n"
+"	const double* const _state = _current->state;\n"
 "	(void) _record;\n"
 "	(void) _predparams;\n"
 "	double Y = NAN;\n"
@@ -1074,7 +1118,7 @@ char openpmxtran_template[] =
 "${OPENPMXTRAN_PREDPARAMS_FIELDS_DECLARE}\n"
 "\n"
 "#define THETA(i) 	((const double)_theta[i-1])\n"
-"#define ETA(i) 	((const double)_popparam->eta[i-1])\n"
+"#define ETA(i) 	((const double)_current->_popparam->eta[i-1])\n"
 "#define A(i) 		((const double)_state[i-1])\n"
 "#define ERR(i) 	((const double)_err[i-1])\n"
 "#define EPS(i) 	((const double)_err[i-1])\n"

@@ -1,28 +1,22 @@
-/*-----------------------------------------------------------------------
-  small changes made to bobyqa.c by Douglas Eleveld deleveld@dds.nl
-  to avoid compiler warnings about possibly unused unitialized values
- -----------------------------------------------------------------------*/
-/*
- * bobyqa.c -
- *
- * Implementation of Mike Powell's BOBYQA algorithm for minimizing a function
- * of many variables.  The method is "derivatives free" (only the function
- * values are needed) and accounts for bound constraints on the variables.  The
- * algorithm is described in:
- *
- *   M.J.D. Powell, "The BOBYQA Algorithm for Bound Constrained Optimization
- *   Without Derivatives."  Technical report, Department of Applied Mathematics
- *   and Theoretical Physics, University of Cambridge (2009).
- *
- * The present code is based on the original FORTRAN version written by Mike
- * Powell who kindly provides his code on demand (at mjdp@cam.ac.uk) and has
- * been converted to C by É. Thiébaut.
- *
- * Copyright (c) 2009, Mike Powell (FORTRAN version).
- * Copyright (c) 2015, Éric Thiébaut (C version).
- *
- * Read the accompanying `LICENSE` file for details.
- */
+/// Implementation of Mike Powell's BOBYQA algorithm for minimizing a function
+/// of many variables.  The method is "derivatives free" (only the function
+/// values are needed) and accounts for bound constraints on the variables.  The
+/// algorithm is described in:
+
+/// M.J.D. Powell, "The BOBYQA Algorithm for Bound Constrained Optimization
+/// Without Derivatives."  Technical report, Department of Applied Mathematics
+/// and Theoretical Physics, University of Cambridge (2009).
+
+/// The present code is based on the original FORTRAN version written by Mike
+/// Powell who kindly provides his code on demand (at mjdp@cam.ac.uk) and has
+/// been converted to C by É. Thiébaut.
+/// Copyright (c) 2009, Mike Powell (FORTRAN version).
+/// Copyright (c) 2015, Éric Thiébaut (C version).
+/// Read the accompanying `LICENSE` file for details.
+ 
+/// Some small changes made to bobyqa.c by Douglas Eleveld 
+/// deleveld@dds.nl to avoid compiler warnings about possibly unused 
+/// unitialized values
 
 #include <stdio.h>
 #include <math.h>
