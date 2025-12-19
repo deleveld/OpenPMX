@@ -215,7 +215,7 @@ ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const A
 	else if (strcmp(steptype, "rk2") == 0)
 		retinit.steptype = gsl_odeiv2_step_rk2;
 	else {
-		fprintf(stderr, "error: Invalid steptype \"%s\"\n", steptype);
+		fprintf(stdout, "error: Invalid steptype \"%s\"\n", steptype);
 		assert(0);
 	}
 #define _TOSTR(x) #x

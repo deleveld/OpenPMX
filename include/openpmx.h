@@ -97,8 +97,7 @@ typedef struct {
 
 /* must be initialized in IMODEL_INIT */
 typedef struct IMODEL IMODEL;
-typedef void (*IMODEL_INIT)(IMODEL* const imodel,
-							ADVANSTATE* advanstate);
+typedef void (*IMODEL_INIT)(IMODEL* const imodel, ADVANSTATE* advanstate);
 
 /* changes to advancer within the IMODEL_INIT function */
 void pmx_advan_amtlag(const ADVANSTATE* advanstate, const int cmt, const double t);

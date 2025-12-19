@@ -145,7 +145,7 @@ void fatal(FILE* stream, const char* format, ... )
 {
     va_list args1;
     va_start(args1, format);
-	openpmx_vprintf(stream, stderr, openpmx_error_prefix, format, args1);
+	openpmx_vprintf(stream, stdout, openpmx_error_prefix, format, args1);
 	va_end(args1);
 	exit(EXIT_FAILURE);
 }
@@ -154,7 +154,7 @@ void warning(FILE* stream, const char* format, ... )
 {
     va_list args1;
     va_start(args1, format);
-	openpmx_vprintf(stream, stderr, openpmx_warning_prefix, format, args1);
+	openpmx_vprintf(stream, stdout, openpmx_warning_prefix, format, args1);
 	va_end(args1);
 }
 

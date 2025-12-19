@@ -95,9 +95,9 @@ static void fatal(const char* format, ... )
     va_list args;
 
     va_start(args, format);
-    fprintf(stderr, "error: ");
-    vfprintf(stderr, format, args);
-    fprintf(stderr, "\n");
+    fprintf(stdout, "error: ");
+    vfprintf(stdout, format, args);
+    fprintf(stdout, "\n");
     va_end(args);
 
     exit(EXIT_FAILURE);
