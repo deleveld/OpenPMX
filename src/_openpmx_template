@@ -21,14 +21,12 @@ set -eu
 FILE="${1}"
 BASE=$(basename "${FILE}")
 
-# temporary files
 OBJFILE="${BASE}.o"
 EXECFILE="a.out"
-trap "echo cleanup; rm -v ${OBJFILE} ${EXECFILE}" EXIT
+trap "echo cleanup; rm -v \"${OBJFILE}\" \"${EXECFILE}\"" EXIT
 
 # translate control file to C code
 if [ "${FILE##*.}" != "c" ]; then
-	echo "translate \"${FILE}\""
 	"${OPENPMXPATH}/bin/openpmxtran" "${FILE}"
 	FILE="${FILE}.c"
 fi

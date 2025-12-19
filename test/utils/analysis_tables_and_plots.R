@@ -6,32 +6,12 @@
 		allmethods[[i]] <-list(data=nonmem,			name="NONMEM",		col="grey",			lw=3)
 		i <- i + 1
 	}
-	if (exists("nonmemlaplace")) {
-		allmethods[[i]] <- list(data=nonmemlaplace,	name="LAPLACE",		col="lightblue",	lw=3)
-		i <- i + 1
-	}
-	if (exists("nonmemsaem")) {
-		allmethods[[i]] <- list(data=nonmemsaem,	name="NONMEM-SAEM",		col="lightblue",	lw=3)
-		i <- i + 1
-	}
-	if (exists("nonmemitsb")) {
-		allmethods[[i]] <- list(data=nonmemitsb,	name="NONMEM-ITSB",		col="gold",	lw=1)
-		i <- i + 1
-	}
-	if (exists("validate")) {
-		allmethods[[i]] <- list(data=validate, 	name="Validate",		col="lightgreen",	lw=5)
-		i <- i + 1
-	}
 	if (exists("gronmem")) {
 		allmethods[[i]] <- list(data=gronmem, 		name="OpenPMX",		col="black",		lw=1)
 		i <- i + 1
 	}
-	if (exists("gronmemicov")) {
-		allmethods[[i]] <- list(data=gronmemicov, 	name="Icov",	col="blue",			lw=1)
-		i <- i + 1
-	}
-	if (exists("gronmemtest")) {
-		allmethods[[i]] <- list(data=gronmemtest, 	name="TEST",		col="lightgreen",	lw=3)
+	if (exists("validate")) {
+		allmethods[[i]] <- list(data=validate, 	name="Validate",		col="lightgreen",	lw=5)
 		i <- i + 1
 	}
 
@@ -274,27 +254,6 @@
 	row.names(tabrmse) <- tabrmse[["name"]]
 	tabbias <- tabbias[ , !(colnames(tabbias) %in% c("type", "name"))]
 	tabrmse <- tabrmse[ , !(colnames(tabrmse) %in% c("type", "name"))]
-
-	calculate_performance_rank <- function()
-	{
-		tabbias_rank <- tabbias
-		tabrmse_rank <- tabrmse
-		for (i in trueparams) {
-			paramname <- i["tabname"]
-
-			v <- tabbias[[paramname]]
-			tabbias_rank[[paramname]] <- rank(abs(v))
-			
-			v <- tabrmse[[paramname]]
-			tabrmse_rank[[paramname]] <- rank(abs(v))
-		}
-		tabbias_rank[["avgrank"]] <- rowMeans(tabbias_rank)
-		tabrmse_rank[["avgrank"]] <- rowMeans(tabrmse_rank)
-
-		tabbias[["avgrank"]] <<- tabbias_rank[["avgrank"]]
-		tabrmse[["avgrank"]] <<- tabrmse_rank[["avgrank"]]
-	}
-###	calculate_performance_rank()
 
 	calculate_performance_score <- function(tabv)
 	{

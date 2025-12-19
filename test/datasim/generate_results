@@ -19,7 +19,7 @@ SCRIPTNAME=$(basename "${0}")
 ########################################################################
 
 # default methods
-DO_NONMEM_SCRIPT="../utils/do_nonmem_run_singlethread"
+DO_NONMEM_SCRIPT="../utils/do_nonmem_run"
 . "../utils/generate_results_methods.sh"
 
 # loop across datasets calling the method

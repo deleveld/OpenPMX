@@ -28,6 +28,10 @@ nonmem()
 {
 	DATASET=${1}
 	RUNNAME=${FUNCNAME[0]}
+	
+	MAXNUMBERNODES=$(($(nproc --all) - 4))
+	NUMBERNODES="${DO_NONMEM_RUN_NODES:-${MAXNUMBERNODES}}"
+	echo nnodes ${NUMBERNODES} >openpmx_nodes.txt
 
 	cat >control.${DATASET}.txt <<-CONTROLFILE
 	${NONMEM_MODEL_PREFIX}
@@ -37,82 +41,12 @@ nonmem()
 	\$ESTM SIG=5 MAX=5000 METHOD=1 INTERACT NOABORT POSTHOC PRINT=1
 CONTROLFILE
 	cat control.${DATASET}.txt
-	${DO_NONMEM_SCRIPT} control.${DATASET}.txt
-
-	# collect NONMEM results and cleanup
-	collect_final_estimate "${DATASET}" "control.${DATASET}.ext" "${SCRIPTNAME}.${RUNNAME}.txt"
-	rm control.*
-	rm gfortran.txt
-	rm nmpathlist.txt
-}
-
-###################
-# NONMEM estimation (LAPLACE)
-nonmemlaplace()
-{
-	DATASET=${1}
-	RUNNAME=${FUNCNAME[0]}
-
-	cat >control.${DATASET}.txt <<-CONTROLFILE
-	${NONMEM_MODEL_PREFIX}
-	\$DATA "simdata/data.${DATASET}.txt" IGNORE=@
-	${NONMEM_MODEL_CODE}
-	${NONMEM_MODEL_INITIAL}
-	\$ESTM SIG=5 MAX=5000 METHOD=1 INTERACT NOABORT POSTHOC PRINT=1 LAPLACE NUMERICAL SLOW
-CONTROLFILE
-	cat control.${DATASET}.txt
-	${DO_NONMEM_SCRIPT} control.${DATASET}.txt
-	
-	ertert
-
-	# collect NONMEM results and cleanup
-	collect_final_estimate "${DATASET}" "control.${DATASET}.ext" "${SCRIPTNAME}.${RUNNAME}.txt"
-	rm control.*
-	rm gfortran.txt
-	rm nmpathlist.txt
-}
-
-###################
-# NONMEM estimation (SAEM)
-nonmemsaem()
-{
-	DATASET=${1}
-	RUNNAME=${FUNCNAME[0]}
-
-	cat >control.${DATASET}.txt <<-CONTROLFILE
-	${NONMEM_MODEL_PREFIX}
-	\$DATA "simdata/data.${DATASET}.txt" IGNORE=@
-	${NONMEM_MODEL_CODE}
-	${NONMEM_MODEL_INITIAL}
-	\$ESTIMATION METHOD=SAEM INTERACTION NBURN=2000 NITER=3000 ISAMPLE=2 PRINT=10 SEED=98765 AUTO=1
-CONTROLFILE
-	cat control.${DATASET}.txt
-	${DO_NONMEM_SCRIPT} control.${DATASET}.txt
-
-	# collect NONMEM results and cleanup
-	collect_final_estimate "${DATASET}" "control.${DATASET}.ext" "${SCRIPTNAME}.${RUNNAME}.txt"
-	rm control.*
-	rm gfortran.txt
-	rm nmpathlist.txt
-}
-
-###################
-# NONMEM estimation (ITSB)
-nonmemitsb()
-{
-	DATASET=${1}
-	RUNNAME=${FUNCNAME[0]}
-
-	cat >control.${DATASET}.txt <<-CONTROLFILE
-	${NONMEM_MODEL_PREFIX}
-	\$DATA "simdata/data.${DATASET}.txt" IGNORE=@
-	${NONMEM_MODEL_CODE}
-	${NONMEM_MODEL_INITIAL}
-	\$ESTIMATION METHOD=ITS INTERACTION MAXEVAL=9999 PRINT=1
-CONTROLFILE
-	cat control.${DATASET}.txt
-	${DO_NONMEM_SCRIPT} control.${DATASET}.txt
-
+	start=$(date +%s%3N)
+	${DO_NONMEM_SCRIPT} "control.${DATASET}.txt" "${NUMBERNODES}"
+	end=$(date +%s%3N)
+	runtime=$((end - start))
+	echo "${DATASET} $runtime" >> "${SCRIPTNAME}.${RUNNAME}.runtime_ms.txt"
+    
 	# collect NONMEM results and cleanup
 	collect_final_estimate "${DATASET}" "control.${DATASET}.ext" "${SCRIPTNAME}.${RUNNAME}.txt"
 	rm control.*
@@ -127,13 +61,22 @@ openpmx()
 	DATASET=${1}
 	RUNNAME=${FUNCNAME[0]}
 
+	MAXNUMBERNODES=$(($(nproc --all) - 4))
+	NUMBERNODES="${DO_NONMEM_RUN_NODES:-${MAXNUMBERNODES}}"
+	echo nnodes ${NUMBERNODES} >openpmx_nodes.txt
+
 	cat >control.${DATASET}.gr <<-CONTROLFILE
 	\$DATA("simdata/data.${DATASET}.txt")
 	${OPENPMX_MODEL_INITIAL}
+	openpmx.nthread = ${NUMBERNODES};
 	estimate();
 CONTROLFILE
 	cat control.${DATASET}.gr
+	start=$(date +%s%3N)
 	../../openpmx control.${DATASET}.gr
+	end=$(date +%s%3N)
+	runtime=$((end - start))
+	echo "${DATASET} $runtime" >> "${SCRIPTNAME}.${RUNNAME}.runtime_ms.txt"
 
 	# collect GRONMEM results and cleanup
 	collect_final_estimate "${DATASET}" "control.${DATASET}.gr.ext" "${SCRIPTNAME}.${RUNNAME}.txt"
@@ -147,94 +90,25 @@ validate()
 	DATASET=${1}
 	RUNNAME=${FUNCNAME[0]}
 
+	MAXNUMBERNODES=$(($(nproc --all) - 4))
+	NUMBERNODES="${DO_NONMEM_RUN_NODES:-${MAXNUMBERNODES}}"
+	echo nnodes ${NUMBERNODES} >openpmx_nodes.txt
+
 	cat >control.${DATASET}.gr <<-CONTROLFILE
 	\$DATA("simdata/data.${DATASET}.txt")
 	${OPENPMX_MODEL_INITIAL}
+	openpmx.nthread = ${NUMBERNODES};
 	estimate();
 CONTROLFILE
 	cat control.${DATASET}.gr
+	start=$(date +%s%3N)
 	../../openpmx control.${DATASET}.gr
+	end=$(date +%s%3N)
+	runtime=$((end - start))
+	echo "${DATASET} $runtime" >> "${SCRIPTNAME}.${RUNNAME}.runtime_ms.txt"
 
 	# collect GRONMEM results and cleanup
 	collect_final_estimate "${DATASET}" "control.${DATASET}.gr.ext" "${SCRIPTNAME}.${RUNNAME}.txt"
-	rm control.*
-}
-
-###################
-# GRONMEM ICOV estimation
-openpmxicov()
-{
-	DATASET=${1}
-	RUNNAME=${FUNCNAME[0]}
-
-	cat >control.${DATASET}.gr <<-CONTROLFILE
-	\$DATA("simdata/data.${DATASET}.txt")
-	${OPENPMX_MODEL_INITIAL}
-	estimate(.stage1.icov_resample = true);
-CONTROLFILE
-	cat control.${DATASET}.gr
-	../../openpmx control.${DATASET}.gr
-
-	# collect GRONMEM results and cleanup
-	collect_final_estimate "${DATASET}" "control.${DATASET}.gr.ext" "${SCRIPTNAME}.${RUNNAME}.txt"
-	rm control.*
-}
-
-###################
-# GRONMEM test estimation
-openpmxtest()
-{
-	DATASET=${1}
-	RUNNAME=${FUNCNAME[0]}
-
-	cat >control.${DATASET}.gr <<-CONTROLFILE
-	\$DATA("simdata/data.${DATASET}.txt")
-	${OPENPMX_MODEL_INITIAL}
-//	openpmx.brief = true;
-	estimate(.stage1.icov_resample=true);
-CONTROLFILE
-	cat control.${DATASET}.gr
-	../../openpmx control.${DATASET}.gr
-
-	# collect GRONMEM results and cleanup
-	collect_final_estimate "${DATASET}" "control.${DATASET}.gr.ext" "${SCRIPTNAME}.${RUNNAME}.txt"
-	rm control.*
-}
-
-###################
-# NLMIXR2 
-nlmixr2()
-{
-	DATASET=${1}
-	RUNNAME=${FUNCNAME[0]}
-
-	cat >control.${DATASET}.R <<-CONTROLFILE
-	df <- read.table("simdata/data.${DATASET}.txt", sep=",", header=TRUE)
-	print(head(df))
-	${NLMIXR2_MODEL_INITIAL}
-
-	# save EXT like file
-	library(readr)
-ext_data <- fit\$eta %>%
-	mutate(ID = rownames(fit\$eta)) %>%
-	relocate(ID)
-# Optional: Add individual predicted parameters
-	posthoc <- ranef(fit)  # adds individual parameter estimates
-	posthoc\$ID <- rownames(posthoc)
-	ext_out <- left_join(ext_data, posthoc, by = "ID")
-	obj_val <- fit\$objf  # Final objective function value
-	ext_out\$OBJ <- obj_val
-	ext_out <- ext_out %>% select(ID, OBJ, everything())
-	write_csv(ext_out, "control.${DATASET}.R.ext")
-	
-CONTROLFILE
-	cat control.${DATASET}.R
-	Rscript control.${DATASET}.R
-
-	dfgdfg
-
-	# collect GRONMEM results and cleanup
-	collect_final_estimate "${DATASET}" "control.${DATASET}.R.ext" "${SCRIPTNAME}.${RUNNAME}.txt"
 	rm control.*
 }
 

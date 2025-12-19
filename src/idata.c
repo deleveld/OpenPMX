@@ -14,6 +14,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+ 
+/// This file handels the individualized data of a population. This 
+/// include the pointers to the individual data records, to the 
+/// initialized models (IMDOEL), state, etas, predictions (PREDICTVARS),
+/// It also keeps track of 4 of the 5 terms in the objective function.
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -25,6 +30,8 @@
 #include "defines.h"
 #include "utils/c22.h"
 #include "utils/various.h"
+
+#include <gsl/gsl_math.h>
 
 IDATA idata_construct(const RECORDINFO* const recordinfo,
 					  const int ntheta,
@@ -354,6 +361,12 @@ void table_icov_resample_idata(const char* filename,
 	fclose(f);
 }
 
+/// Here the objective function for each individual is summed from its
+/// components. The terms match those from the individual objective
+/// function equation in the manuscript. 
+/// The omega_nonzero_lndet term is the log(det(omega)) term and is 
+/// calculated in omegainfo.c.
+
 double idata_objfn(const IDATA* const idata,
 				   const double omega_nonzero_lndet)
 {
@@ -369,11 +382,11 @@ double idata_objfn(const IDATA* const idata,
 	forcount(k, nindivid) {
 		let individ = &idata->individ[k];
 
-		let term1 = individ->obs_lndet;
-		let term2 = individ->obs_min2ll;
-		let term3 = individ->eta_min2ll;
-		var term4 = omega_nonzero_lndet;
- 		let term5 = individ->icov_lndet;
+		let term1 = individ->obs_lndet;		/* first term */
+		let term2 = individ->obs_min2ll;	/* second term */
+		let term3 = individ->eta_min2ll;	/* third term */
+		var term4 = omega_nonzero_lndet;	/* fourth term */
+ 		let term5 = individ->icov_lndet;	/* fifth term */
 		if (individ->nobs == 0) {
 			assert(term1 == 0.);
 			assert(term2 == 0.);
@@ -382,11 +395,11 @@ double idata_objfn(const IDATA* const idata,
 			assert(term5 == 0.);
 		}
 
-		assert(isfinite(term1) == 1);
-		assert(isfinite(term2) == 1);
-		assert(isfinite(term3) == 1);
-		assert(isfinite(term4) == 1);
-		assert(isfinite(term5) == 1);
+		assert(gsl_finite(term1) == 1);
+		assert(gsl_finite(term2) == 1);
+		assert(gsl_finite(term3) == 1);
+		assert(gsl_finite(term4) == 1);
+		assert(gsl_finite(term5) == 1);
 
 		let iobjfn = term1 + term2 + term3 + term4 + term5;
 		individ->iobjfn = iobjfn;
@@ -398,7 +411,7 @@ double idata_objfn(const IDATA* const idata,
 		objfn5 += term5;
 	}
 	let objfn = objfn1 + objfn2 + objfn3 + objfn4 + objfn5;
-	assert(isfinite(objfn) == 1);
+	assert(gsl_finite(objfn) == 1);
 	return objfn;
 }
 

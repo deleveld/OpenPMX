@@ -3,13 +3,24 @@
 NONMEMDIR=~/nm760
 NONMEMFE=nmfe76
 
+if [ ! -f "${NONMEMDIR}/run/${NONMEMFE}" ]; then
+	NONMEMDIR=~/NM751
+	NONMEMFE=nmfe75
+fi
+
 ########################################################################
 set -e
 TEMP=$(mktemp -d)
 trap "rm -rf ${TEMP}" EXIT
 
+# First argument is the control file
 CONTROL=$1
 echo "control is: " ${CONTROL}
+
+# Second argument is optional, is the number of cores
+MAXNUMBERNODES=$(($(nproc --all) - 4))
+NUMBERNODES="${DO_NONMEM_RUN_NODES:-${MAXNUMBERNODES}}"
+echo nnodes ${NUMBERNODES} >nonmem_nodes.txt
 
 # extract datafile name from the control file
 get_datafile() {
@@ -53,7 +64,7 @@ cp --parents ${DATAFILE} ${TEMP}
 cp ${NONMEMDIR}/run/beolaunch.sh ${TEMP}
 cp ${NONMEMDIR}/run/fpi.pnm ${TEMP}
 
-(cd ${TEMP}; ${NONMEMDIR}/run/${NONMEMFE} ${CONTROL} ${BASENAME}.out -parafile="fpi.pnm")
+(cd ${TEMP}; ${NONMEMDIR}/run/${NONMEMFE} ${CONTROL} ${BASENAME}.out -parafile="fpi.pnm" [nodes]=${NUMBERNODES})
 ### (cd ${TEMP}; ${NONMEMDIR}/run/${NONMEMFE} ${CONTROL} ${BASENAME}.out)
 
 cp -v --preserve ${TEMP}/PRDERR .			| true

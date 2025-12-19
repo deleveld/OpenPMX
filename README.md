@@ -36,18 +36,16 @@ The GNU General Public License does not permit this software to be redistributed
 This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 # Install
-* Windows:
+* Ubuntu:
+	1. Install [GSL](https://www.gnu.org/software/gsl/) with `sudo apt install libgsl-dev`
+	2. Run `./install` or `./install openmp` or `./install singlethread`
+* Windows MSYS2:
 	1. Install [MSYS2](https://www.msys2.org/)
 	2. Install [gcc](https://gcc.gnu.org), I used `pacman -S mingw-w64-x86_64-gcc`
 	3. Install [GSL](https://www.gnu.org/software/gsl/), I used `pacman -S mingw-w64-x86_64-gsl`
-	It runs under MSYS2 but seems slow for some reason, looking into it.
-* Ubuntu:
-	1.  Install [GSL](https://www.gnu.org/software/gsl/) with `sudo apt install libgsl-dev`
-
-Then in the source directory choose one of:
- * `./install` default build using [pthreads](https://man7.org/linux/man-pages/man7/pthreads.7.html)
- * `./install openmp` builds using [OpenMP](https://www.openmp.org/)
- * `./install singlethread` use only a single threads
+	4. Run `./install pthread static` or `./install openmp static`
+* Windows WSL:
+	1. ... under construction ...
 
 After install there will be a shell script `openpmx` with the installed paths.
 

@@ -70,7 +70,7 @@ double sample_min2ll(const int nreta,
 	term3 /= 2.;
 #endif
 #endif
-//	assert(isfinite(term3) == 1);
+//	assert(gsl_finite(term3) == 1);
 	return term3;
 }
 

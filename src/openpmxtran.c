@@ -165,6 +165,39 @@ static void strip_comments(char *s, const char* ca, const char* cb, const char r
 	}
 }
 
+static ssize_t _getdelim(char **lineptr, size_t *n, int delim, FILE *stream)
+{
+    if (lineptr == NULL || n == NULL || stream == NULL)
+        return -1;
+
+    if (*lineptr == NULL || *n == 0) {
+        *n = 128;  // initial size
+        *lineptr = malloc(*n);
+        if (*lineptr == NULL)
+            return -1;
+    }
+
+    size_t pos = 0;
+    int c;
+    while ((c = fgetc(stream)) != EOF) {
+        if (pos + 1 >= *n) {
+            size_t new_size = *n * 2;
+            char *new_ptr = realloc(*lineptr, new_size);
+            if (!new_ptr)
+                return -1;
+            *lineptr = new_ptr;
+            *n = new_size;
+        }
+        (*lineptr)[pos++] = (char)c;
+        if (c == delim)
+            break;
+    }
+    if (pos == 0 && c == EOF)  // nothing read
+        return -1;
+    (*lineptr)[pos] = '\0';
+    return pos;
+}
+
 static char* read_file(const char* filename)
 {
 	var s = fopen(filename, "r");
@@ -174,7 +207,7 @@ static char* read_file(const char* filename)
 	/* https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c */
 	char* buffer = NULL;
 	size_t len;
-	ssize_t bytes_read = getdelim(&buffer, &len, '\0', s);
+	ssize_t bytes_read = _getdelim(&buffer, &len, '\0', s);
 	assert(bytes_read != -1);
 	fclose(s);
 
@@ -204,7 +237,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 	/* https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c */
 	char* buffer = NULL;
 	size_t len = 0;
-	ssize_t bytes_read = getdelim(&buffer, &len, '\0', stream);
+	ssize_t bytes_read = _getdelim(&buffer, &len, '\0', stream);
 	fclose(stream);
 	if (bytes_read == -1)
 		fatal("could not read from data");

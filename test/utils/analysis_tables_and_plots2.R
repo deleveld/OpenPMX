@@ -134,8 +134,6 @@
 
 	objfn_compare <- function(g, gname, baseg, basename)
 	{
-		par(mfrow=c(2, 3), mar=c(4,4,1,0), oma=c(0,0,3,1), cex=1)
-
 		objfn1 <- baseg[["OBJ"]]
 		objfn2 <- g[["OBJ"]]
 
@@ -159,41 +157,70 @@
 		xlim <- range(x)
 		ylim <- range(c(y,-y))
 		plot(x=x, y=y, type="n", xlab=NA, ylab=NA, xlim=xlim, ylim=ylim, main=NA)
-		mtext("Difference", side=2, line=2, cex=par()$cex)
-		mtext("Average", side=1, line=2, cex=par()$cex)
+		mtext("Objective function difference", side=2, line=2, cex=par()$cex)
+		mtext("Objective function average", side=1, line=2, cex=par()$cex)
 		grid()
 		points(x=x, y=y, col="black")
 		abline(h=0, col="black")
+
+		frame()
 
 		x <- objfn2
 		y <- objfn1
 		xlim <- range(c(x,y))
 		ylim <- range(c(x,y))
 		plot(x=x, y=y, type="n", xlab=NA, ylab=NA, xlim=xlim, ylim=ylim, main=NA)
-		mtext(gname, side=2, line=2, cex=par()$cex)
-		mtext(basename, side=1, line=2, cex=par()$cex)
+		mtext(sprintf("Objective function %s", gname), side=2, line=2, cex=par()$cex)
+		mtext(sprintf("Objective function %s", basename), side=1, line=2, cex=par()$cex)
 		grid()
 		points(x=x, y=y, col="black")
 		abline(a=0, b=1, col="black")
 	}
+
+	offx <- 0
+	if (exists("median_speed_offset_x"))
+		offx <- median_speed_offset_x
+	offy <- 0
+	if (exists("median_speed_offset_y"))
+		offy <- median_speed_offset_y
+	
+	runtime_compare <- function(g, gname, baseg, basename)
+	{
+		runtime1 <- g[["V2"]]/1000
+		runtime2 <- baseg[["V2"]]/1000
+
+		med1 <- median(runtime1)
+		med2 <- median(runtime2)
+
+		lim <- range(c(runtime1, runtime2))
+		plot(0, type="n", yaxt="n", xlab=NA, ylab=NA, xlim=(lim), ylim=c(0,1.4), main=NA)
+		mtext("Density", side=2, line=0.5, cex=par()$cex)
+		mtext("Runtime (s)", side=1, line=2, cex=par()$cex)
+		grid()
+		d1 <- density(runtime1, na.rm=TRUE)
+		d2 <- density(runtime2, na.rm=TRUE)
+		lines(x=(d2$x), y=d2$y/max(d2$y), col="darkgrey", lw=3)
+		lines(x=(d1$x), y=d1$y/max(d1$y), col="black", lw=1)
+		abline(v=med1, lt=2, col="black")
+		abline(v=med2, lt=2, col="darkgrey")
+		text(x=med1+offx, y=1.05+offy, labels=sprintf(" %.1f s", med1), adj=c(0,0))
+		text(x=med2, y=1.05, labels=sprintf(" %.1f s", med2), adj=c(0,0), col="darkgrey")
+		legend("topright",
+			legend=c(basename, gname),
+			col=c("darkgrey", "black"),
+			lw=c(3,1),
+			bty="n", cex=par()$cex*0.85)
+	}
+
+	mfrow <- c(2,3)
 	if (exists("gronmem") && exists("nonmem")) {
+		par(mfrow=mfrow, mar=c(4,4,1,0), oma=c(0,0,3,1), cex=1)
 		objfn_compare(gronmem, "OpenPMX", nonmem, "NONMEM")
+		runtime_compare(gronmem_ms, "OpenPMX", nonmem_ms, "NONMEM")
 	}
-	if (exists("gronmem") && exists("nonmemlaplace")) {
-		objfn_compare(gronmem, "OpenPMX", nonmemlaplace, "LAPLACE")
+	if (exists("validate") && exists("gronmem")) {
+		par(mfrow=mfrow, mar=c(4,4,1,0), oma=c(0,0,3,1), cex=1)
+		objfn_compare(validate, "Validate", gronmem, "OpenPMX")
+		runtime_compare(validate_ms, "Validate", gronmem_ms, "OpenPMX")
 	}
-	if (exists("gronmemicov") && exists("nonmem")) {
-		objfn_compare(gronmemicov, "OpenPMX_icov", nonmem, "NONMEM")
-	}
-	if (exists("gronmemicov") && exists("nonmem")) {
-		objfn_compare(gronmemicov, "OpenPMX_icov", nonmem, "NONMEM")
-	}
-	if (exists("gronmemicov") && exists("gronmem")) {
-		objfn_compare(gronmemicov, "OpenPMX_icov", gronmem, "OpenPMX")
-	}
-	if (exists("gronmemtest") && exists("gronmem")) {
-		objfn_compare(gronmemtest, "OpenPMX_icov", gronmem, "OpenPMX")
-	}
-	if (exists("gronmem") && exists("validate")) {
-		objfn_compare(gronmem, "OpenPMX", validate, "Validate")
-	}
+

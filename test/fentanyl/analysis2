@@ -1,4 +1,4 @@
-set -eu
+Oset -eu
 TEMP=$(mktemp -d)
 trap "rmdir --ignore-fail-on-non-empty $TEMP" EXIT
 export LC_ALL=C
@@ -24,18 +24,21 @@ R --vanilla --slave <<-RSCRIPT
 ########################################################################
 
 	nonmem <- readin("generate_results.nonmem.txt")
+	nonmem_ms <- read.table("generate_results.nonmem.runtime_ms.txt", header=FALSE)
 
-	if (file.exists("generate_results.openpmx.txt"))
+	if (file.exists("generate_results.openpmx.txt")) {
 		gronmem <- readin("generate_results.openpmx.txt")
-
-	if (file.exists("generate_results.validate.txt"))
+		gronmem_ms <- read.table("generate_results.openpmx.runtime_ms.txt", header=FALSE)
+	}
+	if (file.exists("generate_results.validate.txt")) {
 		validate <- readin("generate_results.validate.txt")
+		validate_ms <- read.table("generate_results.validate.runtime_ms.txt", header=FALSE)
+	}
 
-	if (file.exists("generate_results.openpmxicov.txt"))
-		gronmemicov <- readin("generate_results.openpmxicov.txt")
-	
 	postscript(file="${TEMP}/${0}.ps", horizontal=TRUE)
 	source("../utils/analysis_tables_and_plots.R")
+	median_speed_offset_x <- 6
+	median_speed_offset_y <- 0.2
 	source("../utils/analysis_tables_and_plots2.R")
 	
 RSCRIPT

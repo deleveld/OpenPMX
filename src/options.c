@@ -77,7 +77,7 @@ SIMCONFIG simconfig_default(const SIMCONFIG* const simulate)
 		ret = *simulate;
 
 	if (ret.seed == 0)
-		ret.seed = 200501041406; /* Birthdays of Joyce, Nette and Isabel :) */
+		ret.seed = (unsigned long)200501041406; /* Birthdays of Joyce, Nette and Isabel :) */
 
 	return ret;
 }
@@ -89,8 +89,17 @@ OPTIONS options_default(const OPTIONS* const opt1)
 
 	/* nthreads == 0 means default number */
 	if (ret.nthread == 0) {
+		
+	int ncpu = 1;
+#if defined(_SC_NPROCESSORS_ONLN)
+		ncpu = sysconf(_SC_NPROCESSORS_ONLN) - 4;
+#else
+		const char* value = getenv("NUMBER_OF_PROCESSORS");
+		if (value)
+			ncpu = atoi(value);
+#endif
 		/* leave some cores over for the operating system */		
-		int n = sysconf(_SC_NPROCESSORS_ONLN) - 4;
+		int n = ncpu - 4;
 		if (n < 0)
 			n = 0;
 		ret.nthread = n;

@@ -15,6 +15,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file implements writing tables. 
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -85,6 +87,10 @@ typedef struct {
 	const double* err;
 } TABLE;
 
+#ifndef NAME_MAX
+#define NAME_MAX 256
+#endif
+
 static TABLE table_open(const IDATA* const idata,
 						const ADVANFUNCS* const advanfuncs,
 						const POPMODEL* const popmodel,
@@ -99,13 +105,17 @@ static TABLE table_open(const IDATA* const idata,
 	/* determine the file to open */
 	if (tableconfig) {
 
+/// If a filename is defined in the TABLECONFIG then the output is
+/// written to that filename.  
 		/* write to user define filename */
 		if (tableconfig->filename) {
 			if (tableconfig->name)
 				fatal(0, "Table has both filename and name\n");
 			filename = tableconfig->filename;
 
-		/* with name, you prepend the control file name */
+/// If a name is defined in the TABLECONFIG then the output is
+/// written to a filename which is the name in the PMX object extended
+/// with the given name.   
 		} else if (tableconfig->name) {
 			filename = pmx_filename;
 			if (!filename)
@@ -114,7 +124,9 @@ static TABLE table_open(const IDATA* const idata,
 		}
 	}
 
-	/* if no config then number the tables */
+/// If a neither a filename or a name is defined in the TABLECONFIG then
+/// the output is written to a filename which is the name in the PMX
+/// object extended with a count of the tables written so far.
 	if (!filename) {
 		*tablecount += 1;
 		filename = pmx_filename;
@@ -154,12 +166,14 @@ static TABLE table_open(const IDATA* const idata,
 		.yhat = 0,
 		.err = 0,
 	};
-	
+
+/// The table fields are indicated by a string which will be tokenized
+/// with spaces, tabs or comma.
 	/* parse fields string and write the header */
 	/* we have to tokenize a copy of the fields */
 	char* token;
 	char* rest = ret.fields;
-	while ((token = strtok_r(rest, ", ", &rest))) {
+	while ((token = strtok_r(rest, ", \t", &rest))) {
 		strip_firstlast_space(token);
 		vector_append(ret.fieldnames, token);
 		fprintf(stream, OPENPMX_HEADER_FORMAT, token);
@@ -181,10 +195,11 @@ static void table_close(TABLE* const table)
 	free(table->fields);
 }
 
-/* table generation is single threaded because no integration takes place,
-   only the saved state is used at each step so it should be I/O limited
-   and not cpu limited. It would be very hard to make it multithreaded
-   because the rows have to be output in the correct order */
+/// Table generation is single threaded because no advanging takes
+/// place, only the saved state is used at each step. So it should be I/O
+/// limited and not cpu limited. It would be very hard to make it
+/// multithreaded because the rows have to be output in the correct
+/// order.
 static int table_row(TABLE* const table)
 {
 	assert(table);
@@ -204,6 +219,8 @@ static int table_row(TABLE* const table)
 			firstonly = table->tableconfig->firstonly;
 		let nrecord = idata->individ[table->individ].nrecord;
 
+		/// If firstonly flag in the TABLECONFIG is set then only the
+		/// first record of each individual in output to the table.
 		/* if firstonly then skip to the next individual */
 		if (firstonly) {
 			table->individ += 1;
@@ -276,6 +293,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	if (predictvarsoffset >= 0)
 		return DATA_FIELD(table->predictvars, predictvarsoffset);
 
+	/* Table entries for each RECORD */
 	if (strcmp(name, "yhat") == 0 ||
 		strcmp(name, "YHAT") == 0 ||
 		strcmp(name, "y") == 0 ||
@@ -296,10 +314,8 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	if (strcmp(name, "cwres") == 0 ||
 		strcmp(name, "CWRES") == 0) {
 		let dv = RECORDINFO_DV(recordinfo, table->record);
-		if (table->yhatvar <= 0.) {
-			warning(0, "table value yhatvar produces NAN for CWRES\n");
+		if (table->yhatvar == 0.)
 			return NAN;
-		}
 		return (table->yhat - dv) / sqrt(table->yhatvar);
 	}
 
@@ -316,48 +332,38 @@ static double table_value(const TABLE* const table, const char* const name, cons
 		return RECORDINFO_RATE(recordinfo, table->record);
 	if (strcmp(name, "CMT") == 0)
 		return RECORDINFO_CMT(recordinfo, table->record);
-		
+
+	/* Table entries for THETA, ETA, STATE, or ERR values */
+	const int off = _offset1 ? 1 : 0;
 	var i = -1;
-
-	/* normal C access */
-	if (_offset1 == false) {
-		if (sscanf(name, "theta[%i]", &i)) {
-			assert(i >= 0 && i < idata->ntheta);
-			return table->popmodel.theta[i];
-		}
-		if (sscanf(name, "eta[%i]", &i)) {
-			assert(i >= 0 && i < idata->nomega);
-			return table->eta[i];
-		}
-		if ((sscanf(name, "a(%i)", &i) == 1) ||
-			(sscanf(name, "state(%i)", &i) == 1)) {
-			assert(i >= 0 && i < idata->nstate);
-			return table->state[i];
-		}
-		if (sscanf(name, "err[%i]", &i) == 1) {
-			assert(i >= 0 && i < idata->nsigma);
-			return table->err[i];
-		}
-
-	/* NONMEM like access with 1-offset vectors */
-	} else {
-		if (sscanf(name, "THETA(%i)", &i) == 1) {
-			assert(i-1 >= 0 && i-1 < idata->ntheta);
-			return table->popmodel.theta[i-1];
-		}
-		if (sscanf(name, "ETA(%i)", &i) == 1) {
-			assert(i-1 >= 0 && i-1 < idata->nomega);
-			return table->eta[i-1];
-		}
-		if ((sscanf(name, "A(%i)", &i) == 1) ||
-			(sscanf(name, "STATE(%i)", &i) == 1)) {
-			assert(i-1 >= 0 && i-1 < advanfuncs->nstate);
-			return table->state[i-1];
-		}
-		if (sscanf(name, "ERR(%i)", &i) == 1) {
-			assert(i-1 >= 0 && i-1 < idata->nsigma);
-			return table->err[i-1];
-		}
+	if (sscanf(name, "theta[%i]", &i) == 1 ||
+		sscanf(name, "THETA[%i]", &i) == 1 ||
+		sscanf(name, "theta%i", &i) == 1 ||
+		sscanf(name, "THETA%i", &i) == 1) {
+		i -= off;
+		assert(i >= 0 && i < idata->ntheta);
+		return table->popmodel.theta[i];
+	}
+	if (sscanf(name, "eta[%i]", &i) == 1 ||
+		sscanf(name, "ETA[%i]", &i) == 1 ||
+		sscanf(name, "eta%i", &i) == 1 ||
+		sscanf(name, "ETA%i", &i) == 1) {
+		i -= off;
+		assert(i >= 0 && i < idata->nomega);
+		return table->eta[i];
+	}
+	if (sscanf(name, "a[%i]", &i) == 1 ||
+		sscanf(name, "state[%i]", &i) == 1 ||
+		sscanf(name, "A[%i]", &i) == 1 || 
+		sscanf(name, "STATE[%i]", &i) == 1) {
+		i -= off;
+		assert(i >= 0 && i < idata->nstate);
+		return table->state[i];	
+	}
+	if (sscanf(name, "err[%i]", &i) == 1) {
+		i -= off;
+		assert(i >= 0 && i < idata->nsigma);
+		return table->err[i];
 	}
 	
 	fatal(0, "Cannot find table field \"%s\"\n", name);

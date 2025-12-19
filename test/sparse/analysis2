@@ -30,18 +30,22 @@ R --vanilla --slave <<-RSCRIPT
 ########################################################################
 
 	nonmem <- read.table("generate_results.nonmem.txt", header=TRUE)
+	nonmem_ms <- read.table("generate_results.nonmem.runtime_ms.txt", header=FALSE)
 
-	if (file.exists("generate_results.openpmx.txt"))
+	if (file.exists("generate_results.openpmx.txt")) {
 		gronmem <- read.table("generate_results.openpmx.txt", header=TRUE)
-
-	if (file.exists("generate_results.validate.txt"))
-		validate <- read.table("generate_results.validate.txt", header=TRUE)
-
-	if (file.exists("generate_results.openpmxicov.txt"))
-		gronmemicov <- read.table("generate_results.openpmxicov.txt", header=TRUE)
+		gronmem_ms <- read.table("generate_results.openpmx.runtime_ms.txt", header=FALSE)
+	}
 	
-#	nonmemlaplace   <- read.table("generate_results.nonmemlaplace.txt", header=TRUE)
-#	gronmemtest 	<- read.table("generate_results.openpmxtest.txt", header=TRUE)
+	if (file.exists("generate_results.validate.txt")) {
+		validate <- read.table("generate_results.validate.txt", header=TRUE)
+		validate_ms <- read.table("generate_results.validate_ms.txt", header=FALSE)
+	}
+
+	if (file.exists("generate_results.openpmxicov.txt")) {
+		gronmemicov <- read.table("generate_results.openpmxicov.txt", header=TRUE)
+		gronmemicov_ms <- read.table("generate_results.openpmxicov.txt", header=FALSE)
+	}
 
 	postscript(file="${TEMP}/${0}.ps", horizontal=TRUE)
 	source("../utils/analysis_tables_and_plots.R")

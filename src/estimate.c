@@ -14,6 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+ 
+/// This file does the outer (stage 2) estimation.
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -41,13 +43,7 @@
 
 /*--------------------------------------------------------------------*/
 /* different optimizers */
-
 #define OPTIMIZER_OUTER_BOBYQA
-//#define OPTIMIZER_OUTER_GSL_NELDERMEAD
-//#define OPTIMIZER_OUTER_GSL_BFGS
-// TODO: Not working, sigsev when outer is libprima as well!
-// The data pointer getting passed to inner is invalid
-//#define OPTIMIZER_OUTER_LIBPRIMA
 
 typedef struct {
 	IDATA* const idata;
@@ -87,11 +83,16 @@ static void update_best_imodel(const STAGE2_PARAMS* const params,
 		*best = *popmodel;
 		improved_model = best;
 
+/// Each time the objective function improves during estimation the eta
+/// values are saved. They will be used as initial values for subsequent
+/// optimization.
 		/* save the best eta so we can keep restarting there for speed and hopefully some consistancy */
 		let firstindivid = &idata->individ[0];
 		memcpy(params->besteta, firstindivid->eta, params->neta * sizeof(double));
 	}
 
+/// If the progress flag is set then each time the model fit is improved 
+/// then the results are appended to the ext file.
 	/* update the user */
 	if (options->estimate.verbose)
 		improved_model = popmodel;
@@ -160,71 +161,26 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 #include "bobyqa/bobyqa.h"
 #endif
 
-#ifdef OPTIMIZER_OUTER_GSL_NELDERMEAD
-#include <gsl/gsl_multimin.h>
-static double gsl_stage2_objfn(const gsl_vector* v, void *params)
+static bool bobyqa_error(const int retcode, const char* phase, FILE* stream)
 {
-	return focei_stage2_evaluate_population_objfn(v->size, v->data, params);
+	if (retcode == BOBYQA_SUCCESS)
+		return false;
+
+	var errmsg = "unknown";
+	if (retcode == BOBYQA_BAD_NPT) 
+		errmsg = "NPT is not in the required interval";
+	else if (retcode == BOBYQA_TOO_CLOSE) 
+		errmsg = "insufficient space between the bounds";
+	else if (retcode == BOBYQA_ROUNDING_ERRORS) 
+		errmsg = "too much cancellation in a denominator";
+	else if (retcode == BOBYQA_TOO_MANY_EVALUATIONS) 
+		errmsg = "maximum number of function evaluations exceeded";
+	else if (retcode == BOBYQA_STEP_FAILED) 
+		errmsg = "a trust region step has failed to reduce Q";
+
+	warning(stream, "%s BOBYQA error %i: %s\n", phase, retcode, errmsg);
+	return true;
 }
-#endif
-
-#ifdef OPTIMIZER_OUTER_GSL_BFGS
-#include <gsl/gsl_multimin.h>
-static double foce_stage2_f(const gsl_vector* const v, void* const params)
-{
-	return focei_stage2_evaluate_population_objfn(v->size, v->data, params);
-}
-
-static void foce_stage2_df(const gsl_vector * const x, void* const _params, gsl_vector* const J)
-{
-	let params = (const STAGE2_PARAMS *) _params;
-	let step_size = params->options->estimate.step_initial;
-	let n = params->test.nparam;
-	var xx = gsl_vector_alloc(n);
-
-	let h = step_size;
-	forcount(i, n) {
-		let v = gsl_vector_get(x, i);
-		gsl_vector_memcpy(xx, x);
-
-		let above1 = v + h;
-		gsl_vector_set(xx, i, above1);
-		let f_above1 = foce_stage2_f(xx, _params);
-
-		let below1 = v - h;
-		gsl_vector_set(xx, i, below1);
-		let f_below1 = foce_stage2_f(xx, _params);
-
-		let deriv = (f_above1 - f_below1) / (above1 - below1);	/* arbitrary method */
-
-		gsl_vector_set(J, i, deriv);
-	}
-	gsl_vector_free(xx);
-}
-static void foce_stage2_fdf(const gsl_vector* const x,
-							void* data,
-							double* const f,
-							gsl_vector* const J)
-{
-	*f = foce_stage2_f(x, data);
-	foce_stage2_df(x, data, J);
-}
-#endif
-
-#ifdef OPTIMIZER_OUTER_LIBPRIMA
-//#include "prima.h"
-static void outer_fun(const double x[], double* const f, const void* data)
-{
-//	info(0, "Outer data %p\n", data);
-//	fflush(stdout);
-
-	let params = (STAGE2_PARAMS*) data;
-	let objfn = focei_stage2_evaluate_population_objfn(params->test.nparam,
-													   x, 
-													   data);
-    *f = objfn;
-}
-#endif
 
 static const char* focei(STAGE2_PARAMS* const params)
 {
@@ -247,76 +203,6 @@ static const char* focei(STAGE2_PARAMS* const params)
 	let step_refine = options->estimate.step_refine;
 	let step_final = options->estimate.step_final;
 
-#ifdef OPTIMIZER_OUTER_GSL_NELDERMEAD
-	/* Initialize method and iterate */
-	var minex_func = (gsl_multimin_function) {
-		.n = n,
-		.f = gsl_stage2_objfn,
-		.params = params,
-	};
-
-	var gsl_initial = gsl_vector_view_array(initial, n);
-	let ss = gsl_vector_alloc(n);
-	gsl_vector_set_all(ss, step_initial); /* Starting step size */
-
-	var s = gsl_multimin_fminimizer_alloc(gsl_multimin_fminimizer_nmsimplex2, n);
-	gsl_multimin_fminimizer_set(s, &minex_func, &gsl_initial.vector, ss);
-	int iter = 0;
-	int status;
-	do {
-		iter++;
-		status = gsl_multimin_fminimizer_iterate(s);
-		if (status)
-			break;
-
-		let size = gsl_multimin_fminimizer_size(s);
-		status = gsl_multimin_test_size(size, step_final);
-	}
-	while (status == GSL_CONTINUE && iter < maxeval);
-
-	gsl_multimin_fminimizer_free(s);
-	gsl_vector_free(ss);
-#endif
-
-#ifdef OPTIMIZER_OUTER_GSL_BFGS
-	var my_func = (gsl_multimin_function_fdf) {
-		.f = foce_stage2_f,
-		.df = foce_stage2_df, /* TODO: consider http://www.holoborodko.com/pavel/numerical-methods/numerical-derivative/smooth-low-noise-differentiators/ */
-		.fdf = foce_stage2_fdf,
-		.n = (size_t)n,
-		.params = (void*)params,
-	};
-
-	/* setup and run minimizer */
-	/* arbitrary values */
-	var prevobjfn = DBL_MAX;
-	while (1) {
-		var gsl_initial = gsl_vector_view_array(initial, n);
-		var s = gsl_multimin_fdfminimizer_alloc(gsl_multimin_fdfminimizer_vector_bfgs2, n);
-		gsl_multimin_fdfminimizer_set(s, &my_func, &gsl_initial.vector, step_refine, 0.1);
-
-		/* multimin iterate */
-		int status;
-		while (1) {
-			status = gsl_multimin_fdfminimizer_iterate(s);
-			if (status == GSL_ENOPROG)
-				break;
-			let grad = gsl_multimin_fdfminimizer_gradient(s);
-			status = gsl_multimin_test_gradient(grad, step_final);
-			if (status !=  GSL_CONTINUE)
-				break;
-			if (params->neval >=  maxeval) 
-				break;
-		}
-		gsl_multimin_fdfminimizer_free(s);
-
-		let objfn = params->best.result.objfn;
-		if (prevobjfn - objfn < fabs(options->estimate.dobjfn))
-			break;
-		prevobjfn = objfn;
-	}
-#endif
-
 #ifdef OPTIMIZER_OUTER_BOBYQA
 	let npt = 2*n+1;			/* reccommended */
 //	let npt1 = n+2;				/* minimum */
@@ -325,6 +211,9 @@ static const char* focei(STAGE2_PARAMS* const params)
 	let wsize = (npt+5)*(npt+n)+3*n*(n+5)/2 + 10; /* a little bit extra room to be sure */
 	let w = mallocvar(double, wsize);
 
+/// Model estimation begins with an intial optimization with large 
+/// changes to paramater values with BOBYQA rho values from 
+/// step_initial, stopping at step_refine. 
 	let best = &params->best;
 	var lastobjfn = best->result.objfn;
 	forcount(i, n)
@@ -338,13 +227,15 @@ static const char* focei(STAGE2_PARAMS* const params)
 						 initial, lower, upper,
 						 rhobeg, rhoend,
 						 iprint, neval, w);
-	if (retcode != BOBYQA_SUCCESS)
-		info(params->outstream, "initial BOBYQA error code %i\n", retcode);
+	bobyqa_error(retcode, "stage2 initial", params->outstream); /* warn error, but try refine anyway */
 
 	var timestamp = get_timestamp(params);
 	info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
 	lastobjfn = best->result.objfn;
 
+/// After initial optimization, a smaller search space is used from 
+/// rho_refine to rho_final. This is repeated until the change in 
+/// objective function between restarts is less than dobjfn.
 	if (step_final < step_refine) {
 		var dobjfn = best->result.objfn - lastobjfn;
 		do {
@@ -361,9 +252,9 @@ static const char* focei(STAGE2_PARAMS* const params)
 							 initial, lower, upper,
 							 rhobeg, rhoend,
 							 iprint, neval, w);
-			if (retcode != BOBYQA_SUCCESS)
-				info(params->outstream, "refine BOBYQA error code %i\n", retcode);
-
+			if (bobyqa_error(retcode, "stage2 refine", params->outstream))
+				break;
+				
 			dobjfn = best->result.objfn - lastobjfn;
 			var timestamp = get_timestamp(params);
 			info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
@@ -374,80 +265,6 @@ static const char* focei(STAGE2_PARAMS* const params)
 	info(params->outstream, "optim rho %g\n", rhoend);
 
 	free(w);
-#endif
-
-#ifdef OPTIMIZER_OUTER_LIBPRIMA
-	let best = &params->best;
-	var lastobjfn = best->result.objfn;
-	forcount(i, n)
-		initial[i] = 0.;
-	var neval = maxeval;
-	var rhobeg = step_initial;
-	var rhoend = step_refine;
-	info(params->outstream, "optim rho %g %g\n", rhobeg, rhoend);
-	
-	prima_problem_t problem;
-	prima_init_problem(&problem, n);
-	problem.x0 = initial;
-	problem.xl = lower;
-	problem.xu = upper;
-	problem.calfun = outer_fun;
-
-	// Set up the options
-	prima_options_t poptions;
-	prima_init_options(&poptions);
-	poptions.rhobeg = rhobeg;
-	poptions.rhoend = rhoend;
-	poptions.maxfun = neval;
-	poptions.data = (void*)params;
-	poptions.callback = 0;
-
-	// initial rough estimation
-#define PRIMA_METHOD PRIMA_BOBYQA
-#define PRIMA_METHOD PRIMA_LINCOA
-	prima_result_t result;
-	prima_rc_t retcode = prima_minimize(PRIMA_METHOD, problem, poptions, &result);
-    prima_free_result(&result);
-
-//	if (retcode != PRIMA_RESULT_INITIALIZED)
-//		warning(0, "initial BOBYQA(libprima) error code %i\n", retcode);
-
-	var runtime_s = get_timestamp(params);
-	info(params->outstream, "time %.3f neval %i objfn %f\n", runtime_s, params->neval, best->result.objfn);
-	lastobjfn = best->result.objfn;
-
-	// refine estimation
-	if (step_final < step_refine) {
-		var dobjfn = best->result.objfn - lastobjfn;
-		do {
-			encode_offset(&params->test, &params->best);
-			forcount(i, n)
-				initial[i] = 0.;
-
-			neval = maxeval - params->neval;
-			rhobeg = step_refine;
-			rhoend = step_final;
-			info(params->outstream, "optim rho %g %g\n", rhobeg, rhoend);
-
-			poptions.rhobeg = rhobeg;
-			poptions.rhoend = rhoend;
-			poptions.maxfun = neval;
-			retcode = prima_minimize(PRIMA_METHOD, problem, poptions, &result);
-			prima_free_result(&result);
-
-//			if (retcode != PRIMA_RESULT_INITIALIZED)
-//				warning(0, "refine BOBYQA(libprima) error code %i\n", retcode);
-
-			dobjfn = best->result.objfn - lastobjfn;
-			var runtime_s = get_timestamp(params);
-			info(params->outstream, "time %.3f neval %i objfn %f\n", runtime_s, params->neval, best->result.objfn);
-			lastobjfn = best->result.objfn;
-		}
-		while (dobjfn < -1.*fabs(options->estimate.dobjfn));
-	}
-	info(params->outstream, "optim rho %g\n", rhoend);
-
-    prima_free_result(&result);
 #endif
 
 	free(lower);
@@ -495,7 +312,15 @@ static bool stabilize_model(STAGE2_PARAMS* params)
 	params->neval += 1;
 	var timestamp = get_timestamp(params);
 	info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, popmodel->result.objfn);
-
+	
+/// At initial objective function calculation the results may not be 
+/// stable with recalculating resulting in a different objective 
+/// function value. This seems likely due to the changing of the 
+/// initial conditions for each Stage 1 due to updating of the best eta 
+/// value. So for the first evaluation, the objective function value is
+/// recalculated until it is stabel to 0.01 or 10 iterations. If this
+/// stabilization phase fails or requires many iterations then there may
+/// be numerical stability issues with the model and data. 
 	var done = false;
 	var niter = 0;
 	let maxiter = 10;
@@ -591,7 +416,7 @@ static void outfile_header(FILE* f2,
 	assert(idata);
 	assert(options);
 	
-	info(f2, "$OUTFILE\nOpenPMX %i.%i.%i %s\n", OPENPMX_VERSION_MAJOR, OPENPMX_VERSION_MINOR, OPENPMX_VERSION_RELEASE, OPENPMX_GITHASH);
+	info(f2, "OpenPMX %i.%i.%i %s\n", OPENPMX_VERSION_MAJOR, OPENPMX_VERSION_MINOR, OPENPMX_VERSION_RELEASE, OPENPMX_GITHASH);
 
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 	char parallel_message[] = "pthread";
@@ -602,16 +427,16 @@ static void outfile_header(FILE* f2,
 #else
 #error no parallel processing defined
 #endif
-
 #if defined(OPENPMX_LIBTYPE_SHARED)
 	char libtype_message[] = "shared";
 #elif defined(OPENPMX_LIBTYPE_STATIC)
 	char libtype_message[] = "static";
 #else
-#error no libtype shared/static defined
+#error no libtype defined
 #endif
-
-	info(f2, "config %s %i %s\n", parallel_message, options->nthread, libtype_message);
+	info(f2, "config %s %i %s \"%s\" \"%s\"\n", 
+		parallel_message, options->nthread, libtype_message, 
+		OPENPMX_INSTALL_PLATFORM, OPENPMX_INSTALL_PATH);
 
 	info(f2, "data records %i used %i removed %i\n", advanfuncs->recordinfo.dataconfig->nrecords, idata->ndata, advanfuncs->recordinfo.dataconfig->nrecords - idata->ndata);
 	info(f2, "data individuals %i observations %i\n", idata->nindivid, idata->nobs);
@@ -699,6 +524,7 @@ static void estimate_popmodel(const char* filename,
 	var params = stage2_params(filename, idata, advanfuncs, popmodel, options);
 	popmodel->result.nparam = params.test.nparam;
 
+/// At start of estimation the header of the ext file is written.
 	/* do some logging */
 	/* start extfile and other headers, rest will be saved during iterations */
 	outfile_header(params.outstream, advanfuncs, idata, options, outfile_type);
@@ -708,7 +534,8 @@ static void estimate_popmodel(const char* filename,
 	if (maxeval > 1)
 		info(params.outstream, "optim %s\n", message);
 
-	/* do the checkout */
+/// Before estimation a data checkout is done (see ievaluate.c) to 
+/// detect various errors.
 	idata_ineval(idata, true);
 	idata_checkout(idata, advanfuncs, popmodel, options, params.outstream);
 
@@ -720,6 +547,8 @@ static void estimate_popmodel(const char* filename,
 	let timestamp = get_timestamp(&params);
 	popmodel_information(params.outstream, popmodel, timestamp);
 
+/// At the end of estimation the phi file is written and a trailer is 
+/// put onto the ext file. 
 	/* update results in tables */
 	if (filename) {
 		table_phi_idata(filename, idata, _offset1);
@@ -730,7 +559,7 @@ static void estimate_popmodel(const char* filename,
 		if (options->estimate.stage1.icov_resample)
 			table_icov_resample_idata(filename, idata, _offset1);
 	}
-
+	
 	/* cleanup */
 	stage2_params_cleanup(&params);
 }
@@ -756,6 +585,8 @@ void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 
 	pmx_update_from_popmodel(pmx, &popmodel);
 }
+
+/// Evaluation is the same as estimation but with maxeval=0.
 
 void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 {

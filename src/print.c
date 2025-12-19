@@ -27,7 +27,9 @@
 #include "openpmx_compile_options.h"
 
 /* --------------------------------------------------------------------*/
+/* mutex to syncronize printing from threads */
 static bool mutex_init = false;
+
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 #include <pthread.h>
 static pthread_mutex_t mutex;
@@ -35,57 +37,28 @@ static pthread_mutex_t mutex;
 #include <omp.h>
 static omp_lock_t mutex;
 #elif defined(OPENPMX_PARALLEL_SINGLETHREAD)
-/* nothing for single threaded install */
+/* no mutex */
 #endif
-
-static void lock_print_mutex(void)
-{
-	if (mutex_init) {
-#if defined(OPENPMX_PARALLEL_PTHREADS)
-		pthread_mutex_lock(&mutex);
-#elif defined(OPENPMX_PARALLEL_OPENMP)
-		omp_set_lock(&mutex);	
-#else
-		/* do nothing for single threaded install */
-#endif
-	}
-}
-
-static void unlock_print_mutex(void)
-{
-	if (mutex_init) {
-#if defined(OPENPMX_PARALLEL_PTHREADS)
-		pthread_mutex_unlock(&mutex);
-#elif defined(OPENPMX_PARALLEL_OPENMP)
-		omp_unset_lock(&mutex);	
-#else
-		/* do nothing for single threaded install */
-#endif
-	}
-}
 
 void print_serialize(const bool serial)
 {
-	/* start serializing, make sure mutex exists and is unlocked */
 	if (serial) {
-		if (mutex_init) 
-			fatal(0, "recursive print serialize\n");
+		if (mutex_init)
+			fatal(0, "recursive print_serialize\n");
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 		pthread_mutex_init(&mutex, NULL);
 		pthread_mutex_lock(&mutex);
 		mutex_init = true;
 		pthread_mutex_unlock(&mutex);
 #elif defined(OPENPMX_PARALLEL_OPENMP)
-		omp_init_lock(&mutex);	
+		omp_init_lock(&mutex);
 		omp_set_lock(&mutex);
 		mutex_init = true;
 		omp_unset_lock(&mutex);
 #endif
-					
-	/* stop serializing */
 	} else {
-		if (!mutex_init) 
-			fatal(0, "unpaired print unserialize\n");
+		if (!mutex_init)
+			fatal(0, "unmatched print_serialize\n");
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 		pthread_mutex_lock(&mutex);
 		mutex_init = false;
@@ -100,9 +73,31 @@ void print_serialize(const bool serial)
 	}
 }
 
+static void mutex_lock(void)
+{
+	if (mutex_init) {
+#if defined(OPENPMX_PARALLEL_PTHREADS)
+		pthread_mutex_lock(&mutex);
+#elif defined(OPENPMX_PARALLEL_OPENMP)
+		omp_init_lock(&mutex);	/* initial state is unlocked */
+#endif
+	}
+}
+
+static void mutex_unlock(void)
+{
+	if (mutex_init) {
+#if defined(OPENPMX_PARALLEL_PTHREADS)
+		pthread_mutex_unlock(&mutex);
+#elif defined(OPENPMX_PARALLEL_OPENMP)
+		omp_unset_lock(&mutex);
+#endif
+	}
+}
+
 void openpmx_fputs(FILE* stream1, FILE* stream2, const char* prefix, const char* v)
 {
-	lock_print_mutex();
+	mutex_lock();
 
 	/* actually send the string */
 	if (stream1) {
@@ -116,7 +111,7 @@ void openpmx_fputs(FILE* stream1, FILE* stream2, const char* prefix, const char*
 		fputs(v, stream2);
 	}
 
-	unlock_print_mutex();
+	mutex_unlock();
 }
 
 static void openpmx_vprintf(FILE* stream1, FILE* stream2, const char* prefix, const char* format, va_list args1)

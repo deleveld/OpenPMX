@@ -54,7 +54,8 @@ void omegainfo_update_inverse_lndet(OMEGAINFO* const omegainfo,
 		/* get the nonzero omega matrix to make the cholesky which we
 		 * use to find inverse and log(det()) */
 		reduced_omega_init(&cholesky.matrix, omega, omegainfo->nonzero.rowcol, omegainfo->nonzero.n);
-		cholesky_decomposition(&cholesky.matrix, "nonzero");
+		let fail = cholesky_decomposition(&cholesky.matrix);
+		assert(!fail);
 
 		/* fill in data of nonzero inverse matrix */
 		gsl_matrix_memcpy(&inverse.matrix, &cholesky.matrix);

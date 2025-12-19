@@ -162,9 +162,9 @@ static void idata_resample_eta(IDATA* const idata,
  * without noise. If the error has not been resampled yet by calling
  * idata_resample_err then the error will be zero */
 static void idata_predict_dv(IDATA* const idata,
-							const ADVANFUNCS* const advanfuncs,
-							const POPMODEL* popmodel,
-							const OPTIONS* const options)
+							 const ADVANFUNCS* const advanfuncs,
+							 const POPMODEL* popmodel,
+							 const OPTIONS* const options)
 {
 	/* make sure error has been allocated. If error has not been resampled yet,
 	 * then the initial value (zero) will be used */
