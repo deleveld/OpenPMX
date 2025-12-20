@@ -27,26 +27,23 @@ trap "rm \"${OBJFILE}\" \"${EXECFILE}\"" EXIT
 
 # translate control file to C code
 if [ "${FILE##*.}" != "c" ]; then
-	"${OPENPMXPATH}/bin/openpmxtran" "${FILE}"
+	"${OPENPMXPATH}/bin/openpmxtran" "${FILE}" 2>&1
 	FILE="${FILE}.c"
 fi
 
 # compile the C code
 # only show relative paths
-(${CC} ${CFLAGS} -fdebug-prefix-map=$(pwd)=. -I${OPENPMXPATH}/include -c "${FILE}" -o "${OBJFILE}")
+(${CC} ${CFLAGS} -fdebug-prefix-map=$(pwd)=. -I${OPENPMXPATH}/include -c "${FILE}" -o "${OBJFILE}") 2>&1
 
 # we have object files, so link now
-# echo "link \"${OBJFILE}\""
-###(${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} -lopenpmx -lprimac -lprimaf -lgsl -lgslcblas -lm) 2>&1
 (${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm) 2>&1
 
 # execute
-# echo "execute \"${EXECFILE}\""
 if [ -f "${EXECFILE}" ]; then
 	if [ "${LIBTYPE}" = "shared" ]; then
-		env LD_LIBRARY_PATH=${OPENPMXPATH}/lib:${LD_LIBRARY_PATH:-} "./${EXECFILE}"
+		env LD_LIBRARY_PATH=${OPENPMXPATH}/lib:${LD_LIBRARY_PATH:-} "./${EXECFILE}"  2>&1
 	elif [ "${LIBTYPE}" = "static" ]; then
-		"./${EXECFILE}"
+		"./${EXECFILE}" 2>&1
 	else
 		echo "error: \"${LIBTYPE}\" must be static or shared"
 		exit 1
