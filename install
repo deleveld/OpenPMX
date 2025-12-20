@@ -123,7 +123,7 @@ elif [ "${TARGET}" = "sanitize" ]; then
 	CFLAGS="${CFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
 	LFLAGS="${LFLAGS} -pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
 	echo '#define OPENPMX_PARALLEL_PTHREADS' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
-	echo '#define OPENPMX_SANATIZE' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
+	echo '#define OPENPMX_SANITIZE' >>"${OPENPMXPATH}/src/openpmx_compile_options.h"
 
 # install flags for single threaded
 elif [ "${TARGET}" = "singlethread" ]; then

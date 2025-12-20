@@ -233,7 +233,7 @@ static int match_recordname(const char* p, const char* q, int* i, const bool whi
 
 static void load_datafile_write_dataconfig(const char* datafile, STRING* data, STRINGS* fieldnames, STRING* config)
 {
-	fprintf(stdout, "data \"%s\"\n", datafile);
+//	fprintf(stdout, "data \"%s\"\n", datafile);
 	var stream = fopen(datafile, "r");
 	if (!stream) 
 		fatal("could not read data file \"%s\"", datafile);
@@ -711,7 +711,7 @@ int main(int argc, char* argv[])
 	PARSERESULT res = { };
 
 	/* read in GR file */
-	fprintf(stdout, "read \"%s\"\n", grfilename);
+//	fprintf(stdout, "read \"%s\"\n", grfilename);
 	var grfile = read_file(grfilename);
 	string_append(&res.filename, grfilename);
 
@@ -960,7 +960,7 @@ extern char openpmxtran_template[];
 
 	/* write output file */
 	STRING outputfile = string_allocf("%s.c", res.filename.ptr);
-	fprintf(stdout, "write \"%s\"\n", outputfile.ptr);
+//	fprintf(stdout, "write \"%s\"\n", outputfile.ptr);
 	var f = fopen(outputfile.ptr, "w");
 	assert(f);
 	fputs(res.output.ptr, f);
@@ -1118,7 +1118,7 @@ char openpmxtran_template[] =
 "${OPENPMXTRAN_PREDPARAMS_FIELDS_DECLARE}\n"
 "\n"
 "#define THETA(i) 	((const double)_theta[i-1])\n"
-"#define ETA(i) 	((const double)_current->_popparam->eta[i-1])\n"
+"#define ETA(i) 	((const double)_current->popparam->eta[i-1])\n"
 "#define A(i) 		((const double)_state[i-1])\n"
 "#define ERR(i) 	((const double)_err[i-1])\n"
 "#define EPS(i) 	((const double)_err[i-1])\n"

@@ -149,17 +149,14 @@ typedef struct ADVANCONFIG {
 	} args;
 } ADVANCONFIG;
 
-/*---------------------------------------------------------------------*/
-/* advancer */
-/*---------------------------------------------------------------------*/
-/* analytic */
+/* analytic advan methods */
 ADVANFUNCS* pmx_advan_pred(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_onecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_onecomp_depot(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 
-/* differential equations */
+/* differential equation advan methods */
 ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_diffeqn_test(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 

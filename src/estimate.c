@@ -182,11 +182,10 @@ static bool bobyqa_error(const int retcode, const char* phase, FILE* stream)
 	return true;
 }
 
-static const char* focei(STAGE2_PARAMS* const params)
+static bool focei(STAGE2_PARAMS* const params)
 {
-	if (!params)
-		return "FOCEI BOBYQA";
-
+	assert(params);
+	var converged = false;
 	let options = params->options;
 
 	let n = params->test.nparam;
@@ -228,6 +227,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 						 rhobeg, rhoend,
 						 iprint, neval, w);
 	bobyqa_error(retcode, "stage2 initial", params->outstream); /* warn error, but try refine anyway */
+	neval = maxeval - params->neval;
 
 	var timestamp = get_timestamp(params);
 	info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
@@ -236,14 +236,13 @@ static const char* focei(STAGE2_PARAMS* const params)
 /// After initial optimization, a smaller search space is used from 
 /// rho_refine to rho_final. This is repeated until the change in 
 /// objective function between restarts is less than dobjfn.
-	if (step_final < step_refine) {
+	if (neval > 1 && step_final < step_refine) {
 		var dobjfn = best->result.objfn - lastobjfn;
-		do {
+		while (!converged) {
 			encode_offset(&params->test, &params->best);
 			forcount(i, n)
 				initial[i] = 0.;
 
-			neval = maxeval - params->neval;
 			rhobeg = step_refine;
 			rhoend = step_final;
 			info(params->outstream, "optim rho %g %g\n", rhobeg, rhoend);
@@ -252,6 +251,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 							 initial, lower, upper,
 							 rhobeg, rhoend,
 							 iprint, neval, w);
+			neval = maxeval - params->neval;
 			if (bobyqa_error(retcode, "stage2 refine", params->outstream))
 				break;
 				
@@ -259,10 +259,12 @@ static const char* focei(STAGE2_PARAMS* const params)
 			var timestamp = get_timestamp(params);
 			info(params->outstream, "time %.3f neval %i objfn %f\n", timestamp, params->neval, best->result.objfn);
 			lastobjfn = best->result.objfn;
+
+			if (fabs(dobjfn) < fabs(options->estimate.dobjfn))
+				converged = true;
 		}
-		while (dobjfn < -1.*fabs(options->estimate.dobjfn));
 	}
-	info(params->outstream, "optim rho %g\n", rhoend);
+//	info(params->outstream, "optim rho %g\n", rhoend);
 
 	free(w);
 #endif
@@ -271,7 +273,7 @@ static const char* focei(STAGE2_PARAMS* const params)
 	free(upper);
 	free(initial);
 
-	return 0;
+	return converged;
 }
 
 static void estimate_print_model(STAGE2_PARAMS* params)
@@ -390,8 +392,9 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 	let maxeval = options->estimate.maxeval;
 	params->best.result.type = OBJFN_EVALUATE;
 	if (maxeval > 1) {
-		focei(params); /* TODO: this should be renamed I think */
-		params->best.result.type = OBJFN_FINAL;
+		let fullconverge = focei(params); /* TODO: this should be renamed I think */
+		if (fullconverge) 
+			params->best.result.type = OBJFN_FINAL;
 		params->best.result.nparam = params->test.nparam;
 		params->best.result.neval = params->neval;
 
@@ -434,9 +437,9 @@ static void outfile_header(FILE* f2,
 #else
 #error no libtype defined
 #endif
-	info(f2, "config %s %i %s \"%s\" \"%s\"\n", 
+	info(f2, "config %s %i %s \"%s\"\n", 
 		parallel_message, options->nthread, libtype_message, 
-		OPENPMX_INSTALL_PLATFORM, OPENPMX_INSTALL_PATH);
+		OPENPMX_INSTALL_PLATFORM);
 
 	info(f2, "data records %i used %i removed %i\n", advanfuncs->recordinfo.dataconfig->nrecords, idata->ndata, advanfuncs->recordinfo.dataconfig->nrecords - idata->ndata);
 	info(f2, "data individuals %i observations %i\n", idata->nindivid, idata->nobs);
@@ -516,7 +519,9 @@ static void estimate_popmodel(const char* filename,
 	let maxeval = options->estimate.maxeval;
 	popmodel->result.type = OBJFN_CURRENT;
 	if (maxeval > 1) {
-		message = focei(0);
+#ifdef OPTIMIZER_OUTER_BOBYQA
+		message = "FOCEI BOBYQA";
+#endif
 		outfile_type = OUTFILE_HEADER_ESTIMATE;
 	}
 

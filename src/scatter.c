@@ -83,7 +83,7 @@ static struct {
 	THREADTASK threadtask;
 } ttasks;
 
-static void pthreads_cleanup(FILE* logstream)
+static void pthreads_cleanup(void)
 {
 	if (tpool.init) {
 
@@ -92,12 +92,12 @@ static void pthreads_cleanup(FILE* logstream)
 		tpool.stop = true;
 		pthread_cond_broadcast(&tpool.cond);
 		pthread_mutex_unlock(&tpool.mutex);
-		info(logstream, "tpool: stop ");
+//		info(logstream, "tpool: stop ");
 		forcount(i, tpool.nrunning) {
 			pthread_join(tpool.running[i], 0);
-			info(logstream, " %i", i);
+//			info(logstream, " %i", i);
 		}
-		info(logstream, "\n");
+//		info(logstream, "\n");
 		pthread_mutex_destroy(&tpool.mutex);
 		pthread_cond_destroy(&tpool.cond);
 
@@ -263,6 +263,6 @@ void scatter_threads(const IDATA* const idata,
 void scatter_cleanup(void)
 {
 #ifdef OPENPMX_PARALLEL_PTHREADS
-	pthreads_cleanup(0);
+	pthreads_cleanup();
 #endif
 }

@@ -23,7 +23,7 @@ BASE=$(basename "${FILE}")
 
 OBJFILE="${BASE}.o"
 EXECFILE="a.out"
-trap "echo cleanup; rm -v \"${OBJFILE}\" \"${EXECFILE}\"" EXIT
+trap "rm \"${OBJFILE}\" \"${EXECFILE}\"" EXIT
 
 # translate control file to C code
 if [ "${FILE##*.}" != "c" ]; then
@@ -32,12 +32,13 @@ if [ "${FILE##*.}" != "c" ]; then
 fi
 
 # compile the C code
-(${CC} ${CFLAGS} -I${OPENPMXPATH}/include -c "${FILE}" -o "${OBJFILE}")
+# only show relative paths
+(${CC} ${CFLAGS} -fdebug-prefix-map=$(pwd)=. -I${OPENPMXPATH}/include -c "${FILE}" -o "${OBJFILE}")
 
 # we have object files, so link now
 # echo "link \"${OBJFILE}\""
-###(${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} -lopenpmx -lprimac -lprimaf -lgsl -lgslcblas -lm)
-(${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm)
+###(${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} -lopenpmx -lprimac -lprimaf -lgsl -lgslcblas -lm) 2>&1
+(${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm) 2>&1
 
 # execute
 # echo "execute \"${EXECFILE}\""
