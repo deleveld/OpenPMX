@@ -98,8 +98,8 @@ static void update_best_imodel(const STAGE2_PARAMS* const params,
 		improved_model = popmodel;
 	if (improved_model) {
 		let ineval = idata_ineval(idata, false);
-		var outstream = (options->estimate.progress) ? (params->outstream) : 0;
-		var extstream = (options->estimate.progress) ? (params->extstream) : 0;
+		var outstream = params->outstream;
+		var extstream = params->extstream;
 		let runtime_s = get_timestamp(params);
 		popmodel_eval_information(improved_model,
 								  runtime_s,
@@ -287,8 +287,8 @@ static void estimate_print_model(STAGE2_PARAMS* params)
 //		sprintf(message, " objfn %f", popmodel->result.objfn);
 
 	let ineval = idata_ineval(idata, false);
-	var outstream = (options->estimate.progress) ? (params->outstream) : 0;
-	var extstream = (options->estimate.progress) ? (params->extstream) : 0;
+	var outstream = params->outstream;
+	var extstream = params->extstream;
 	let runtime_s = get_timestamp(params);
 	popmodel_eval_information(popmodel,
 							  runtime_s,

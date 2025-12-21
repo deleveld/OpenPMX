@@ -265,7 +265,6 @@ typedef struct {
 
 	bool details;
 	bool verbose;
-	bool progress;
 } ESTIMCONFIG;
 
 void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimconfig);
