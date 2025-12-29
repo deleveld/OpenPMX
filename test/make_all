@@ -34,13 +34,6 @@ do_run()
 }
 
 do_run schnider	1	supplement_2	supplement_3
-do_run schnider_2core	102	speed_none_4_1	speed_4_2
-do_run schnider_4core	104	speed_none_4_1	speed_4_2
-do_run schnider_8core	108	speed_none_8_1	speed_8_2
-do_run schnider_12core	112	speed_none_12_1	speed_12_2
-do_run schnider_16core	116	speed_none_16_1	speed_16_2
-do_run schnider_24core	124	speed_none_24_1	speed_24_2
-
 do_run sparse	2	supplement_5	supplement_6
 do_run fentanyl	3	supplement_8	supplement_9
 do_run warfarin	4	supplement_11	supplement_12

@@ -31,7 +31,6 @@ nonmem()
 	
 	MAXNUMBERNODES=$(($(nproc --all) - 4))
 	NUMBERNODES="${DO_NONMEM_RUN_NODES:-${MAXNUMBERNODES}}"
-	echo nnodes ${NUMBERNODES} >openpmx_nodes.txt
 
 	cat >control.${DATASET}.txt <<-CONTROLFILE
 	${NONMEM_MODEL_PREFIX}

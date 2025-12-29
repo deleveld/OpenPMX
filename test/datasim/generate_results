@@ -19,6 +19,7 @@ SCRIPTNAME=$(basename "${0}")
 ########################################################################
 
 # default methods
+export DO_NONMEM_RUN_NODES=4
 DO_NONMEM_SCRIPT="../utils/do_nonmem_run"
 . "../utils/generate_results_methods.sh"
 
