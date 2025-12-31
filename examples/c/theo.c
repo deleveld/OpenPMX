@@ -136,6 +136,7 @@ int main(void)
 #include "stage1.c"
 #include "scatter.c"
 #include "estimate.c"
+#include "predict.c"
 #include "checkout.c"
 #include "encode.c"
 #include "utils/vector.c"

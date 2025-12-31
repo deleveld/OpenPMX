@@ -15,28 +15,21 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/// This file define the file extenstions and numeric formats used.
+#ifndef OPENPMX_PREDICT_H
+#define OPENPMX_PREDICT_H
 
-#ifndef OPENPMX_DEFINES_H
-#define OPENPMX_DEFINES_H
+#include "openpmx.h"
+#include "popmodel.h"
+#include "options.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define OPENPMX_OUTFILE 				".out"
-#define OPENPMX_EXTFILE 				".ext"
-#define OPENPMX_PHIFILE 				".phi"
-#define OPENPMX_PREDFILE 				".pred"
-#define OPENPMX_ICOVRESAMPLEFILE 		".icov"
-#define OPENPMX_TABLEFILE				".txt"
-
-#define OPENPMX_SFORMAT 				" %12s"
-#define OPENPMX_IFORMAT 				" %12i"
-#define OPENPMX_FFORMAT 				" %12g"
-
-#define OPENPMX_HEADER_FORMAT 			" %24s"
-#define OPENPMX_TABLE_FORMAT 			" %24.17g"
+void idata_predict_pred(const IDATA* const idata,
+						const ADVANFUNCS* const advanfuncs,
+						const POPMODEL* const popmodel,
+						const OPTIONS* const options);
 
 #ifdef __cplusplus
 }

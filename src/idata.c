@@ -301,6 +301,53 @@ void table_phi_idata(const char* filename,
 	fclose(f);
 }
 
+void table_pred_idata(const char* filename,
+					  const IDATA* const idata,
+					  const bool _offset1)
+{
+	assert(filename);
+	var f = results_fopen(filename, OPENPMX_PREDFILE, "w");
+	assert(f);
+
+	fprintf(f, OPENPMX_HEADER_FORMAT, "RECORD_NO");
+	fprintf(f, OPENPMX_HEADER_FORMAT, "ID");
+	fprintf(f, OPENPMX_HEADER_FORMAT, "PRED");
+	fprintf(f, OPENPMX_HEADER_FORMAT, "YHAT");
+	fprintf(f, OPENPMX_HEADER_FORMAT, "YHATVAR");
+
+	let indexoffset = _offset1 ? 1 : 0;
+	let nstate = idata->nstate;
+	forcount(i, nstate) {
+		char temp[128];
+		sprintf(temp, "A(%i)", i + indexoffset);
+		fprintf(f, OPENPMX_HEADER_FORMAT, temp);
+	}
+	fprintf(f, "\n");
+
+	var record_no = 0.;
+	forcount(k, idata->nindivid) {
+		let individ = &idata->individ[k];
+
+		forcount(j, individ->nrecord) {
+			fprintf(f, OPENPMX_TABLE_FORMAT, record_no);
+			fprintf(f, OPENPMX_TABLE_FORMAT, individ->ID);
+
+			fprintf(f, OPENPMX_TABLE_FORMAT, individ->pred[j]);
+			fprintf(f, OPENPMX_TABLE_FORMAT, individ->yhat[j]);
+			fprintf(f, OPENPMX_TABLE_FORMAT, individ->yhatvar[j]);
+
+			let istate = individ->istate;
+			forcount(i, nstate) 
+				fprintf(f, OPENPMX_TABLE_FORMAT, istate[j * nstate + i]);
+
+			fprintf(f, "\n");
+			++record_no;
+		}
+	}
+
+	fclose(f);
+}
+
 void table_icov_resample_idata(const char* filename,
 							   const IDATA* const idata,
 							   const bool _offset1)

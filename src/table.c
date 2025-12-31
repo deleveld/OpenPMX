@@ -195,7 +195,7 @@ static void table_close(TABLE* const table)
 	free(table->fields);
 }
 
-/// Table generation is single threaded because no advanging takes
+/// Table generation is single threaded because no advancing takes 
 /// place, only the saved state is used at each step. So it should be I/O
 /// limited and not cpu limited. It would be very hard to make it
 /// multithreaded because the rows have to be output in the correct
@@ -311,13 +311,6 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	if (strcmp(name, "ineval") == 0 ||
 		strcmp(name, "INEVAL") == 0)
 		return individ->ineval;
-	if (strcmp(name, "cwres") == 0 ||
-		strcmp(name, "CWRES") == 0) {
-		let dv = RECORDINFO_DV(recordinfo, table->record);
-		if (table->yhatvar == 0.)
-			return NAN;
-		return (table->yhat - dv) / sqrt(table->yhatvar);
-	}
 
 	if (strcmp(name, "evid") == 0 ||
 		strcmp(name, "EVID") == 0) 

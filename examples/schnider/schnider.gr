@@ -35,5 +35,4 @@ $MAIN
 	estimate(.maxeval=100);
 	predict_pred();
 //	table("ID,AGE,WT,HT,M1F2", .name="covariates");
-//	table("ID,TIME,DV,IPRED,PRED,yhat,yhatvar", .name="pred");
 

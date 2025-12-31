@@ -35,6 +35,7 @@
 #include "print.h"
 #include "options.h"
 #include "pmxstate.h"
+#include "predict.h"
 #include "advan/advan.h"
 #include "utils/c22.h"
 #include "utils/various.h"
@@ -553,10 +554,15 @@ static void estimate_popmodel(const char* filename,
 	popmodel_information(params.outstream, popmodel, timestamp);
 
 /// At the end of estimation the phi file is written and a trailer is 
-/// put onto the ext file. 
+/// put onto the ext file. Also the pred file is written with prediction
+/// varaiables including pred, yhhat, yhatvar, and the state.
 	/* update results in tables */
 	if (filename) {
+		/* TODO: could this be optional, it might be burdensome for large models */
+		idata_predict_pred(idata, advanfuncs, popmodel, options);
+
 		table_phi_idata(filename, idata, _offset1);
+		table_pred_idata(filename, idata, _offset1);
 		if (params.extstream) {
 			let ineval = idata_ineval(idata, false);
 			extfile_trailer(params.extstream, &params.best, timestamp, ineval);

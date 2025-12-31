@@ -19,13 +19,7 @@ $OMEGABLOCK(
 	.1,
 	0.01, .1,
 	0.01, 0.01, .1)
-$SIGMA(1, 1, 0.)
+$SIGMA(1, 1, 1.)
 $MAIN
-//	openpmx.details = true;
-//	openpmx.verbose = true;
 	estimate();
-//	predict_pred();
-	table("ID BWT", .name="covariates", .firstonly=true);
-	table("ID TIME evid DV yhat yhatvar cwres PRED IPRED", .name="pred");
-	table("ID ineval", .firstonly=true);
 

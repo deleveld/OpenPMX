@@ -20,13 +20,12 @@
 #include <string.h>
 #include <assert.h>
 
+#include "predict.h"
 #include "ievaluate.h"
-#include "popmodel.h"
 #include "idata.h"
 #include "scatter.h"
 #include "utils/c22.h"
 #include "utils/various.h"
-#include "options.h"
 #include "pmxstate.h"
 
 /* NOTE: this function must be thread safe on the level of an individual */
@@ -129,10 +128,10 @@ static void idata_predict_yhat(const IDATA* const idata,
 	scatter_threads(idata, advanfuncs, popmodel, 0, options, &scatteroptions, idata_predict_yhat_thread);
 }
 
-static void idata_predict_pred(const IDATA* const idata,
-							   const ADVANFUNCS* const advanfuncs,
-							   const POPMODEL* const popmodel,
-							   const OPTIONS* const options)
+void idata_predict_pred(const IDATA* const idata,
+						const ADVANFUNCS* const advanfuncs,
+						const POPMODEL* const popmodel,
+						const OPTIONS* const options)
 {
 	/* fill in pred */
 	SCATTEROPTIONS scatteroptions = { };
