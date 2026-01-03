@@ -27,7 +27,7 @@ extern "C" {
 #define OPENPMX_OUTFILE 				".out"
 #define OPENPMX_EXTFILE 				".ext"
 #define OPENPMX_PHIFILE 				".phi"
-#define OPENPMX_PREDFILE 				".pred"
+#define OPENPMX_YHATFILE 				".yhat"
 #define OPENPMX_ICOVRESAMPLEFILE 		".icov"
 #define OPENPMX_TABLEFILE				".txt"
 

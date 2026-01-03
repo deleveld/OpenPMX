@@ -12,7 +12,7 @@ $ADVAN(threecomp)
 $IMODEL(V1, V2, V3, CL, Q2, Q3)
 	const double SIZE = WT/70.;
 	V1 = THETA(1) * SIZE * exp(ETA(1));
-	V2 = THETA(2) * SIZE * exp(ETA(2));
+	V2 = THETA(2) * SIZE * exp(ETA(2) + THETA(7)*(AGE-35));
 	V3 = THETA(3) * SIZE * exp(ETA(3));
 	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4));
 //	Q2 = THETA(5) * pow(SIZE, 0.75) * exp(ETA(5));
@@ -29,10 +29,10 @@ $THETA
 	{   0.1,   2,   5,  ESTIMATE     },
 	{   0.1,   2,   5,  ESTIMATE     },
 	{   0.1,   1,   5,  ESTIMATE     },
+	{   -.1,   0,   .1,  ESTIMATE     },
 $OMEGA(0.1, 0.1, 0.1, 0.1, 0., 0.)
 $SIGMA(0.1)
 $MAIN
-	estimate(.maxeval=100);
-	predict_pred();
-//	table("ID,AGE,WT,HT,M1F2", .name="covariates");
+	estimate();
+	table("ID AGE WT HT M1F2", .name="covariates");
 

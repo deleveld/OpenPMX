@@ -558,11 +558,13 @@ static void estimate_popmodel(const char* filename,
 /// varaiables including pred, yhhat, yhatvar, and the state.
 	/* update results in tables */
 	if (filename) {
-		/* TODO: could this be optional, it might be burdensome for large models */
-		idata_predict_pred(idata, advanfuncs, popmodel, options);
-
 		table_phi_idata(filename, idata, _offset1);
-		table_pred_idata(filename, idata, _offset1);
+
+		/* TODO: could this be optional, it might be burdensome for large
+		 * models because it forces another solving of the equations */
+		idata_predict_pred(idata, advanfuncs, popmodel, options);
+		table_yhat_idata(filename, idata, _offset1);
+
 		if (params.extstream) {
 			let ineval = idata_ineval(idata, false);
 			extfile_trailer(params.extstream, &params.best, timestamp, ineval);

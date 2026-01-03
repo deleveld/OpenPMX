@@ -271,11 +271,24 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 			const char* token;
 			char* rest = line;
 			while ((token = strtok_r(rest, delim, &rest))) {
-
 				/* write tokens to recordfields */
 				let s = strdup(token);
 				strip_firstlast_space(s);
 				vector_append(*fieldnames, s);
+
+				/* error on reserved names in data, do this after
+				 * strip_firstlast_space() so we have the correct name */
+				if (streq(s, "PRED") ||
+					streq(s, "pred") ||
+					streq(s, "YHAT") ||
+					streq(s, "yhat") ||
+					streq(s, "YHATVAR") ||
+					streq(s, "yhatvar")||
+					streq(s, "OBJ") ||
+					streq(s, "obj") ||
+					streq(s, "INEVAL") ||
+					streq(s, "ineval"))
+					fatal("reserved name \"%s\" in data file\n", s);
 
 				if (vector_size(*fieldnames) != 1)
 					string_append(data, ", ");

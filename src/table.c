@@ -295,9 +295,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 
 	/* Table entries for each RECORD */
 	if (strcmp(name, "yhat") == 0 ||
-		strcmp(name, "YHAT") == 0 ||
-		strcmp(name, "y") == 0 ||
-		strcmp(name, "Y") == 0)
+		strcmp(name, "YHAT") == 0)
 		return table->yhat;
 	if (strcmp(name, "yhatvar") == 0 ||
 		strcmp(name, "YHATVAR") == 0)
