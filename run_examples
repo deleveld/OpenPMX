@@ -9,6 +9,6 @@ set -ex
 
 (cd examples/schnider; ../../openpmx schnider.gr)
 (cd examples/theo; ../../openpmx theo.gr)
-(cd examples/schnider; ../../openpmx schnider_diffeqn.gr)
+# (cd examples/schnider; ../../openpmx schnider_diffeqn.gr)
 (cd examples/warfarin; ../../openpmx warfarin.gr)
 

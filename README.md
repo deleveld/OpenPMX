@@ -70,7 +70,7 @@ In directory `examples/theo` these are the Theophylline data from the NONMEM dis
 
 ### Warfarin
 In directory `examples/warfarin` contains data obtained from [here](http://clinpharmacol.fmhs.auckland.ac.nz/docs/warfarin.csv) and [here](https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://holford.fmhs.auckland.ac.nz/docs/pkpd-workshop-nonmem7.pdf).
-The PK analysis example is:
+The PK-PD analysis example is:
 - `../../openpmx warfarin.gr`
 
 # Contributors
