@@ -92,8 +92,6 @@ static void update_best_imodel(const STAGE2_PARAMS* const params,
 		memcpy(params->besteta, firstindivid->eta, params->neta * sizeof(double));
 	}
 
-/// If the progress flag is set then each time the model fit is improved 
-/// then the results are appended to the ext file.
 	/* update the user */
 	if (options->estimate.verbose)
 		improved_model = popmodel;
@@ -554,8 +552,8 @@ static void estimate_popmodel(const char* filename,
 	popmodel_information(params.outstream, popmodel, timestamp);
 
 /// At the end of estimation the phi file is written and a trailer is 
-/// put onto the ext file. Also the pred file is written with prediction
-/// varaiables including pred, yhhat, yhatvar, and the state.
+/// put onto the ext file. Also the yhat file is written with prediction
+/// varaiables including pred, yhat, yhatvar, and the state.
 	/* update results in tables */
 	if (filename) {
 		table_phi_idata(filename, idata, _offset1);

@@ -288,11 +288,11 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 					streq(s, "obj") ||
 					streq(s, "INEVAL") ||
 					streq(s, "ineval"))
-					fatal("reserved name \"%s\" in data file\n", s);
+					fatal("reserved name \"%s\" in data\n", s);
 
 				if (vector_size(*fieldnames) != 1)
 					string_append(data, ", ");
-				string_append(data, token);
+				string_append(data, s);
 			}
 			string_append(data, ";\n");
 			string_append(data, "} RECORD;\n");
