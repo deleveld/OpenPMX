@@ -44,6 +44,8 @@ R --vanilla --slave <<-RSCRIPT
 
 	postscript(file="${TEMP}/${0}.ps", horizontal=TRUE)
 	source("../utils/analysis_tables_and_plots.R")
+#	median_speed_offset_x <- 6
+	median_speed_offset_y <- 0.2	
 	source("../utils/analysis_tables_and_plots2.R")
 
 RSCRIPT

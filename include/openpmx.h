@@ -30,8 +30,8 @@ extern "C" {
 /// the number of state variables etc. If these are too low they can
 /// be adjusted here and the library must be recompiled.
 #define OPENPMX_VERSION_MAJOR			0
-#define OPENPMX_VERSION_MINOR			0
-#define OPENPMX_VERSION_RELEASE			3
+#define OPENPMX_VERSION_MINOR			1
+#define OPENPMX_VERSION_RELEASE			0
 
 #define OPENPMX_THETA_MAX				64
 #define OPENPMX_OMEGABLOCKSIZE_MAX		64
