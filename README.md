@@ -37,7 +37,7 @@ This library is distributed in the hope that it will be useful, but WITHOUT ANY 
 
 # Install
 * Ubuntu:
-	1. Install [GSL](https://www.gnu.org/software/gsl/) with `sudo apt install libgsl-dev`
+	1. Install [GSL](https://www.gnu.org/software/gsl/) with `sudo apt-get install libgsl-dev`
 	2. Run `./install` or `./install openmp` or `./install singlethread`
 * Windows MSYS2:
 	1. Install [MSYS2](https://www.msys2.org/)
@@ -45,7 +45,9 @@ This library is distributed in the hope that it will be useful, but WITHOUT ANY 
 	3. Install [GSL](https://www.gnu.org/software/gsl/), I used `pacman -S mingw-w64-x86_64-gsl`
 	4. Run `./install pthread static` or `./install openmp static`
 * Windows WSL:
-	1. ... under construction ...
+	1. Install compiler and linker with `sudo apt-get install build-essentials`
+	2. Install [GSL](https://www.gnu.org/software/gsl/), with `sudo apt-get install libgsl-dev`
+	3. Run `./install` or `./install openmp` or `./install singlethread`
 
 After install there will be a shell script `openpmx` with the installed paths.
 
