@@ -64,7 +64,6 @@ typedef struct {
 
 	const double zeroerr[OPENPMX_SIGMA_MAX];
 
-	int printrow;
 	int individ;
 	int individ_i;
 	FILE* stream;
@@ -150,7 +149,6 @@ static TABLE table_open(const IDATA* const idata,
 
 		.zeroerr = { },
 
-		.printrow = 0,
 		.individ = 0,
 		.individ_i = 0,
 		.stream = stream,
@@ -210,7 +208,6 @@ static int table_row(TABLE* const table)
 	if (table->record == 0) {
 		table->individ = 0;
 		table->individ_i = 0;
-		table->printrow = 0;
 
 	/* we are already handling a normal row */
 	} else {
@@ -241,12 +238,8 @@ static int table_row(TABLE* const table)
 			table->record = 0;
 			table->individ = 0;
 			table->individ_i = 0;
-			table->printrow = 0;
 			return 0;
 		}
-
-		/* go to the next row */
-		table->printrow +=1;
 	}
 
 	/* prepare information about the table row for user */
@@ -332,29 +325,41 @@ static double table_value(const TABLE* const table, const char* const name, cons
 		sscanf(name, "theta%i", &i) == 1 ||
 		sscanf(name, "THETA%i", &i) == 1) {
 		i -= off;
-		assert(i >= 0 && i < idata->ntheta);
-		return table->popmodel.theta[i];
+		if (i >= 0 && i < idata->ntheta)
+			return table->popmodel.theta[i];
+		if (table->individ == 0 && table->individ_i == 0)
+			warning(0, "Accessing (\"%s\") outside ntheta (%i)\n", name, idata->ntheta + off);
+		return NAN;
 	}
 	if (sscanf(name, "eta[%i]", &i) == 1 ||
 		sscanf(name, "ETA[%i]", &i) == 1 ||
 		sscanf(name, "eta%i", &i) == 1 ||
 		sscanf(name, "ETA%i", &i) == 1) {
 		i -= off;
-		assert(i >= 0 && i < idata->nomega);
-		return table->eta[i];
+		if (i >= 0 && i < idata->nomega)
+			return table->eta[i];
+		if (table->individ == 0 && table->individ_i == 0)
+			warning(0, "Accessing (\"%s\") outside nomega (%i)\n", name, idata->nomega + off);
+		return NAN;
 	}
 	if (sscanf(name, "a[%i]", &i) == 1 ||
 		sscanf(name, "state[%i]", &i) == 1 ||
 		sscanf(name, "A[%i]", &i) == 1 || 
 		sscanf(name, "STATE[%i]", &i) == 1) {
 		i -= off;
-		assert(i >= 0 && i < idata->nstate);
-		return table->state[i];	
+		if (i >= 0 && i < idata->nstate)
+			return table->state[i];	
+		if (table->individ == 0 && table->individ_i == 0)
+			warning(0, "Accessing (\"%s\") outside nstate (%i)\n", name, idata->nstate + off);
+		return NAN;
 	}
 	if (sscanf(name, "err[%i]", &i) == 1) {
 		i -= off;
-		assert(i >= 0 && i < idata->nsigma);
-		return table->err[i];
+		if (i >= 0 && i < idata->nsigma)
+			return table->err[i];
+		if (table->individ == 0 && table->individ_i == 0)
+			warning(0, "Accessing (\"%s\") outside nsigma (%i)\n", name, idata->nsigma + off);
+		return NAN;
 	}
 	
 	fatal(0, "Cannot find table field \"%s\"\n", name);

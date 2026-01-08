@@ -538,8 +538,8 @@ static void estimate_popmodel(const char* filename,
 	if (maxeval > 1)
 		info(params.outstream, "optim %s\n", message);
 
-/// Before estimation a data checkout is done (see ievaluate.c) to 
-/// detect various errors.
+/// Before estimation a data checkout is done (see checkout.c and 
+/// ievaluate.c) to detect various errors. 
 	idata_ineval(idata, true);
 	idata_checkout(idata, advanfuncs, popmodel, options, params.outstream);
 
@@ -558,8 +558,9 @@ static void estimate_popmodel(const char* filename,
 	if (filename) {
 		table_phi_idata(filename, idata, _offset1);
 
-		/* TODO: could this be optional, it might be burdensome for large
-		 * models because it forces another solving of the equations */
+		/* TODO: could this be optional, it might be burdensome for 
+		 * large models because it forces another advancing throught the 
+		 * records */
 		idata_predict_pred(idata, advanfuncs, popmodel, options);
 		table_yhat_idata(filename, idata, _offset1);
 
