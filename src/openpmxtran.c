@@ -429,9 +429,9 @@ static char* match_brackets(char* p, int level)
 	return 0;
 }
 
-/// For the $DATA() identifier the string in the brackets is the data
-/// filename.
-static void parse_data(PARSERESULT* res, char* p)
+/// For the $DATA("filename") identifier the string in the brackets is
+/// the data filename.
+static void parse_data_with_filename(PARSERESULT* res, char* p)
 {
 	if (vector_size(res->data) ||
 		vector_size(res->record_field_names))
@@ -450,9 +450,26 @@ static void parse_data(PARSERESULT* res, char* p)
 
 	load_datafile_write_dataconfig(p, &res->data, &res->record_field_names, &res->dataconfig);
 
-/// In the $DATA() block is code called for each row of the data.
 	strip_firstlast_space(endvars + 1);
 	string_append(&res->data_preprocess_code, endvars + 1);
+}
+
+/// For the $DATA identifier the data filename must be passed as the
+/// second argument.
+static void parse_data_without_filename(PARSERESULT* res, char* p, const char* filename)
+{
+	if (vector_size(res->data) ||
+		vector_size(res->record_field_names))
+		fatal("more than one $DATA \"%s\"", p);
+
+	if (!filename || strlen(filename) == 0) 
+		fatal("$DATA identifier and no datafile passed");
+
+	load_datafile_write_dataconfig(filename, &res->data, &res->record_field_names, &res->dataconfig);
+
+/// In the $DATA block is code called for each row of the data.
+	strip_firstlast_space(p);
+	string_append(&res->data_preprocess_code, p);
 }
 
 /// For the $ADVAN() identifier the name in the brackets is the
@@ -718,8 +735,11 @@ static int find_marker(const char* ptr)
 
 int main(int argc, char* argv[])
 {
-	assert(argc == 2);
+	assert(argc == 2 || argc == 3);
 	const char* grfilename = argv[1];
+	const char* datafilename = "";
+	if (argc == 3)
+		datafilename = argv[2];
 
 	PARSERESULT res = { };
 
@@ -745,7 +765,10 @@ int main(int argc, char* argv[])
 
 		int i;
 		if (match_recordname(begin, "$DATA(", &i, false))
-			parse_data(&res, begin + i);
+			parse_data_with_filename(&res, begin + i);
+
+		else if (match_recordname(begin, "$DATA", &i, true))
+			parse_data_without_filename(&res, begin + i, datafilename);
 
 		else if (match_recordname(begin, "$ADVAN(", &i, false))
 			parse_advan_init(&res, begin + i);
@@ -785,6 +808,14 @@ int main(int argc, char* argv[])
 		begin = end;
 	}
 	free(grfile);
+
+	/* if $DATA is wholly missing then it must be passed on the command
+	 * line */
+	if (vector_size(res.record_field_names) == 0) {
+		if (!datafilename || strlen(datafilename) == 0) 
+			fatal("$DATA identifier missing and no datafile passed");
+		parse_data_without_filename(&res, "", datafilename);
+	}
 
 	/* read in template file */
 extern char openpmxtran_template[];

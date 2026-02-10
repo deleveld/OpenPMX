@@ -16,6 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 FILE="${1}"
+DATA="${2:-}"
 
 # control, object, and executable
 BASE=$(basename "${FILE}")
@@ -29,11 +30,6 @@ while ! mkdir "$LOCKDIR" 2>/dev/null; do
     sleep 10
 done
 
-# Set platform-specific variables
-if [[ "$PLATFORM" == "msys2" ]]; then
-	EXECFILE="${FILE}.exe"
-fi
-
 # cleanup when done
 EXITMESSAGE="error: openpmx failed\n"
 cleanup() {
@@ -44,9 +40,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Set platform-specific variables
+if [[ "$PLATFORM" == "msys2" ]]; then
+	EXECFILE="${FILE}.exe"
+fi
+
 # translate control file to C code
 if [ "${FILE##*.}" != "c" ]; then
-	"${OPENPMXPATH}/bin/openpmxtran" "${FILE}" 2>&1
+	"${OPENPMXPATH}/bin/openpmxtran" "${FILE}" "${DATA}" 2>&1
 	FILE="${FILE}.c"
 fi
 
