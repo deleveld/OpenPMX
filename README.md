@@ -1,5 +1,3 @@
-# OpenPMX
-
 Hi everybody out there doing pharmacometrics,
 
 I have been writing some free model estimation software as a side project. It wont be a big professional thing like
@@ -20,8 +18,10 @@ Douglas Eleveld
 
 ---
 
+# OpenPMX
+
 OpenPMX is a collection of numerical routines for estimation and simulation of mixed-effect pharmacokinetic and pharmacodynamic models.
-This repository contains a copy of the latest stable version.
+This repository contains a copy of the work-in-progress development version and could concievably be broken. If you just want to use the latest stable version then you should look at the Releases.
 
 - First-order conditional estimation results similar to industry standard [NONMEM](https://www.iconplc.com/solutions/technologies/nonmem)
 - Code and simulate/estimate models using text files and C allows scripting and integration with other tools
@@ -36,18 +36,22 @@ The GNU General Public License does not permit this software to be redistributed
 This library is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 
 # Install
+
+### First, prepare for install:
+
 * Ubuntu:
 	1. Install [GSL](https://www.gnu.org/software/gsl/) with `sudo apt-get install libgsl-dev`
-	2. Run `./install` or `./install openmp` or `./install singlethread`
 * Windows MSYS2:
 	1. Install [MSYS2](https://www.msys2.org/)
 	2. Install [gcc](https://gcc.gnu.org), I used `pacman -S mingw-w64-x86_64-gcc`
 	3. Install [GSL](https://www.gnu.org/software/gsl/), I used `pacman -S mingw-w64-x86_64-gsl`
-	4. Run `./install pthread static` or `./install openmp static`
 * Windows WSL:
 	1. Install compiler and linker with `sudo apt-get install build-essentials`
 	2. Install [GSL](https://www.gnu.org/software/gsl/), with `sudo apt-get install libgsl-dev`
-	3. Run `./install` or `./install openmp` or `./install singlethread`
+
+### Next, run install script:
+
+Run `./install` or `./install openmp` or `./install singlethread`
 
 After install there will be a shell script `openpmx` with the installed paths.
 

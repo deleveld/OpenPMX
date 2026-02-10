@@ -55,7 +55,7 @@ RECORDINFO recordinfo_init(const DATACONFIG* const dataconfig)
 	/* count the number of individuals and observations using the incompletely constructed RECORDINFO */
 	const int nrecords = dataconfig->nrecords;
 	int i = 0;
-	int nusuable = 0;
+	int ndata = 0;
 	int nobs = 0;
 	int nindivid = 0;
 	while (i < nrecords) {
@@ -70,7 +70,7 @@ RECORDINFO recordinfo_init(const DATACONFIG* const dataconfig)
 			if (!isnan(dv) && evid == 0)
 				++nobs;
 			++nidata;
-			++nusuable;
+			++ndata;
 		}
 		++nindivid;
 		i += nidata;
@@ -88,7 +88,7 @@ RECORDINFO recordinfo_init(const DATACONFIG* const dataconfig)
 		.offsetCMT 	= temp.offsetCMT,
 		.offsetDVLOW = temp.offsetDVLOW,
 		._offset1 = temp._offset1,
-		.ndata = nusuable,
+		.ndata = ndata,
 		.nindivid = nindivid,
 		.nobs = nobs,
 	};

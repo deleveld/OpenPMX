@@ -29,7 +29,7 @@
 #include "print.h"
 #include "utils/c22.h"
 
-#include "openpmx_compile_options.h"
+#include "buildflags.h"
 
 /* --------------------------------------------------------------------*/
 /// The threadpool is implemented by pthreads or OpenMP. A

@@ -18,123 +18,130 @@
 
 set -euo pipefail
 
-# Set defaults and paths
+# Set the parallel target
 TARGET="${1:-pthread}"
-LIBTYPE="${2:-shared}"
-UNAME="$(uname -s)"
-PLATFORM="${3:-${UNAME}}"
-OPENPMXPATH=$(cd "$(dirname "${0}")" && pwd)
 
-printf "install %s %s %s\n" "${TARGET}" "${LIBTYPE}" "${PLATFORM}"
+# print success/failed message when done
+EXITMESSAGE="failed"
+cleanup() {
+	printf "openpmx install $EXITMESSAGE\n"
+}
+trap cleanup EXIT
+
+# find out about the platform and the path 
+detect_platform() {
+    case "$OSTYPE" in
+        darwin*)  echo "macos" ;;
+        msys*)    echo "msys2" ;;
+        *)
+            if grep -qi microsoft /proc/version 2>/dev/null; then
+                echo "wsl"
+            else
+                echo "linux"
+            fi
+            ;;
+    esac
+}
+PLATFORM=$(detect_platform)
+OPENPMXPATH=$(cd "$(dirname "${0}")" && pwd)
+printf "install %s %s\n" "${TARGET}" "${PLATFORM}"
 printf "path %s\n" "${OPENPMXPATH}"
 
-# General build flags
+# cleaup previous build
+mkdir -p "${OPENPMXPATH}/build" "${OPENPMXPATH}/bin" "${OPENPMXPATH}/lib"
+printf "clean\n"
+rm -vf "${OPENPMXPATH}"/build/*.o
+rm -vf "${OPENPMXPATH}"/bin/openpmxtran
+rm -vf "${OPENPMXPATH}"/lib/*.a
+rm -vf "${OPENPMXPATH}/openpmx"
+rm -vf "${OPENPMXPATH}/src/buildflags.h"
+if [ "${TARGET}" = "clean" ]; then
+    exit 0
+fi
+
+# general build flags
 CC="${CC:-gcc}"
-RM="rm -vf"
 LIBNAME="openpmx"
-CFLAGS="-g -O2 -march=native -W -Wall -Wextra"
+CFLAGS="-g -O2 -W -Wall -Wextra"
 CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -Wwrite-strings -Isrc"
 LFLAGS=""
-SOEXT="so"
+AR="ar rcs lib/lib${LIBNAME}.a"
 
-# 1. Platform Detection
+# adjust flags for different platforms
 case "${PLATFORM}" in
-    Linux*)
+    macos*)
+        # macOS-specific flags
+        # Remove -march=native as it's not well supported on Apple Silicon
+        # Use -fPIC for position independent code
         CLIBFLAGS="${CLIBFLAGS} -fPIC"
-        SOEXT="so"
+        # Detect architecture
+        ARCH=$(uname -m)
+        if [ "$ARCH" = "arm64" ]; then
+            # Apple Silicon
+            CFLAGS="${CFLAGS} -mcpu=apple-m1"
+        else
+            # Intel Mac
+            CFLAGS="${CFLAGS} -march=native"
+        fi
+        LFLAGS="${LFLAGS} -flto"
         ;;
-    MINGW*|MSYS*)
-        CFLAGS="${CFLAGS} -I/mingw64/include"
+    linux*|wsl*)
+        CFLAGS="${CFLAGS} -march=native"
+        CLIBFLAGS="${CLIBFLAGS} -fPIC"
+        LFLAGS="${LFLAGS} -flto -static"
+        ;;
+    msys2*)
+        CFLAGS="${CFLAGS} -march=native -I/mingw64/include"
         LFLAGS="${LFLAGS} -L\"${OPENPMXPATH}/lib\" -L/mingw64/lib"
-        SOEXT="dll"
+        LFLAGS="${LFLAGS} -flto -static"
         ;;
     *)
-        SOEXT="so"
+        printf "error: platform %s not recognized" "${PLATFORM}" >&2
+        exit 1
         ;;
 esac
 
 SOURCEFILES="pmxstate.c options.c ievaluate.c predict.c stage1.c checkout.c popmodel.c encode.c nonzero.c omegainfo.c linalg.c print.c idata.c table.c scatter.c estimate.c simulate.c dataconfig/dataconfig.c advan/advan.c advan/pred.c advan/onecomp.c advan/onecomp_depot.c advan/twocomp.c advan/threecomp.c advan/diffeqn_test.c advan/diffeqn_libgsl.c utils/vector.c utils/various.c bobyqa/bobyqa.c"
 
-mkdir -p "${OPENPMXPATH}/build" "${OPENPMXPATH}/bin" "${OPENPMXPATH}/lib"
-
-printf "clean\n"
-${RM} "${OPENPMXPATH}"/build/*.o
-${RM} "${OPENPMXPATH}"/bin/openpmxtran
-${RM} "${OPENPMXPATH}"/lib/*.so "${OPENPMXPATH}"/lib/*.a "${OPENPMXPATH}"/lib/*.dll
-${RM} "${OPENPMXPATH}/openpmx"
-${RM} "${OPENPMXPATH}/src/openpmx_compile_options.h"
-
-if [ "${TARGET}" = "clean" ]; then
-    exit 0
-fi
-
-# Initialize header file
+# initialize build flags
 {
     printf "#define OPENPMX_INSTALL_PLATFORM \"%s\"\n" "${PLATFORM}"
     printf "#define OPENPMX_INSTALL_PATH \"%s\"\n" "${OPENPMXPATH}"
-} >> "${OPENPMXPATH}/src/openpmx_compile_options.h"
+} >> "${OPENPMXPATH}/src/buildflags.h"
 
-# 2. LIBTYPE handling using case statement
-case "${LIBTYPE}" in
-    shared)
-        # Check platform-specific constraints
-        case "${PLATFORM}" in
-            MINGW*|MSYS*)
-                printf "error: mingw64 platform requires static\n" >&2
-                exit 1
-                ;;
-        esac
-
-        printf "build %s library\n" "${LIBTYPE}"
-        AR="${CC} -shared -o lib/lib${LIBNAME}.${SOEXT}"
-        LFLAGS="${LFLAGS} -flto"
-        printf "#define OPENPMX_LIBTYPE_SHARED\n" >> "${OPENPMXPATH}/src/openpmx_compile_options.h"
-        ;;
-
-    static)
-        printf "build %s library\n" "${LIBTYPE}"
-        AR="ar rcs lib/lib${LIBNAME}.a"
-        LFLAGS="${LFLAGS} -flto -static"
-        printf "#define OPENPMX_LIBTYPE_STATIC\n" >> "${OPENPMXPATH}/src/openpmx_compile_options.h"
-        ;;
-
-    *)
-        printf "error: install: \"%s\" must be static or shared\n" "${LIBTYPE}" >&2
-        exit 1
-        ;;
-esac
-
-# 3. Target Configuration
+# handle different flags for targets
 case "${TARGET}" in
     openmp)
         CFLAGS="${CFLAGS} -fopenmp"
         LFLAGS="${LFLAGS} -fopenmp -lgomp"
-        printf "#define OPENPMX_PARALLEL_OPENMP\n" >> "${OPENPMXPATH}/src/openpmx_compile_options.h"
+        printf "#define OPENPMX_PARALLEL_OPENMP\n" >> "${OPENPMXPATH}/src/buildflags.h"
         ;;
     pthread)
         CFLAGS="${CFLAGS} -pthread"
         LFLAGS="${LFLAGS} -pthread"
-        printf "#define OPENPMX_PARALLEL_PTHREADS\n" >> "${OPENPMXPATH}/src/openpmx_compile_options.h"
+        printf "#define OPENPMX_PARALLEL_PTHREADS\n" >> "${OPENPMXPATH}/src/buildflags.h"
         ;;
     sanitize)
         SFLAGS="-pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
         CFLAGS="${CFLAGS} ${SFLAGS}"
         LFLAGS="${LFLAGS} ${SFLAGS}"
-        printf "#define OPENPMX_PARALLEL_PTHREADS\n" >> "${OPENPMXPATH}/src/openpmx_compile_options.h"
-        printf "#define OPENPMX_SANITIZE\n" >> "${OPENPMXPATH}/src/openpmx_compile_options.h"
+        printf "#define OPENPMX_PARALLEL_PTHREADS\n" >> "${OPENPMXPATH}/src/buildflags.h"
+        printf "#define OPENPMX_SANITIZE\n" >> "${OPENPMXPATH}/src/buildflags.h"
         ;;
     singlethread)
-        printf "#define OPENPMX_PARALLEL_SINGLETHREAD\n" >> "${OPENPMXPATH}/src/openpmx_compile_options.h"
+        printf "#define OPENPMX_PARALLEL_SINGLETHREAD\n" >> "${OPENPMXPATH}/src/buildflags.h"
         ;;
     *)
-        printf "error: install: target \"%s\" not recognized\n" "${TARGET}" >&2
+        printf "error: target \"%s\" not recognized\n" "${TARGET}" >&2
         exit 1
         ;;
 esac
 
+# compile openpmxtran
 printf "compile openpmxtran\n"
 (cd "${OPENPMXPATH}" && ${CC} ${CFLAGS} "src/openpmxtran.c" -o "bin/openpmxtran" ${LFLAGS} -lm)
 
+# compile source code to object files
 OBJECTFILES=""
 for FILE in ${SOURCEFILES}; do
     printf "compile %s\n" "${FILE}"
@@ -144,10 +151,11 @@ for FILE in ${SOURCEFILES}; do
     OBJECTFILES="${OBJECTFILES} build/${OBJFILE}"
 done
 
+# build library from object files
 printf "build library\n"
 (cd "${OPENPMXPATH}" && ${AR} ${OBJECTFILES})
 
-# Write the final launcher script
+# write the final launcher script
 printf "write openpmx script\n"
 {
     printf "#!/bin/bash\n"
@@ -158,9 +166,12 @@ printf "write openpmx script\n"
     printf "CFLAGS=\"%s\"\n" "${CFLAGS}"
     printf "LFLAGS=\"%s\"\n" "${LFLAGS}"
     printf "OPENPMXPATH=\"%s\"\n" "${OPENPMXPATH}"
-    printf "LIBTYPE=\"%s\"\n\n" "${LIBTYPE}"
+    printf "PLATFORM=\"%s\"\n" "${PLATFORM}"
     cat "${OPENPMXPATH}/src/_openpmx_template"
 } > "${OPENPMXPATH}/openpmx"
 
 chmod a+x "${OPENPMXPATH}/openpmx"
-printf "success\n"
+
+# exit with success message
+EXITMESSAGE="success"
+

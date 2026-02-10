@@ -15,15 +15,34 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-set -eu
+FILE="${1}"
 
 # control, object, and executable
-FILE="${1}"
 BASE=$(basename "${FILE}")
-
 OBJFILE="${BASE}.o"
-EXECFILE="a.out"
-trap "rm \"${OBJFILE}\" \"${EXECFILE}\"" EXIT
+EXECFILE="${FILE}.bin"
+
+# dont allow recursive runs
+LOCKDIR="${FILE}.lockdir"
+while ! mkdir "$LOCKDIR" 2>/dev/null; do
+	printf "... waiting 10s for previous run to finish \"${LOCKDIR}\"\n" >&2
+    sleep 10
+done
+
+# Set platform-specific variables
+if [[ "$PLATFORM" == "msys2" ]]; then
+	EXECFILE="${FILE}.exe"
+fi
+
+# cleanup when done
+EXITMESSAGE="error: openpmx failed\n"
+cleanup() {
+	printf "${EXITMESSAGE}"
+	rm "${OBJFILE}" 2>/dev/null || true
+	rm "${EXECFILE}" 2>/dev/null || true
+	rmdir "$LOCKDIR" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 # translate control file to C code
 if [ "${FILE##*.}" != "c" ]; then
@@ -33,22 +52,12 @@ fi
 
 # compile the C code
 # only show relative paths
-(${CC} ${CFLAGS} -fdebug-prefix-map=$(pwd)=. -I${OPENPMXPATH}/include -c "${FILE}" -o "${OBJFILE}") 2>&1
+(${CC} ${CFLAGS} -fdebug-prefix-map=$(pwd)=. -I"${OPENPMXPATH}/include" -c "${FILE}" -o "${OBJFILE}") 2>&1
 
 # we have object files, so link now
 (${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm) 2>&1
 
-# execute
-if [ -f "${EXECFILE}" ]; then
-	if [ "${LIBTYPE}" = "shared" ]; then
-		env LD_LIBRARY_PATH=${OPENPMXPATH}/lib:${LD_LIBRARY_PATH:-} "./${EXECFILE}"  2>&1
-	elif [ "${LIBTYPE}" = "static" ]; then
-		"./${EXECFILE}" 2>&1
-	else
-		echo "error: \"${LIBTYPE}\" must be static or shared"
-		exit 1
-	fi
-else
-	echo "error: no executable, something failed"
+# execute and clear exit message
+if "./${EXECFILE}" 2>&1; then
+	EXITMESSAGE=""
 fi
-

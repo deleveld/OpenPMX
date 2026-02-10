@@ -24,7 +24,7 @@
 #include "print.h"
 #include "utils/c22.h"
 
-#include "openpmx_compile_options.h"
+#include "buildflags.h"
 
 /* --------------------------------------------------------------------*/
 /* mutex to syncronize printing from threads */

@@ -40,7 +40,7 @@
 #include "utils/c22.h"
 #include "utils/various.h"
 
-#include "openpmx_compile_options.h"
+#include "buildflags.h"
 
 /*--------------------------------------------------------------------*/
 /* different optimizers */
@@ -418,7 +418,7 @@ static void outfile_header(FILE* f2,
 	assert(idata);
 	assert(options);
 	
-	info(f2, "OpenPMX %i.%i.%i %s\n", OPENPMX_VERSION_MAJOR, OPENPMX_VERSION_MINOR, OPENPMX_VERSION_RELEASE, OPENPMX_GITHASH);
+	info(f2, "OpenPMX %i.%i.%i hash %s\n", OPENPMX_VERSION_MAJOR, OPENPMX_VERSION_MINOR, OPENPMX_VERSION_RELEASE, OPENPMX_GITHASH);
 
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 	char parallel_message[] = "pthread";
@@ -429,18 +429,10 @@ static void outfile_header(FILE* f2,
 #else
 #error no parallel processing defined
 #endif
-#if defined(OPENPMX_LIBTYPE_SHARED)
-	char libtype_message[] = "shared";
-#elif defined(OPENPMX_LIBTYPE_STATIC)
-	char libtype_message[] = "static";
-#else
-#error no libtype defined
-#endif
-	info(f2, "config %s %i %s \"%s\"\n", 
-		parallel_message, options->nthread, libtype_message, 
-		OPENPMX_INSTALL_PLATFORM);
+	info(f2, "config %s %i %s\n", 
+		parallel_message, options->nthread, OPENPMX_INSTALL_PLATFORM);
 
-	info(f2, "data records %i used %i removed %i\n", advanfuncs->recordinfo.dataconfig->nrecords, idata->ndata, advanfuncs->recordinfo.dataconfig->nrecords - idata->ndata);
+	info(f2, "data records %i\n", advanfuncs->recordinfo.dataconfig->nrecords);
 	info(f2, "data individuals %i observations %i\n", idata->nindivid, idata->nobs);
 	info(f2, "data table offset %s\n", advanfuncs->recordinfo.dataconfig->_offset1 ? "true" : "false");
 
