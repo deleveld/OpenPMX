@@ -29,9 +29,6 @@ while (( $# )); do
         openmp)
 			TARGET="openmp"
             ;;
-        sanitize)
-			TARGET="sanitize"
-            ;;
         singlethread)
 			TARGET="singlethread"
             ;;
@@ -154,13 +151,6 @@ case "${TARGET}" in
         CFLAGS="${CFLAGS} -pthread"
         LFLAGS="${LFLAGS} -pthread"
         printf "#define OPENPMX_PARALLEL_PTHREADS\n" >> "${OPENPMXPATH}/src/buildflags.h"
-        ;;
-    sanitize)
-        SFLAGS="-pedantic -pthread -fsanitize=address,leak,undefined -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow"
-        CFLAGS="${CFLAGS} ${SFLAGS}"
-        LFLAGS="${LFLAGS} ${SFLAGS}"
-        printf "#define OPENPMX_PARALLEL_PTHREADS\n" >> "${OPENPMXPATH}/src/buildflags.h"
-        printf "#define OPENPMX_SANITIZE\n" >> "${OPENPMXPATH}/src/buildflags.h"
         ;;
     singlethread)
         printf "#define OPENPMX_PARALLEL_SINGLETHREAD\n" >> "${OPENPMXPATH}/src/buildflags.h"
