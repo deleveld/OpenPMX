@@ -429,8 +429,17 @@ static void outfile_header(FILE* f2,
 #else
 #error no parallel processing defined
 #endif
-	info(f2, "config %s %i %s\n", 
-		parallel_message, options->nthread, OPENPMX_INSTALL_PLATFORM);
+
+#if defined(OPENPMX_SERVER)
+	char server_message[] = "server";
+#elif defined(OPENPMX_NOTSERVER)
+	char server_message[] = "notserver";
+#else
+#error no server option defined
+#endif
+
+	info(f2, "config %s %i %s %s\n", 
+		parallel_message, options->nthread, server_message, OPENPMX_INSTALL_PLATFORM);
 
 	info(f2, "data records %i\n", advanfuncs->recordinfo.dataconfig->nrecords);
 	info(f2, "data individuals %i observations %i\n", idata->nindivid, idata->nobs);

@@ -18,8 +18,8 @@
 
 set -euo pipefail
 
-# Set the parallel target
 TARGET="${1:-pthread}"
+SERVER="${2:-notserver}"
 
 # print success/failed message when done
 EXITMESSAGE="failed"
@@ -101,8 +101,6 @@ case "${PLATFORM}" in
         ;;
 esac
 
-SOURCEFILES="pmxstate.c options.c ievaluate.c predict.c stage1.c checkout.c popmodel.c encode.c nonzero.c omegainfo.c linalg.c print.c idata.c table.c scatter.c estimate.c simulate.c dataconfig/dataconfig.c advan/advan.c advan/pred.c advan/onecomp.c advan/onecomp_depot.c advan/twocomp.c advan/threecomp.c advan/diffeqn_test.c advan/diffeqn_libgsl.c utils/vector.c utils/various.c bobyqa/bobyqa.c"
-
 # initialize build flags
 {
     printf "#define OPENPMX_INSTALL_PLATFORM \"%s\"\n" "${PLATFORM}"
@@ -137,11 +135,38 @@ case "${TARGET}" in
         ;;
 esac
 
+# for server the lockdir is in the install dir so only a single instance
+# can run per install, others wait until they can
+case "${SERVER}" in
+    server)
+		LOCKDIR="${OPENPMXPATH}/openpmx.lockdir"
+        printf "#define OPENPMX_SERVER\n" >> "${OPENPMXPATH}/src/buildflags.h"
+		;;
+    notserver)
+		LOCKDIR="openpmx.lockdir"
+        printf "#define OPENPMX_NOTSERVER\n" >> "${OPENPMXPATH}/src/buildflags.h"
+        ;;
+    *)
+        printf "error: server \"%s\" not recognized\n" "${SERVER}" >&2
+        exit 1
+        ;;
+esac
+
 # compile openpmxtran
 printf "compile openpmxtran\n"
 (cd "${OPENPMXPATH}" && ${CC} ${CFLAGS} "src/openpmxtran.c" -o "bin/openpmxtran" ${LFLAGS} -lm)
 
 # compile source code to object files
+SOURCEFILES="pmxstate.c options.c ievaluate.c predict.c stage1.c
+			 checkout.c popmodel.c encode.c nonzero.c omegainfo.c
+			 linalg.c print.c idata.c table.c scatter.c estimate.c
+			 simulate.c
+			 dataconfig/dataconfig.c
+			 advan/advan.c advan/pred.c advan/onecomp.c
+			 advan/onecomp_depot.c advan/twocomp.c advan/threecomp.c
+			 advan/diffeqn_test.c advan/diffeqn_libgsl.c
+			 utils/vector.c utils/various.c
+			 bobyqa/bobyqa.c"
 OBJECTFILES=""
 for FILE in ${SOURCEFILES}; do
     printf "compile %s\n" "${FILE}"
@@ -167,6 +192,7 @@ printf "write openpmx script\n"
     printf "LFLAGS=\"%s\"\n" "${LFLAGS}"
     printf "OPENPMXPATH=\"%s\"\n" "${OPENPMXPATH}"
     printf "PLATFORM=\"%s\"\n" "${PLATFORM}"
+    printf "LOCKDIR=\"%s\"\n" "${LOCKDIR}"
     cat "${OPENPMXPATH}/src/_openpmx_template"
 } > "${OPENPMXPATH}/openpmx"
 

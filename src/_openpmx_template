@@ -23,8 +23,7 @@ BASE=$(basename "${FILE}")
 OBJFILE="${BASE}.o"
 EXECFILE="${FILE}.bin"
 
-# dont allow recursive runs
-LOCKDIR="${FILE}.lockdir"
+# dont allow recursive runs, for server
 while ! mkdir "$LOCKDIR" 2>/dev/null; do
 	printf "... waiting 10s for previous run to finish \"${LOCKDIR}\"\n" >&2
     sleep 10
