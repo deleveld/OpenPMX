@@ -423,9 +423,9 @@ static void outfile_header(FILE* f2,
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 	char parallel_message[] = "pthread";
 #elif defined(OPENPMX_PARALLEL_OPENMP)
-	char parallel_message[] = "OpenMP";
+	char parallel_message[] = "openmp";
 #elif defined(OPENPMX_PARALLEL_SINGLETHREAD)
-	char parallel_message[] = "single";
+	char parallel_message[] = "singlethread";
 #else
 #error no parallel processing defined
 #endif

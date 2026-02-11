@@ -21,13 +21,20 @@ Douglas Eleveld
 # OpenPMX
 
 OpenPMX is a collection of numerical routines for estimation and simulation of mixed-effect pharmacokinetic and pharmacodynamic models.
-This repository contains a copy of the work-in-progress development version and could concievably be broken. If you just want to use the latest stable version then you should look at the Releases.
 
-- First-order conditional estimation results similar to industry standard [NONMEM](https://www.iconplc.com/solutions/technologies/nonmem)
+This repository contains the work-in-progress (WIP) development version and could concievably be broken.
+
+If you just want to use the latest stable version then you should look at the [Releases](https://github.com/deleveld/OpenPMX/releases).
+
+### Features
+
+- First-order conditional estimation with interation (FOCEI) results similar to industry standard [NONMEM](https://www.iconplc.com/solutions/technologies/nonmem)
 - Code and simulate/estimate models using text files and C allows scripting and integration with other tools
 - Analytic models for common comparmental models, ODE solver for complex models
 - Utilize multi-core CPUs via [OpenMP](https://www.openmp.org/) or [pthreads](https://man7.org/linux/man-pages/man7/pthreads.7.html)
-- Limited project dependencies: [gcc](https://gcc.gnu.org/), [GSL](https://www.gnu.org/software/gsl/)
+- Estimation speed comparable with NONMEM (faster for small data sets, similar for large data sets)
+- Limited project scope and complexity, focused on simulation and estimation
+- Few dependencies: [gcc](https://gcc.gnu.org/), [GSL](https://www.gnu.org/software/gsl/)
 
 OpenPMX is free software, you can redistribute it and/or modify it under the terms of the GNU General Public License.
 Unlike the licenses of proprietary pharmacometric software the license of OpenPMX does not restrict scientific cooperation. It allows you to share your programs freely with others.
@@ -49,7 +56,7 @@ This library is distributed in the hope that it will be useful, but WITHOUT ANY 
 	1. Install compiler and linker with `sudo apt-get install build-essentials`
 	2. Install [GSL](https://www.gnu.org/software/gsl/), with `sudo apt-get install libgsl-dev`
 
-### Next, run install script:
+### Second, run install script:
 
 Run `./install` or `./install openmp` or `./install singlethread`
 

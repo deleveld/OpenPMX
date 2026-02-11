@@ -42,13 +42,14 @@ while (( $# )); do
             SERVER="notserver"
             ;;
         clean)
+			TARGET="clean"
             ;;
         --help)
 			printf "This file installs OpenPMX (https://github.com/deleveld/openpmx).\n"
 			exit 1
 			;;
         *)
-			printf "error: argument %s not recognized" "${1}" >&2
+			printf "error: argument %s not recognized\n" "${1}" >&2
 			exit 1
             ;;
     esac
@@ -67,11 +68,12 @@ detect_platform() {
     case "$OSTYPE" in
         darwin*)  echo "macos" ;;
         msys*)    echo "msys2" ;;
+        linux*)    echo "linux" ;;
         *)
             if grep -qi microsoft /proc/version 2>/dev/null; then
                 echo "wsl"
             else
-                echo "linux"
+                echo "unknown"
             fi
             ;;
     esac
@@ -122,15 +124,15 @@ case "${PLATFORM}" in
     linux*|wsl*)
         CFLAGS="${CFLAGS} -march=native"
         CLIBFLAGS="${CLIBFLAGS} -fPIC"
-        LFLAGS="${LFLAGS} -flto"
+        LFLAGS="${LFLAGS} -static -flto"
         ;;
     msys2*)
         CFLAGS="${CFLAGS} -march=native -I/mingw64/include"
         LFLAGS="${LFLAGS} -L\"${OPENPMXPATH}/lib\" -L/mingw64/lib"
-        LFLAGS="${LFLAGS} -flto"
+        LFLAGS="${LFLAGS} -static -flto"
         ;;
     *)
-        printf "error: platform %s not recognized" "${PLATFORM}" >&2
+        printf "error: platform %s not recognized\n" "${PLATFORM}" >&2
         exit 1
         ;;
 esac

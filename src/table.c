@@ -110,12 +110,16 @@ static TABLE table_open(const IDATA* const idata,
 		if (tableconfig->filename) {
 			if (tableconfig->name)
 				fatal(0, "Table has both filename and name\n");
+			if (tableconfig->stream)
+				fatal(0, "Table has both filename and stream\n");
 			filename = tableconfig->filename;
 
 /// If a name is defined in the TABLECONFIG then the output is
 /// written to a filename which is the name in the PMX object extended
 /// with the given name.   
 		} else if (tableconfig->name) {
+			if (tableconfig->stream)
+				fatal(0, "Table has both name and stream\n");
 			filename = pmx_filename;
 			if (!filename)
 				filename = "";
@@ -123,22 +127,31 @@ static TABLE table_open(const IDATA* const idata,
 		}
 	}
 
-/// If a neither a filename or a name is defined in the TABLECONFIG then
-/// the output is written to a filename which is the name in the PMX
-/// object extended with a count of the tables written so far.
-	if (!filename) {
-		*tablecount += 1;
-		filename = pmx_filename;
-		sprintf(ext, "table.%i" OPENPMX_TABLEFILE, *tablecount);
-	}
+	FILE* stream = 0;
+/// if a FILE* stream is provided then table will be output to this. For
+/// example it could be stdout or stderr.
+	if (tableconfig->stream) {
+		stream = tableconfig->stream;
 
-	char fname[PATH_MAX + NAME_MAX] = "";
-	if (filename && filename[0]) { /* if its either 0 or "" we dont use it */
-		strcpy(fname, filename);
-		strcat(fname, ".");
+/// If a neither a filename, name, or stream is defined in the
+/// TABLECONFIG then the output is written to a filename which is the
+/// name in the PMX object extended with a count of the tables written
+/// so far.
+	} else {
+		if (!filename) {
+			*tablecount += 1;
+			filename = pmx_filename;
+			sprintf(ext, "table.%i" OPENPMX_TABLEFILE, *tablecount);
+		}
+
+		char fname[PATH_MAX + NAME_MAX] = "";
+		if (filename && filename[0]) { /* if its either 0 or "" we dont use it */
+			strcpy(fname, filename);
+			strcat(fname, ".");
+		}
+		strcat(fname, ext);
+		stream = fopen(fname, "w");
 	}
-	strcat(fname, ext);
-	var stream = fopen(fname, "w");
 	assert(stream);
 
 	var ret = (TABLE) {
@@ -183,8 +196,8 @@ static TABLE table_open(const IDATA* const idata,
 
 static void table_close(TABLE* const table)
 {
-	/* close the stream */
-	if (table->stream)
+	/* close the stream if we opened it */
+	if (table->stream && !table->tableconfig->stream)
 		fclose(table->stream);
 	table->stream = 0;
 

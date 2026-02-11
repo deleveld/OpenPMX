@@ -574,12 +574,11 @@ typedef struct IMODEL {
 } IMODEL;
 
 static void imodel_init(IMODEL* const _imodel,
-						 ADVANSTATE* const _advanstate,
-						 const POPPARAM* const _popparam)
+						 ADVANSTATE* const _advanstate)
 {
-	const double* _theta = _popparam->theta;
-	const double* _eta = _popparam->eta;
-	const RECORD* const _record = _advanstate->record;
+	const double* _theta = _advanstate->current.popparam->theta;
+	const double* _eta = _advanstate->current.popparam->eta;
+	const RECORD* const _record = _advanstate->current.record;
 
 	/* allow access to RECORD fields */
 	const double ID = _record->ID;
@@ -614,11 +613,11 @@ static void imodel_init(IMODEL* const _imodel,
 
 #define THETA(i) 		((const double)_theta[(i)-1])
 #define ETA(i) 		((const double)_eta[(i)-1])
-#define A(i) 			((const double)_advanstate->state[(i)-1])
+#define A(i) 			((const double)_advanstate->current.state[(i)-1])
 #define INITCOUNT 		pmx_advan_initcount(_advanstate)
 #define ALAG(i,t) 		pmx_advan_amtlag(_advanstate, (i)-1, (t))
 #define BIOAVAIL(i,f)	pmx_advan_bioavail(_advanstate, (i)-1, (f))
-#define STATETIME 		((const double)_advanstate->statetime)
+#define STATETIME 		((const double)_advanstate->current,statetime)
 #define INITTIME(t) 	pmx_advan_inittime(_advanstate, (t))
 #define A_0(i,v) 		pmx_advan_state_init(_advanstate, (i)-1, (v))
 
@@ -739,14 +738,12 @@ static void imodel_diffeqn(double _dadt[],
 }
 
 static double imodel_predict(const IMODEL* const _imodel,
-							 const PREDICTSTATE* const _predictstate,
-							 const POPPARAM* const _popparam,
+							 const PREDICTSTATE* const _current,
 							 const double* const _err,
 							 PREDICTVARS* _predparams)
 {
-	const RECORD* const _record = _predictstate->record;
-	const double* const _state = _predictstate->state;
-	(void) _popparam;
+	const RECORD* const _record = _current->record;
+	const double* const _state = _current->state;
 	(void) _record;
 	(void) _predparams;
 	double Y = NAN;
@@ -794,7 +791,7 @@ static double imodel_predict(const IMODEL* const _imodel,
 	double BPRED;
 
 #define THETA(i) 	((const double)_theta[i-1])
-#define ETA(i) 	((const double)_popparam->eta[i-1])
+#define ETA(i) 	((const double)_current->popparam->eta[i-1])
 #define A(i) 		((const double)_state[i-1])
 #define ERR(i) 	((const double)_err[i-1])
 #define EPS(i) 	((const double)_err[i-1])

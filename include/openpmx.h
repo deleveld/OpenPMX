@@ -19,6 +19,7 @@
 #define OPENPMX_H
 
 #include <stdbool.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -274,6 +275,7 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimconfig);
 /* tables */
 /*---------------------------------------------------------------------*/
 typedef struct {
+	FILE* stream;
 	const char* filename;
 	const char* name;
 	bool firstonly;
