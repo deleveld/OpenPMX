@@ -764,10 +764,14 @@ int main(int argc, char* argv[])
 		*end = 0;
 
 		int i;
-		if (match_recordname(begin, "$DATA(", &i, false))
+		if (match_recordname(begin, "$DATA(", &i, false)) {
+			/* must not pass data filename */
+			if (datafilename && strlen(datafilename))
+				fatal("$DATA(\"...\") exists, but data filename passed as argument as well");
+	
 			parse_data_with_filename(&res, begin + i);
 
-		else if (match_recordname(begin, "$DATA", &i, true))
+		} else if (match_recordname(begin, "$DATA", &i, true))
 			parse_data_without_filename(&res, begin + i, datafilename);
 
 		else if (match_recordname(begin, "$ADVAN(", &i, false))
