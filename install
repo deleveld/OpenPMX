@@ -18,8 +18,40 @@
 
 set -euo pipefail
 
-TARGET="${1:-pthread}"
-SERVER="${2:-notserver}"
+# handle command line arguments
+TARGET="pthread"
+SERVER="notserver"
+while (( $# )); do
+    case $1 in
+        pthread)
+			TARGET="pthread"
+            ;;
+        openmp)
+			TARGET="openmp"
+            ;;
+        sanitize)
+			TARGET="sanitize"
+            ;;
+        singlethread)
+			TARGET="singlethread"
+            ;;
+        server)
+            SERVER="server"
+            ;;
+        notserver)
+            SERVER="notserver"
+            ;;
+        --help)
+			printf "This file installs OpenPMX (https://github.com/deleveld/openpmx).\n"
+			exit 1
+			;;
+        *)
+			printf "error: argument %s not recognized" "${1}" >&2
+			exit 1
+            ;;
+    esac
+    shift
+done
 
 # print success/failed message when done
 EXITMESSAGE="failed"
@@ -44,7 +76,7 @@ detect_platform() {
 }
 PLATFORM=$(detect_platform)
 OPENPMXPATH=$(cd "$(dirname "${0}")" && pwd)
-printf "install %s %s\n" "${TARGET}" "${PLATFORM}"
+printf "install %s %s %s\n" "${TARGET}" "${SERVER}" "${PLATFORM}" 
 printf "path %s\n" "${OPENPMXPATH}"
 
 # cleaup previous build
@@ -88,12 +120,12 @@ case "${PLATFORM}" in
     linux*|wsl*)
         CFLAGS="${CFLAGS} -march=native"
         CLIBFLAGS="${CLIBFLAGS} -fPIC"
-        LFLAGS="${LFLAGS} -flto -static"
+        LFLAGS="${LFLAGS} -flto"
         ;;
     msys2*)
         CFLAGS="${CFLAGS} -march=native -I/mingw64/include"
         LFLAGS="${LFLAGS} -L\"${OPENPMXPATH}/lib\" -L/mingw64/lib"
-        LFLAGS="${LFLAGS} -flto -static"
+        LFLAGS="${LFLAGS} -flto"
         ;;
     *)
         printf "error: platform %s not recognized" "${PLATFORM}" >&2
