@@ -41,6 +41,8 @@ while (( $# )); do
         notserver)
             SERVER="notserver"
             ;;
+        clean)
+            ;;
         --help)
 			printf "This file installs OpenPMX (https://github.com/deleveld/openpmx).\n"
 			exit 1
