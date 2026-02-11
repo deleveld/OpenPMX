@@ -467,7 +467,8 @@ static void parse_data_without_filename(PARSERESULT* res, char* p, const char* f
 
 	load_datafile_write_dataconfig(filename, &res->data, &res->record_field_names, &res->dataconfig);
 
-/// In the $DATA block is code called for each row of the data.
+/// In the $DATA block is code called for each row of the data, allowing
+/// modification of records before analysis.
 	strip_firstlast_space(p);
 	string_append(&res->data_preprocess_code, p);
 }
