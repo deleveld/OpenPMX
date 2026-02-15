@@ -78,11 +78,6 @@ typedef struct {
 	const IMODEL* imodel;
 	const PREDICTVARS* predictvars;
 	const RECORD* record;
-	const double* state;
-	const double* eta;
-	double yhat;
-	double yhatvar;
-	double pred;
 	const double* err;
 } TABLE;
 
@@ -128,7 +123,7 @@ static TABLE table_open(const IDATA* const idata,
 			if (!stream)
 				fatal(0, "Could not open table file \"%s\".\n", fname);
 
-/// if a .stream (FILE*) is provided then table will be output to this.
+/// if a .stream (FILE*) is provided then table will be output to it.
 /// For example it could be stdout or stderr. If given in this way then
 /// fclose() is not called on the stream when the table is closed.
 		} else if (tableconfig->stream) {
@@ -279,7 +274,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	let individ = &idata->individ[table->individ];
 	let advanfuncs = table->advanfuncs;
 
-/// ### Values availabe for table output
+/// Values availabe for table output
 /// All of the fields of the data record are accessible.
 	let recordinfo = &advanfuncs->recordinfo;
 	let recordfields = &recordinfo->dataconfig->recordfields;
