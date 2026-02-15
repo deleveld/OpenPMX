@@ -84,8 +84,17 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
 			 * to zero the entire errarray each time we call this */
 			errarray[j] = 0;
 			
-			var deriv = (ya1 - ya2) / (above - below);
-			yhatvar += (deriv*deriv) * sigma[j];
+/*			var deriv = (ya1 - ya2) / (above - below);
+			yhatvar += (deriv*deriv) * sigma[j]; */
+
+			/* Gemini suggests this */
+			/* OPTIMIZATION 3: Pre-calculate the denominator component.
+             * (above - below) = (g - (-g)) = 2g.
+             * The deriv formula is ((ya1 - ya2) / 2g)^2 * sigma.
+             * Since g = sqrt(sigma), then (2g)^2 = 4 * sigma.
+             * The formula simplifies to: (ya1 - ya2)^2 / 4. */
+			let diff = ya1 - ya2;
+			yhatvar += (diff * diff) * 0.25;
 		}
 	}
 	return yhatvar;
@@ -99,10 +108,13 @@ static inline double phi(const double x)
 	return gsl_cdf_ugaussian_P(x);
 }
 
+/* alignment should help with access speed, may allow SIMD instructions */
 typedef struct {
-	double errarray[OPENPMX_SIGMA_MAX];
-	double _predictvars[OPENPMX_PREDICTVARS_MAX];	/* will be cast to PREDICTVARS */
-	double _imodel[OPENPMX_IMODEL_MAX];				/* will be cast to IMODEL */
+	double errarray[OPENPMX_SIGMA_MAX]				__attribute__((aligned(32)));
+	/* will be cast to PREDICTVARS */
+	double _predictvars[OPENPMX_PREDICTVARS_MAX]	__attribute__((aligned(32)));
+	/* will be cast to IMODEL */
+	double _imodel[OPENPMX_IMODEL_MAX]				__attribute__((aligned(32)));
 } ADVAN_MODEL_MEMORY;
 
 /* functions for Bae and Yim objective function Term 1 and Term 2 */
@@ -120,7 +132,7 @@ double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { };
+	ADVAN_MODEL_MEMORY advanmem = { 0 };
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 
@@ -183,7 +195,7 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { };
+	ADVAN_MODEL_MEMORY advanmem = { 0 };
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 
@@ -294,7 +306,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { };
+	ADVAN_MODEL_MEMORY advanmem = { 0 };
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 	assert((int)sizeof(advanmem._predictvars) >= advanfuncs->advanconfig->predictfields.size);
@@ -460,7 +472,7 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { }; /* errarray isnt used here, we use the one from the simulation */
+	ADVAN_MODEL_MEMORY advanmem = { 0 }; /* errarray isnt used here, we use the one from the simulation */
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 
