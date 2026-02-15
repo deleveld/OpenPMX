@@ -66,12 +66,14 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 	var i = 0;
 	while (i < ndata) {
 		var nobsi = 0;
-		var nrecord = 0;
+		var nrecordi = 0;
 		let thisid = RECORDINFO_ID(recordinfo, RECORDINFO_INDEX(recordinfo, data, i));
-		while (i+nrecord < ndata && RECORDINFO_ID(recordinfo, RECORDINFO_INDEX(recordinfo, data, i+nrecord)) == thisid) {
-			if (RECORDINFO_EVID(recordinfo, RECORDINFO_INDEX(recordinfo, data, i+nrecord)) == 0)
+		while (i+nrecordi < ndata && RECORDINFO_ID(recordinfo, RECORDINFO_INDEX(recordinfo, data, i+nrecordi)) == thisid) {
+			let dv = RECORDINFO_DV(recordinfo, RECORDINFO_INDEX(recordinfo, data, i+nrecordi)); 
+			let evid = RECORDINFO_EVID(recordinfo, RECORDINFO_INDEX(recordinfo, data, i+nrecordi)); 
+			if (!isnan(dv) && evid == 0)
 				++nobsi;
-			++nrecord;
+			++nrecordi;
 		}
 
 		/* initialise INDIVID for each individual. We have to do this in place
@@ -81,7 +83,7 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 		var temp = (INDIVID) {
 			.ID = thisid,
 			.record = RECORDINFO_INDEX(recordinfo, data, i),
-			.nrecord = nrecord,
+			.nrecord = nrecordi,
 			.nobs = nobsi,
 
 			/* individual data are views into the main matrix */
@@ -103,15 +105,15 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 			.icov_lndet = 0.,
 			.iobjfn = DBL_MAX,
 
-			.eval_msec = 1. + nrecord,		/* first guess as to evaluation time is the number of records */
-			.stage1_msec = 1. + nrecord,
+			.eval_msec = 1. + nrecordi,		/* first guess as to evaluation time is the number of records */
+			.stage1_msec = 1. + nrecordi,
 			.ineval = 0,
 		};
 		var iptr = &individ[n];
 		memcpy(iptr, &temp, sizeof(temp));
 
 		++n;
-		i += nrecord;
+		i += nrecordi;
 	}
 
 	return (IDATA) {
@@ -131,22 +133,28 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 
 void idata_destruct(IDATA* const idata)
 {
-	/* first individual has the all the memory */
-	var firstindivid = &idata->individ[0];
-	free(firstindivid->imodel);
-	free(firstindivid->istate);
-	free(firstindivid->eta);
-	free(firstindivid->icov);
-	free(firstindivid->yhat);
-	free(firstindivid->yhatvar);
-	free(firstindivid->pred);
-	free(firstindivid->predictvars);
-	free(firstindivid->icovsample);	/* could be zero. allocated in idata_alloc_icovridata */
-	free(firstindivid->icovweight);	/* could be zero. allocated in idata_alloc_icovridata */
-	free(firstindivid->isimerr);	/* could be zero. allocated in idata_alloc_simerr */
+    /* check if idata is null or if there are no individuals to clean up */
+    if (idata == NULL || idata->individ == NULL || idata->nindivid <= 0) 
+        return;
 
-	/* now we can delete the individ array */
-	free(idata->individ);
+    /* the first individual has the all the memory allocated in idata_construct */
+    var firstindivid = &idata->individ[0];
+    free(firstindivid->imodel);
+    free(firstindivid->istate);
+    free(firstindivid->eta);
+    free(firstindivid->icov);
+    free(firstindivid->yhat);
+    free(firstindivid->yhatvar);
+    free(firstindivid->pred);
+    free(firstindivid->predictvars);
+    
+    /* these pointers are only non-zero if idata_alloc_... functions were called */
+    free(firstindivid->icovsample);
+    free(firstindivid->icovweight);
+    free(firstindivid->isimerr);
+
+    /* now we can safely delete the individ array itself */
+    free(idata->individ);
 }
 
 double* idata_alloc_simerr(const IDATA* const idata)
@@ -219,7 +227,7 @@ int idata_ineval(const IDATA* const idata, const bool reset)
 	let nindivid = idata->nindivid;
 	var ineval = 0;
 	forcount(i, nindivid) {
-		ineval = individ[i].ineval;
+		ineval += individ[i].ineval;
 		if (reset)
 			individ[i].ineval = 0;
 	}

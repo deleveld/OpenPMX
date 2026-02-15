@@ -56,7 +56,7 @@ double sample_min2ll(const int nreta,
 	double term3 = 0.;
 #ifdef SAMPLE_MIN2LL_FROM_INVERSE
 	const double* omegainverse_data = nonzero->inversedata;
-	const gsl_matrix_const_view  = gsl_matrix_const_view_array(omegainverse_data, nreta, nreta);
+	const gsl_matrix_const_view omegainverse = gsl_matrix_const_view_array(omegainverse_data, nreta, nreta);
 	term3 += sample_min2ll_from_inverse(reta, &omegainverse.matrix);
 #endif
 #ifdef SAMPLE_MIN2LL_FROM_CHOLESKY

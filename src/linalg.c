@@ -35,31 +35,23 @@ int cholesky_decomposition(gsl_matrix* matrix)
 	let n = matrix->size1;
 	assert(n == matrix->size2);
 
-	var mat = gsl_matrix_alloc(n, n);
-	gsl_matrix_memcpy(mat, matrix);
-
-//	forcount(i, n) {
-//		forcount(j, n) 
-//			printf("%f ", gsl_matrix_get(mat, i, j));
-//		printf("\n");
-//	}
-
-	/* try to do cholesky decomposition */
+	/* https://www.gnu.org/software/gsl/doc/html/linalg.html#c.gsl_linalg_cholesky_decomp1
+	 * On input, the values from the diagonal and lower-triangular part
+	 * of the matrix A are used (the upper triangular part is ignored).
+	 * On output the diagonal and lower triangular part of the input
+	 * matrix A contain the matrix L, while the upper triangular part
+	 * contains the original matrix */
 	let oldhandler = gsl_set_error_handler_off();
 	let err = gsl_linalg_cholesky_decomp1(matrix);
 	gsl_set_error_handler(oldhandler);
 
-	/* error about not positive definite */
-	assert(err != GSL_EDOM);
-
-	/* make the cholesky only lower diagonal */
+	/* zero the upper triangular so its a proper Cholesky matrix */
 	forcount(i, n)
-		forcount(j, i)
-			gsl_matrix_set(matrix, j, i, 0.);
+		for(unsigned j=i+1; j<n; j++)
+			gsl_matrix_set(matrix, i, j, 0.);
 
-	gsl_matrix_free(mat);
-
-	return 0;
+	/* error about not positive definite */
+	return err == GSL_EDOM;
 }
 
 double matrix_lndet_from_cholesky(const gsl_matrix* const chol)
@@ -91,12 +83,17 @@ double sample_min2ll_from_cholesky(const double* const data,
 	gsl_vector_memcpy(&r.vector, &x.vector);
 	gsl_blas_dtrsv(CblasLower, CblasNoTrans, CblasNonUnit, chol, &r.vector);
 
+	var lik = 0.;
+	gsl_blas_ddot(&r.vector, &r.vector, &lik);
+	return lik; 
+
+/* alternative implementation
 	double sum = 0.;
 	forcount(i, n) {
 		let v = gsl_vector_get(&r.vector, i);
 		sum += v * v;
 	}
-	return sum;
+	return sum; */
 }
 
 double sample_min2ll_from_inverse(const double* const data,
@@ -109,16 +106,18 @@ double sample_min2ll_from_inverse(const double* const data,
 
 	gsl_blas_dgemv(CblasNoTrans, 1., inverse, &x.vector, 0., &y.vector);
 
-//	var lik = 0.;
-//	gsl_blas_ddot(&x.vector, &y.vector, &lik);
-//	return lik;
-	double sum = 0.;
+	var lik = 0.;
+	gsl_blas_ddot(&x.vector, &y.vector, &lik);
+	return lik; 
+
+/* alternative implementation
+ 	double sum = 0.;
 	forcount(i, n) {
 		let _x = gsl_vector_get(&x.vector, i);
 		let _y = gsl_vector_get(&y.vector, i);
 		sum += _x * _y;
 	}
-	return sum;
+	return sum; */
 }
 
 

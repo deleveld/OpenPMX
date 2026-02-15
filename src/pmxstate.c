@@ -120,6 +120,7 @@ void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel
 				forcount(i, ndim) {
 					double v = omega[offset + i][offset + i];
 					let f = omegafixed[offset + i][offset + i];
+					/* fixed omegas on diagonal are negative */
 					if (f != 0 && v != 0.)
 						v = -fabs(v);
 					pmx->omega[k].values[i] = v;
@@ -132,7 +133,8 @@ void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel
 					forcount(j, i + 1) {
 						double v = omega[offset + i][offset + j];
 						let f = omegafixed[offset + i][offset + j];
-						if (f != 0 && v != 0.)
+						/* fixed omegas on diagonal are negative */
+						if (f != 0 && v != 0. && i == j)
 							v = -fabs(v);
 						pmx->omega[k].values[blocki] = v;
 						blocki++;
@@ -141,7 +143,7 @@ void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel
 				break;
 			}
 			case OMEGA_SAME: {
-				/* we dont need to do anything here since the block is already */
+				/* we dont need to do anything here */
 				break;
 			}
 			default:

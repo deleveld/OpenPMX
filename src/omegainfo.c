@@ -81,7 +81,7 @@ OMEGAINFO omegainfo_init(const int nomega,
 	ret.nonzero.n = 0;
 	ret.nonfixed.n = 0;
 
-	var maxdiag = -DBL_MAX;
+	var maxdiag = 0.;
 	forcount(i, nomega) {
 		let v = omega[i][i];
 		if (v > maxdiag)

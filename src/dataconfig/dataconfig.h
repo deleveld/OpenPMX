@@ -117,7 +117,7 @@ static inline int RECORDINFO_CMT_0offset(const RECORDINFO* const recordinfo, con
 static inline double RECORDINFO_CMT(const RECORDINFO* const recordinfo, const RECORD* p)
 {
 	if (recordinfo->offsetCMT == -1)
-		return 0.;
+		return 0;
 
 	return *(const double*)((const char*)p + recordinfo->offsetCMT);
 }
