@@ -211,7 +211,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			if (v->start == currenttime && v->rate == 0.) {
 				assert(v->start == v->end);
 				let record_cmt = v->cmt;
-				if (v->cmt == -1.) {		/* This means call init again */
+				if (v->cmt == -1) {		/* This means call init again */
 					need_init_now = true;
 				} else {
 					let record_amt = v->amt;

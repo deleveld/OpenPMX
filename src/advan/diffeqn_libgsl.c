@@ -19,7 +19,7 @@
 
 #include <assert.h>
 #include <math.h>
-#include <math.h>
+#include <string.h>
 
 #include "advan/advan.h"
 #include "utils/c22.h"
@@ -37,7 +37,9 @@ typedef struct {
 	ADVANCER_DIFFEQN_CALLBACK_ARGS args;
 } ADVANCER_LIBGSL;
 
-#define STEPTYPE_NAME_LENGTH	32
+#define STEPTYPE_NAME_LENGTH	64
+#define DEFAULT_ABSTOL			1e-9
+#define DEFAULT_RELTOL			1e-9
 
 /* TODO: Should these be moved to ADVANCER_LIBGSL so that changes to the config actually get passed on when an ADVAN is made */
 typedef struct {
@@ -136,8 +138,6 @@ static void advancer_diffeqn_libgsl_advance_interval(ADVAN* advan,
 {
 	var advandes = (ADVANCER_LIBGSL*)advan;	/* up cast */
 
-	(void) advandes;
-
 	/* advandes->args.diffeqn already set in constructor */
 	advandes->args.advan = advan;
 	advandes->args.imodel = imodel;
@@ -151,17 +151,21 @@ static void advancer_diffeqn_libgsl_advance_interval(ADVAN* advan,
 	while (advan->time < endtime) {
 		let status = gsl_odeiv2_driver_apply(advandes->d, &advan->time, endtime, state);
 		if (status != GSL_SUCCESS) {
-			printf("error integrating from %f to %f\n", advan->time, endtime);
-			printf(" - delta is %f\n", endtime - advan->time);
-			printf(" - status is %i\n", status);
-			printf(" - info: status %s is %i\n", "GSL_FAILURE", GSL_FAILURE);
-			printf(" - info: status %s is %i\n", "GSL_EMAXITER", GSL_EMAXITER);
-			printf(" - info: status %s is %i\n", "GSL_ENOPROG", GSL_ENOPROG);
-			printf(" - info: status %s is %i\n", "GSL_EBADFUNC", GSL_EBADFUNC);
-			printf(" - info: status %s is %i\n", "GSL_SUCCESS", GSL_SUCCESS);
-			printf(" - info: status %s is %i\n", "GSL_EFAULT", GSL_EFAULT);
-			printf(" - info: status %s is %i\n", "GSL_EINVAL", GSL_EINVAL);
-			assert(0);
+			fprintf(stderr, "error integrating from %f to %f\n", advan->time, endtime);
+			fprintf(stderr, " - delta is %f\n", endtime - advan->time);
+			var status_string = "unknown";
+			switch (status) {
+				case GSL_FAILURE: status_string = "GSL_FAILURE"; break;
+				case GSL_EMAXITER: status_string = "GSL_EMAXITER"; break;
+				case GSL_ENOPROG: status_string = "GSL_ENOPROG"; break;
+				case GSL_EBADFUNC: status_string = "GSL_EBADFUNC"; break;
+				case GSL_SUCCESS: status_string = "GSL_SUCCESS"; break;
+				case GSL_EFAULT: status_string = "GSL_EFAULT"; break;
+				case GSL_EINVAL: status_string = "GSL_EINVAL"; break;
+				default: break;
+			}
+			fprintf(stderr, " - status %s\n", status_string);
+			exit(EXIT_FAILURE);
 		}
 	}
 	assert(advan->time == endtime); /* is this redundant?, the ode solver may have already set this */
@@ -196,43 +200,46 @@ ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const A
 	memset(retinit.steptype_name, 0, sizeof(retinit.steptype_name));
 
 /// The default setting are:
-///
 /// - ODE stepping function `gsl_odeiv2_step_rk8pd`
-
 	let steptype = advanconfig->args.diffeqn.steptype;
-	if (steptype == 0)
+	var steptype_name = "";
+	
+	if (steptype == 0 || strcmp(steptype, "rk8pd") == 0) { 
 		retinit.steptype = gsl_odeiv2_step_rk8pd;
-	else if (strcmp(steptype, "msadams") == 0)
-		retinit.steptype = gsl_odeiv2_step_msadams;
-	else if (strcmp(steptype, "rkf45") == 0)
-		retinit.steptype = gsl_odeiv2_step_rkf45;
-	else if (strcmp(steptype, "rk8pd") == 0)
-		retinit.steptype = gsl_odeiv2_step_rk8pd;
-	else if (strcmp(steptype, "rkck") == 0)
-		retinit.steptype = gsl_odeiv2_step_rkck;
-	else if (strcmp(steptype, "rk4") == 0)
-		retinit.steptype = gsl_odeiv2_step_rk4;
-	else if (strcmp(steptype, "rk2") == 0)
-		retinit.steptype = gsl_odeiv2_step_rk2;
-	else {
-		fprintf(stdout, "error: Invalid steptype \"%s\"\n", steptype);
-		assert(0);
-	}
-#define _TOSTR(x) #x
-#define TOSTR(x) _TOSTR(x)
-	if (steptype)
-		strncpy(retinit.steptype_name, steptype, STEPTYPE_NAME_LENGTH-1); /* dont overwrite the zero terminator */
-	else
-		strncpy(retinit.steptype_name, TOSTR(DIFFEQN_STEPPING_FUNCTION), STEPTYPE_NAME_LENGTH-1);
+		steptype_name = "rk8pd, Runge-Kutta Prince-Dormand (8,9)";
 
-/// - Absolute tolerance `abstol` 1e-9
-/// - Relative tolerance `reltol` 1e-9
+	} else if (strcmp(steptype, "msadams") == 0) {
+		retinit.steptype = gsl_odeiv2_step_msadams;
+		steptype_name = "msadams, Multistep Adams";
+
+	} else if (strcmp(steptype, "rkf45") == 0) {
+		retinit.steptype = gsl_odeiv2_step_rkf45;
+		steptype_name = "rk45, Runge-Kutta-Fehlberg (4,5)";
+
+	} else if (strcmp(steptype, "rkck") == 0) {
+		retinit.steptype = gsl_odeiv2_step_rkck;
+		steptype_name = "rkck, Runge-Kutta Cash-Karp (4,5) ";
+
+	} else if (strcmp(steptype, "rk4") == 0) {
+		retinit.steptype = gsl_odeiv2_step_rk4;
+		steptype_name = "rk4, Explicit 4th order (classical) Runge-Kutta";
+
+	} else if (strcmp(steptype, "rk2") == 0) {
+		retinit.steptype = gsl_odeiv2_step_rk2;
+		steptype_name = "rk2, Explicit embedded Runge-Kutta (2,3)";
+
+	} else {
+		fprintf(stderr, "error: Invalid steptype \"%s\"\n", steptype);
+		exit(EXIT_FAILURE);
+	}
+	snprintf(retinit.steptype_name, STEPTYPE_NAME_LENGTH, "%s", steptype_name);
+
 	if (retinit.hstart == 0.)
 		retinit.hstart = 1.;
 	if (retinit.abstol == 0.)
-		retinit.abstol = 1e-9;
+		retinit.abstol = DEFAULT_ABSTOL;
 	if (retinit.reltol == 0.)
-		retinit.reltol = 1e-9;
+		retinit.reltol = DEFAULT_RELTOL;
 
 	ADVANTABLE_LIBGSL* ret = malloc(sizeof(ADVANTABLE_LIBGSL));
 	assert(ret);

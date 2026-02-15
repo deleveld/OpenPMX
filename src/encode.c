@@ -158,9 +158,6 @@ static void scale_to_match_diagonal(gsl_matrix* matrix, const gsl_matrix* ref)
 {
 	let n = matrix->size1;
 
-	double tempdata[OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX];
-	var temp = gsl_matrix_view_array(tempdata, n, n);
-
 	double scaledata[OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX];
 	var scale = gsl_matrix_view_array(scaledata, n, n);
 	gsl_matrix_set_zero(&scale.matrix);
@@ -177,7 +174,10 @@ static void scale_to_match_diagonal(gsl_matrix* matrix, const gsl_matrix* ref)
 			x = sqrt(s/v);
 		gsl_matrix_set(&scale.matrix, i, i, x);
 	}
+
 	/* correct scale as S*omega*ST */
+	double tempdata[OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX];
+	var temp = gsl_matrix_view_array(tempdata, n, n);
 	gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1., &scale.matrix, matrix, 0., &temp.matrix);
 	gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1., &temp.matrix, &scale.matrix, 0., matrix);
 }
@@ -385,7 +385,7 @@ void encode_update(ENCODE* encode, const double* x)
 	let nonfixed = &omegainfo->nonfixed;
 	var ndim = nonfixed->n;
 	if (ndim) {
-		var rowcol = nonfixed->rowcol;
+		let rowcol = nonfixed->rowcol;
 		var S = gsl_matrix_alloc(ndim, ndim);
 		var z = gsl_matrix_alloc(ndim, ndim);
 		gsl_matrix_set_zero(S);

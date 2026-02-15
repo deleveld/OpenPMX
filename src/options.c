@@ -87,23 +87,30 @@ OPTIONS options_default(const OPTIONS* const opt1)
 	assert(opt1);
 	OPTIONS ret = *opt1;
 
-	/* nthreads == 0 means default number */
-	if (ret.nthread == 0) {
-		
-	int ncpu = 1;
+	var ncpu = 1;
+#ifndef OPENPMX_PARALLEL_SINGLETHREAD
 #if defined(_SC_NPROCESSORS_ONLN)
-		ncpu = sysconf(_SC_NPROCESSORS_ONLN) - 4;
+	ncpu = sysconf(_SC_NPROCESSORS_ONLN) - 4;
 #else
-		const char* value = getenv("NUMBER_OF_PROCESSORS");
-		if (value)
-			ncpu = atoi(value);
+	let value = getenv("NUMBER_OF_PROCESSORS");
+	if (value)
+		ncpu = atoi(value);
 #endif
-		/* leave some cores over for the operating system */		
-		int n = ncpu - 4;
-		if (n < 0)
-			n = 0;
-		ret.nthread = n;
+#endif // OPENPMX_PARALLEL_SINGLETHREAD
+
+#define NUMBER_CORES_RESERVED_FOR_OS 4
+	/* nthreads < 0 means number of CPUs minus this */
+	int n = ret.nthread;
+	if (ret.nthread < 0) {
+		n = ncpu - abs(ret.nthread);
+	/* nthreads == 0 means default number which is everything except
+	 * some cores for operating_system. */
+	} else if (ret.nthread == 0) {
+		n = ncpu - NUMBER_CORES_RESERVED_FOR_OS;
 	}
+	if (n < 1)
+		n = 1;
+	ret.nthread = n;
 
 	ret.estimate = estimconfig_default(&ret.estimate);
 	ret.simulate = simconfig_default(&ret.simulate);

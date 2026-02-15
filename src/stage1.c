@@ -25,7 +25,6 @@
 #include "nonzero.h"
 #include "linalg.h"
 #include "print.h"
-//#include "scatter.h"
 #include "advan/advan.h"
 #include "utils/c22.h"
 #include "utils/various.h"
@@ -532,7 +531,7 @@ void stage1_thread(INDIVID* const individ,
 	individ->icov_lndet = matrix_lndet_from_cholesky(reducedicov);
 
 	if (!gsl_finite(individ->icov_lndet)) {
-		warning(0, "individual lndet is not finite\n"); /* TODO: add info about ID and eta */
+		warning(0, "ID %f lndet is not finite\n", individ->ID);
 		individ->icov_lndet = 100.;
 	}
 //	assert(gsl_finite(individ->icov_lndet) == 1);

@@ -68,7 +68,8 @@ static struct {
 	pthread_t* running;
 	int nrunning;
 	pthread_mutex_t mutex;
-	pthread_cond_t cond;
+	pthread_cond_t task_is_available;
+	pthread_cond_t task_is_done;
 } tpool = { };
 
 static struct {
@@ -90,60 +91,68 @@ static void pthreads_cleanup(void)
 		/* signal threads to stop and wait for that */
 		pthread_mutex_lock(&tpool.mutex);
 		tpool.stop = true;
-		pthread_cond_broadcast(&tpool.cond);
+		pthread_cond_broadcast(&tpool.task_is_available);
 		pthread_mutex_unlock(&tpool.mutex);
-//		info(logstream, "tpool: stop ");
+//		info(0, "tpool: stop ");
 		forcount(i, tpool.nrunning) {
 			pthread_join(tpool.running[i], 0);
-//			info(logstream, " %i", i);
+//			info(0, " %i", i);
 		}
-//		info(logstream, "\n");
+//		info(0, "\n");
 		pthread_mutex_destroy(&tpool.mutex);
-		pthread_cond_destroy(&tpool.cond);
+		pthread_cond_destroy(&tpool.task_is_available);
+		pthread_cond_destroy(&tpool.task_is_done);
 
 		free(tpool.running);
 
 		tpool.init = false;
 		tpool.stop = false;
+		memset(&tpool, 0, sizeof(tpool));
+		memset(&ttasks, 0, sizeof(ttasks));
 	}
 }
 
-static void* run_threadpool_task(void *ptr)
+typedef struct {
+    const bool is_main_thread;
+} THREAD_CONTEXT;
+
+static void* run_threadpool_task(void *_ptr)
 {
+	var context = (THREAD_CONTEXT*)_ptr;
 	bool complete = false;
 	while (1) {
 		pthread_mutex_lock(&tpool.mutex);
-		if (complete)
-			++ttasks.ncomplete;
 
-		/* wait until there is work to do */
-		/* main thread (ptr != 0) return when there are no new individuals to get
-		 * in that case we still have to wait for the already running threads to finish */
+		if (complete) {
+			++ttasks.ncomplete;
+			/* signal the main thread that a task is done and it can
+			 * check if everything is done. */
+			pthread_cond_signal(&tpool.task_is_done); 
+		}
+
+		/* workers wait here for new individuals */
 		while (ttasks.nindivids == 0 && !tpool.stop) {
-			if (ptr != 0)
+			if (context && context->is_main_thread)
 				goto done;
-			pthread_cond_wait(&tpool.cond, &tpool.mutex);
+			pthread_cond_wait(&tpool.task_is_available, &tpool.mutex);
 		}
 		if (tpool.stop)
 			break;
 
-		/* take the last one in the list, and shorten the list for the other threads */
+		/* take a task to do, remove from list */
 		let individ = ttasks.individs[ttasks.nindivids - 1];
 		--ttasks.nindivids;
 		pthread_mutex_unlock(&tpool.mutex);
 
-		/* do the task, we must only touch individual data */
-		let popmodel = ttasks.popmodel;
-		let nonzero = ttasks.nonzero;
-		let options = ttasks.options;
-		let advanfuncs = ttasks.advanfuncs;
-		let scatteroptions = ttasks.scatteroptions;
-		ttasks.threadtask(individ, advanfuncs, popmodel, nonzero, options, scatteroptions);
+		/* execute task */
+		ttasks.threadtask(individ, ttasks.advanfuncs, ttasks.popmodel, 
+						  ttasks.nonzero, ttasks.options,
+						  ttasks.scatteroptions);
 		complete = true;
 	}
 done:
-    pthread_mutex_unlock(&tpool.mutex);
-    return ptr;
+	pthread_mutex_unlock(&tpool.mutex);
+	return _ptr;
 }
 #endif
 
@@ -158,35 +167,61 @@ void scatter_threads(const IDATA* const idata,
 {
 	let individ = idata->individ;
 	let nindivid = idata->nindivid;
+	let logstream = scatteroptions->logstream;
 
-/// When scattering tasks, sort individuals based on thier expected
-/// runtime, doing slowest first so we are the most efficient because of
-/// lower risk of one long process slowing down finishing the last task.
+/// The number of threads is limited to the number of individuals.
+/// Otherwise threads will always be waiting and do nothing.
+/// The main thread does work as well so we make nthread-1 worker
+/// threads.
+	var nthread = options->nthread;
+	if (nthread > nindivid && scatteroptions->checkout_errors) {
+		info(logstream, "nthread (%i) limited to number of individuals (%i)\n", nthread, idata->nindivid);
+		nthread = nindivid;
+	}
+	int nworker = nthread - 1;
+	if (nworker <= 0)
+		nworker = 0;
+#if defined(OPENPMX_PARALLEL_SERIAL)
+	nworker = 0;
+#endif
+
+#if defined(OPENPMX_PARALLEL_PTHREADS)
+	/* if we are already running and the number of threads dont match
+	 * then cleanup and init all over again as necessary. */
+	if (tpool.init && tpool.nrunning != nworker) 
+		scatter_cleanup();
+#endif
+
+/// When scattering tasks, we sort individuals based on thier expected
+/// runtime. We do the slowest first so we are the most efficient
+/// because of lower risk of one long process slowing down finishing the
+/// last task. This avoids the "long-tail" inefficiency.
 	var index_time = mallocvar(INDIVID_TASK, nindivid);
 	forcount(i, nindivid) {
 		index_time[i].individ = &individ[i];
 		index_time[i].msec = (scatteroptions->stage1_order) ? (individ[i].stage1_msec) : (individ[i].eval_msec);
 	}
 	qsort(index_time, nindivid, sizeof(INDIVID_TASK), index_time_sort);
+
+	/* individs is allocated here, valid until workers are done */
 	var individs = mallocvar(INDIVID*, nindivid);
 	forcount(i, nindivid)
 		individs[i] = index_time[i].individ;
 	free(index_time);
 
-/// It does not make sense to start more threads than individuals
-/// otherwise threads will always be waiting and do nothing.
-	int nthreads = options->nthread;
-	if (nthreads < 0)
-		nthreads = abs(nthreads);
-	if (nthreads > idata->nindivid && scatteroptions->checkout_errors) {
-		info(scatteroptions->logstream, "nthread (%i) limited to number of individuals (%i)\n", nthreads, idata->nindivid);
-		nthreads = idata->nindivid;
+	/* just handle the individuals serially and skip any threading stuff
+	 * if we dont use any worker threads. */
+	if (nworker == 0) {
+		for (int i=0; i<nindivid; i++)
+			threadtask(individs[i], advanfuncs, popmodel, nonzero, options, scatteroptions);
+		goto done;
 	}
 
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 	if (!tpool.init) {
 		pthread_mutex_init(&tpool.mutex, NULL);
-		pthread_cond_init(&tpool.cond, NULL);
+		pthread_cond_init(&tpool.task_is_available, NULL);
+		pthread_cond_init(&tpool.task_is_done, NULL);
 	}
 
 	/* make sure threads wont do anything until we are ready for them */
@@ -204,59 +239,65 @@ void scatter_threads(const IDATA* const idata,
 	/* startup the thread pool, mutex is locked so we wont start until the
 	   condition is signalled */
 	if (!tpool.init) {
-		tpool.running = callocvar(pthread_t, nthreads);
-		info(scatteroptions->logstream, "tpool: start");
-		forcount(i, nthreads) {
-			pthread_create(&tpool.running[i], NULL, run_threadpool_task, 0);
-			info(scatteroptions->logstream, " %i", i);
+		tpool.running = callocvar(pthread_t, nworker);
+		if (!tpool.running)
+			fatal(logstream, "tpool: allocation failed");
+		info(logstream, "tpool: start (%i)", nthread);
+
+		var ncreated = 0;
+		forcount(i, nworker) {
+			if (pthread_create(&tpool.running[i], NULL, run_threadpool_task, 0) != 0) {
+				warning(logstream, "tpool: create thread failed %d\n", i);
+				break;
+			}
+			info(logstream, " %i", i);
+			ncreated++;
 		}
-		info(scatteroptions->logstream, "\n");
-		tpool.nrunning = nthreads;
+		info(logstream, "\n");
+		if (ncreated == 0)
+			fatal(logstream, "tpool: could not create any threads");
+		tpool.nrunning = ncreated;
 		tpool.init = true;
 	}
 
-	/* start to allow threads to do work, they will lock the mutex to get task and unlock */
-	pthread_cond_broadcast(&tpool.cond);
+	/* start to allow threads to do work, they will lock the mutex to
+	 * get task and unlock */
+	pthread_cond_broadcast(&tpool.task_is_available);
 	pthread_mutex_unlock(&tpool.mutex);
 	print_serialize(true);
 
-/// The main thread does work was well while its waiting.
-	/* passing non-zero pointer means we are the main thread, its a bit hacky, I know */
-	run_threadpool_task(&ttasks);
+	/* The main thread must return immediately when there is no work
+	 * to be done and wait for the other already started threads to
+	 * finish. The other threads will keep running in the background and
+	 * wait for new individuals to process. */
+	var thread_context = (THREAD_CONTEXT){ .is_main_thread = true };
+	run_threadpool_task(&thread_context);
 
 	/* some other threads could still be computing so we wait for them */
-	bool done = false;
-	while (!done) {
-		pthread_mutex_lock(&tpool.mutex);
-		if (ttasks.ncomplete == nindivid)
-			done = true;
-		pthread_mutex_unlock(&tpool.mutex);
-	}
+	pthread_mutex_lock(&tpool.mutex);
+	while (ttasks.ncomplete < nindivid) 
+		pthread_cond_wait(&tpool.task_is_done, &tpool.mutex);
+	pthread_mutex_unlock(&tpool.mutex);
 	assert(ttasks.ncomplete == nindivid);
 
 	print_serialize(false);
+	ttasks.individs = 0; /* dont point to invalid memory */
+	ttasks.nindivids = 0;
 
 #elif defined(OPENPMX_PARALLEL_OPENMP)
 	print_serialize(true);
 
-	omp_set_num_threads(nthreads);
+	/* do this backwards so slowest tasks are done first so we are more
+	 * efficient at the end of the individuals */
+	omp_set_num_threads(nthread);
 #pragma omp parallel for schedule(dynamic, 1)
 	for (int i=nindivid-1; i>=0; i--)
 		threadtask(individs[i], advanfuncs, popmodel, nonzero, options, scatteroptions);
 
 	print_serialize(false);
-
-/* in the absense of any parallel processing we do everything serially */
-/* do this forward to be most cache coherent */
-#else
-	for (int i=0; i<nindivid; i++)
-		threadtask(individs[i], advanfuncs, popmodel, nonzero, options, scatteroptions);
 #endif
 
-#if defined(OPENPMX_PARALLEL_PTHREADS)
-	ttasks.individs = 0; /* dont point to invalid memory */
-	ttasks.nindivids = 0;
-#endif
+done:
 	free(individs);
 }
 

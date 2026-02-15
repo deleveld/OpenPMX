@@ -36,7 +36,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 	let omegablocks = pmx->omega;
 	let sigma = pmx->sigma;
 	
-	POPMODEL ret = { };
+	POPMODEL ret = { 0 };
 	ret.ntheta = 0;
 	ret.nblock = 0;
 	ret.nomega = 0;
@@ -53,9 +53,12 @@ POPMODEL popmodel_init(const OPENPMX* const pmx)
 		ret.blocktype[i] = OMEGA_INVALID;
 		ret.blockdim[i] = 0;
 	}
-	forcount(i, OPENPMX_OMEGA_MAX) 
-		forcount(j, OPENPMX_OMEGA_MAX)
+	forcount(i, OPENPMX_OMEGA_MAX) {
+		forcount(j, OPENPMX_OMEGA_MAX) {
 			ret.omega[i][j] = NAN;
+			ret.omegafixed[i][j] = 0;
+		}
+	}
 	forcount(i, OPENPMX_SIGMA_MAX) {
 		ret.sigma[i] = NAN;
 		ret.sigmafixed[i] = 1;
@@ -273,7 +276,12 @@ void extfile_append(FILE* f, const POPMODEL* const popmodel, const double runtim
 
 void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runtime_s, const int ineval)
 {
-	fprintf(f, OPENPMX_IFORMAT, -1000000000);
+#define EXTFILE_FINAL_ESTIMATES  -1000000000
+#define EXTFILE_FIXED_FLAGS      -1000000006
+#define EXTFILE_LOWER_BOUNDS     -2000000001
+#define EXTFILE_UPPER_BOUNDS     -2000000001
+
+	fprintf(f, OPENPMX_IFORMAT, EXTFILE_FINAL_ESTIMATES);
 	let ntheta = popmodel->ntheta;
 	forcount(i, ntheta)
 		fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->theta[i]);
@@ -288,7 +296,7 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runti
 	fprintf(f, OPENPMX_IFORMAT, ineval);
 	fprintf(f, "\n");
 
-	fprintf(f, OPENPMX_IFORMAT, -1000000006);
+	fprintf(f, OPENPMX_IFORMAT, EXTFILE_FIXED_FLAGS);
 	forcount(i, ntheta) {
 		let est = (popmodel->thetaestim[i] == FIXED) ? 1. : 0.;
 		fprintf(f, OPENPMX_TABLE_FORMAT, est);
@@ -306,7 +314,7 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runti
 
 	/* NON-STANDARD!!! DIFFERENT THAN NONMEM
 	 * add extra line with theta upper and lower limits */
-	fprintf(f, OPENPMX_IFORMAT, -2000000001);
+	fprintf(f, OPENPMX_IFORMAT, EXTFILE_LOWER_BOUNDS);
 	forcount(i, ntheta)
 		fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->lower[i]);
 	forcount(i, nsigma)
@@ -319,7 +327,7 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runti
 	fprintf(f, OPENPMX_IFORMAT, 0);
 	fprintf(f, "\n");
 
-	fprintf(f, OPENPMX_IFORMAT, -2000000002);
+	fprintf(f, OPENPMX_IFORMAT, EXTFILE_UPPER_BOUNDS);
 	forcount(i, ntheta)
 		fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->upper[i]);
 	forcount(i, nsigma)

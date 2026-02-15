@@ -27,34 +27,56 @@
 #include "buildflags.h"
 
 /* --------------------------------------------------------------------*/
-/* mutex to syncronize printing from threads */
+/* mutex to synchronize printing from threads */
 static bool mutex_init = false;
 
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 #include <pthread.h>
 static pthread_mutex_t mutex;
+static pthread_t main_thread_id = 0;
+
 #elif defined(OPENPMX_PARALLEL_OPENMP)
 #include <omp.h>
 static omp_lock_t mutex;
+
 #elif defined(OPENPMX_PARALLEL_SINGLETHREAD)
 /* no mutex */
 #endif
 
+static void fatal_if_not_main_thread(void)
+{
+	bool not_main_thread = false;
+	
+#if defined(OPENPMX_PARALLEL_PTHREADS)
+	// Store main thread ID on first init
+	if (main_thread_id == 0)
+		main_thread_id = pthread_self();
+	else if (!pthread_equal(pthread_self(), main_thread_id))
+		not_main_thread = true;
+#elif defined(OPENPMX_PARALLEL_OPENMP)
+	if (omp_get_thread_num() != 0) 
+		not_main_thread = true;
+#endif
+
+	if (not_main_thread) {
+		fputs("print_serialize() must be called from main thread\n", stderr);
+		exit(EXIT_FAILURE);
+	}
+}
+
 void print_serialize(const bool serial)
 {
+	fatal_if_not_main_thread();
+
 	if (serial) {
 		if (mutex_init)
 			fatal(0, "recursive print_serialize\n");
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 		pthread_mutex_init(&mutex, NULL);
-		pthread_mutex_lock(&mutex);
 		mutex_init = true;
-		pthread_mutex_unlock(&mutex);
 #elif defined(OPENPMX_PARALLEL_OPENMP)
 		omp_init_lock(&mutex);
-		omp_set_lock(&mutex);
 		mutex_init = true;
-		omp_unset_lock(&mutex);
 #endif
 	} else {
 		if (!mutex_init)
@@ -79,7 +101,7 @@ static void mutex_lock(void)
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 		pthread_mutex_lock(&mutex);
 #elif defined(OPENPMX_PARALLEL_OPENMP)
-		omp_init_lock(&mutex);	/* initial state is unlocked */
+		omp_set_lock(&mutex);	/* initial state is unlocked */
 #endif
 	}
 }
@@ -110,7 +132,7 @@ void openpmx_fputs(FILE* stream1, FILE* stream2, const char* prefix, const char*
 			fputs(prefix, stream2);
 		fputs(v, stream2);
 	}
-
+	
 	mutex_unlock();
 }
 
@@ -123,7 +145,7 @@ static void openpmx_vprintf(FILE* stream1, FILE* stream2, const char* prefix, co
     va_end(args2);
 
 	/* reserve some space including zero terminator */
-	char* v = mallocvar(char, nchars + 2);
+	char* v = mallocvar(char, nchars + 1);
     vsnprintf(v, nchars + 1, format, args1);
 	openpmx_fputs(stream1, stream2, prefix, v);
 	free(v);

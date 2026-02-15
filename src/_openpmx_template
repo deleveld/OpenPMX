@@ -23,10 +23,18 @@ BASE=$(basename "${FILE}")
 OBJFILE="${BASE}.o"
 EXECFILE="${FILE}.bin"
 
-# dont allow recursive runs, for server
+# dont allow recursive runs, for server the lock is in the OpenPMX
+# install directory so only a single run per install is done.
+MAX_RETRIES=60  # (60 retries * 10s = 10 minute total timeout)
+RETRY_COUNT=0
 while ! mkdir "$LOCKDIR" 2>/dev/null; do
-	printf "... waiting 10s for previous run to finish \"${LOCKDIR}\"\n" >&2
+    if [ "$RETRY_COUNT" -ge "$MAX_RETRIES" ]; then
+        printf "error: timeout reached. Could not acquire lock after %ds.\n" $((MAX_RETRIES * 10)) >&2
+        exit 1
+    fi
+    printf "... waiting 10s for previous run to finish (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)\n" >&2
     sleep 10
+    ((RETRY_COUNT++))
 done
 
 # cleanup when done

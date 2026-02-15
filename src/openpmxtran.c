@@ -146,7 +146,8 @@ static int strip_quotes(char* s)
 
 	/* copy data over with classic strcpy
 	 * which allows overlap */
-	while ((*s++ = *a++)) { }
+//	while ((*s++ = *a++)) { }
+	memmove(s, a, strlen(a) + 1);
 
 	return 0;
 }
@@ -165,17 +166,19 @@ static void strip_comments(char *s, const char* ca, const char* cb, const char r
 		b += bl;
 		if (replace_char != 0)
 			*a++ = replace_char;
-		while ((*a++ = *b++)) { } /* classic strcpy */
+			
+//		while ((*a++ = *b++)) { } 
+		memmove(a, b, strlen(b) + 1);
 	}
 }
 
-static ssize_t _getdelim(char **lineptr, size_t *n, int delim, FILE *stream)
+static ssize_t _openpmx_getdelim(char **lineptr, size_t *n, int delim, FILE *stream)
 {
     if (lineptr == NULL || n == NULL || stream == NULL)
         return -1;
 
     if (*lineptr == NULL || *n == 0) {
-        *n = 128;  // initial size
+        *n = 512;  // initial size
         *lineptr = malloc(*n);
         if (*lineptr == NULL)
             return -1;
@@ -211,7 +214,7 @@ static char* read_file(const char* filename)
 	/* https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c */
 	char* buffer = NULL;
 	size_t len;
-	ssize_t bytes_read = _getdelim(&buffer, &len, '\0', s);
+	ssize_t bytes_read = _openpmx_getdelim(&buffer, &len, '\0', s);
 	assert(bytes_read != -1);
 	fclose(s);
 
@@ -241,7 +244,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 	/* https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c */
 	char* buffer = NULL;
 	size_t len = 0;
-	ssize_t bytes_read = _getdelim(&buffer, &len, '\0', stream);
+	ssize_t bytes_read = _openpmx_getdelim(&buffer, &len, '\0', stream);
 	fclose(stream);
 	if (bytes_read == -1)
 		fatal("could not read from data");
@@ -260,11 +263,11 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 	var nrows = -1;
 	var line = buffer;
 	var linebreak = strchr(line, '\n');
-	if (!linebreak)
+	if (linebreak == 0)
 		fatal("no lines in data");
 	*linebreak = 0;
 	while (line) {
-		const char delim[] = " \t,";
+		let delim = " \t,";
 
 		/* read tokens in header */
 		if (nrows == -1) {
@@ -301,7 +304,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 		/* read tokens and write out in a RECORD struct */
 		} else {
 			var n = 0;
-			char* token;
+			const char* token;
 			char* rest = line;
 			string_appendf(data, "\t{\t");
 			while ((token = strtok_r(rest, delim, &rest))) {
@@ -546,7 +549,8 @@ static void parse_imodel(PARSERESULT* res, char* p)
 
 	char* token;
 	char* rest = p;
-	while ((token = strtok_r(rest, ", ", &rest))) {
+	let delim = ", \t\n";
+	while ((token = strtok_r(rest, delim, &rest))) {
 		strip_firstlast_space(token);
 		let s = strdup(token);
 		vector_append(res->imodel_field_names, s);
@@ -580,7 +584,8 @@ static void parse_predict(PARSERESULT* res, char* p)
 
 	char* token;
 	char* rest = p;
-	while ((token = strtok_r(rest, ", ", &rest))) {
+	let delim = ", \t\n";
+	while ((token = strtok_r(rest, delim, &rest))) {
 		strip_firstlast_space(token);
 		let s = strdup(token);
 		vector_append(res->predict_field_names, s);
