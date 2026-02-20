@@ -274,7 +274,6 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	let individ = &idata->individ[table->individ];
 	let advanfuncs = table->advanfuncs;
 
-/// Values availabe for table output
 /// All of the fields of the data record are accessible.
 	let recordinfo = &advanfuncs->recordinfo;
 	let recordfields = &recordinfo->dataconfig->recordfields;

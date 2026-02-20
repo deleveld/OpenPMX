@@ -90,7 +90,7 @@ OPTIONS options_default(const OPTIONS* const opt1)
 	var ncpu = 1;
 #ifndef OPENPMX_PARALLEL_SINGLETHREAD
 #if defined(_SC_NPROCESSORS_ONLN)
-	ncpu = sysconf(_SC_NPROCESSORS_ONLN) - 4;
+	ncpu = sysconf(_SC_NPROCESSORS_ONLN);
 #else
 	let value = getenv("NUMBER_OF_PROCESSORS");
 	if (value)
@@ -98,7 +98,7 @@ OPTIONS options_default(const OPTIONS* const opt1)
 #endif
 #endif // OPENPMX_PARALLEL_SINGLETHREAD
 
-#define NUMBER_CORES_RESERVED_FOR_OS 4
+#define NUMBER_CORES_RESERVED_FOR_OS 1
 	/* nthreads < 0 means number of CPUs minus this */
 	int n = ret.nthread;
 	if (ret.nthread < 0) {

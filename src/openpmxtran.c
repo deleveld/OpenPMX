@@ -34,6 +34,13 @@
 
 typedef VECTOR(char*) STRINGS;
 
+static void strings_free(STRINGS* s)
+{
+	forvector(i, *s)
+		free(s->rawptr[i]);
+	vector_free(*s);
+}
+
 typedef VECTOR(char) STRING;
 
 static void string_terminate(STRING* v)
@@ -249,9 +256,6 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 	if (bytes_read == -1)
 		fatal("could not read from data");
 
-	/* allow comments in data files */
-	strip_comments(buffer, "/*", "*/", ' ');
-	strip_comments(buffer, "//", "\n", '\n');
 	strip_firstlast_space(buffer);
 
 	assert(vector_size(*fieldnames) == 0);
@@ -389,23 +393,17 @@ static void parserresult_free(PARSERESULT* res)
 	vector_free(res->filename);
 	vector_free(res->data);
 	vector_free(res->data_preprocess_code);
+	
 	vector_free(res->dataconfig);
-	forvector(i, res->record_field_names)
-		free(vector_elem(res->record_field_names, i));
-	vector_free(res->record_field_names);
-
+	strings_free(&res->record_field_names);
 	vector_free(res->advan_init);
 
 	vector_free(res->imodel_diffeqn_code);
 
-	forvector(i, res->imodel_field_names)
-		free(vector_elem(res->imodel_field_names, i));
-	vector_free(res->imodel_field_names);
+	strings_free(&res->imodel_field_names);
 	vector_free(res->imodel_fields_code);
 
-	forvector(i, res->predict_field_names)
-		free(vector_elem(res->predict_field_names, i));
-	vector_free(res->predict_field_names);
+	strings_free(&res->predict_field_names);
 	vector_free(res->predict_fields_code);
 
 	vector_free(res->theta_init);
@@ -488,8 +486,6 @@ static void parse_advan_init(PARSERESULT* res, char* p)
 		fatal("Could not find ')' to mark end of ADVAN() method name");
 	*endvars = 0;
 
-	strip_comments(p, "/*", "*/", ' ');
-	strip_comments(p, "//", "\n", '\n');
 	strip_firstlast_space(p);
 
 	res->predict_state_maybe_unused = "";
@@ -528,6 +524,18 @@ static void parse_advan_init(PARSERESULT* res, char* p)
 	string_append(&res->advan_init, endvars + 1);
 }
 
+static void get_field_names(char* p, STRINGS* namevec)
+{
+	char* token;
+	char* rest = p;
+	let delim = ", \t\n";
+	while ((token = strtok_r(rest, delim, &rest))) {
+		strip_firstlast_space(token);
+		let s = strdup(token);
+		vector_append(*namevec, s);
+	}
+}
+
 /// For the $IMODEL() itentifier the names in the brackets are the
 /// individual model parameters. The list is tokenized with comma or
 /// space.
@@ -543,18 +551,8 @@ static void parse_imodel(PARSERESULT* res, char* p)
 		fatal("could not find ')' to mark end of IMODEL() parameters");
 	*endvars = 0;
 
-	strip_comments(p, "/*", "*/", ' ');
-	strip_comments(p, "//", "\n", '\n');
 	strip_firstlast_space(p);
-
-	char* token;
-	char* rest = p;
-	let delim = ", \t\n";
-	while ((token = strtok_r(rest, delim, &rest))) {
-		strip_firstlast_space(token);
-		let s = strdup(token);
-		vector_append(res->imodel_field_names, s);
-	}
+	get_field_names(p, &res->imodel_field_names);
 
 /// In the $IMODEL() block is code called to initialize each
 /// individual model.
@@ -563,7 +561,7 @@ static void parse_imodel(PARSERESULT* res, char* p)
 	string_append(&res->imodel_fields_code, endvars + 1);
 }
 
-/// For the $PREDICT() itentifier the names in the brackets are the
+/// For the $PREDICT() identifier the names in the brackets are the
 /// variables needing prediction for each record. The list is tokenized
 /// with comma or space.
 static void parse_predict(PARSERESULT* res, char* p)
@@ -578,18 +576,8 @@ static void parse_predict(PARSERESULT* res, char* p)
 		fatal("could not find ')' to mark end of PREDICT() parameters");
 	*endvars = 0;
 
-	strip_comments(p, "/*", "*/", ' ');
-	strip_comments(p, "//", "\n", '\n');
 	strip_firstlast_space(p);
-
-	char* token;
-	char* rest = p;
-	let delim = ", \t\n";
-	while ((token = strtok_r(rest, delim, &rest))) {
-		strip_firstlast_space(token);
-		let s = strdup(token);
-		vector_append(res->predict_field_names, s);
-	}
+	get_field_names(p, &res->predict_field_names);
 
 /// In the $PREDICT() block is code called to calculate the prediction
 /// variables and the observation prediction Y.
@@ -619,55 +607,70 @@ static void parse_theta(PARSERESULT* res, char* p)
 	string_append(&res->theta_init, p);
 }
 
-static int count_elements(const char* p)
+static void check_excess_text(char* after, const char* place)
 {
-	var token = p;
-	var n = 1;
-	char* d;
-	while ((d = strchr(token, ','))) {
-		token = d + 1;
-		++n;
+	if (after) { 
+		strip_firstlast_space(after);
+		if (strlen(after))
+			fatal("excess text \"%s\" after %s", after, place);
 	}
-	return n;
 }
 
-/// In the $OMEGA() block is a initializer for a diagonal block in the
-/// omega matrix.
+/// In the $OMEGA() block is a initializer for a diagonal of the omega
+/// matrix.
 static void parse_omega(PARSERESULT* res, char* p)
 {
+	char* after = 0;
 	var endvars = match_brackets(p, 1);
 	if (!endvars)
 		fatal("Could not find ')' to mark end of OMEGA()");
+	if (*endvars)
+		after = endvars + 1;
 	*endvars = 0;
 
-	strip_comments(p, "/*", "*/", ' ');
-	strip_comments(p, "//", "\n", '\n');
 	strip_firstlast_space(p);
 
-	let n = count_elements(p);
-	string_appendf(&res->omega_init, "\t\t{ OMEGA_DIAG, %i, { %s } },", n, p);
+	STRINGS s = { 0 };
+	get_field_names(p, &s);
+	let ndim = vector_size(s);
+	string_appendf(&res->omega_init, "\t\t{ OMEGA_DIAG, %i, { ", ndim);
+	forvector(i, s)
+		string_appendf(&res->omega_init, "%s, ", s.ptr[i]);
+	string_appendf(&res->omega_init, " } },");
+	strings_free(&s);
+
+	check_excess_text(after, "$OMEGA()");
 }
 
-/// In the $OMEGA() block is a initializer for a lower triangular block
-/// in the omega matrix.
+/// In the $OMEGABLOCK() block is a initializer for a lower triangular block
+/// of the omega matrix.
 static void parse_omegablock(PARSERESULT* res, char* p)
 {
+	char* after = 0;
 	var endvars = match_brackets(p, 1);
 	if (!endvars)
 		fatal("Could not find ')' to mark end of OMEGABLOCK()");
+	if (*endvars)
+		after = endvars + 1;
 	*endvars = 0;
 
-	strip_comments(p, "/*", "*/", ' ');
-	strip_comments(p, "//", "\n", '\n');
 	strip_firstlast_space(p);
 
 	/* calculate dimensions */
 	/* https://www.wolframalpha.com/input?i2d=true&i=solve+k%5C%2844%29+n%3Dk*Divide%5B%5C%2840%29k%2B1%5C%2841%29%2C2%5D */
-	let n = count_elements(p);
+	STRINGS s = { 0 };
+	get_field_names(p, &s);
+	let n = vector_size(s);
 	let ndim = (int)floor((sqrt(8 * n + 1) - 1) / 2);
 
 	/* TODO: maybe put some error checking on the dimension */
-	string_appendf(&res->omega_init, "\t\t{ OMEGA_BLOCK, %i, { %s } },", ndim, p);
+	string_appendf(&res->omega_init, "\t\t{ OMEGA_BLOCK, %i, { ", ndim);
+	forvector(i, s)
+		string_appendf(&res->omega_init, "%s, ", s.ptr[i]);
+	string_appendf(&res->omega_init, " } },");
+	strings_free(&s);
+
+	check_excess_text(after, "$OMEGABLOCK()");
 }
 
 /// An $OMEGASAME() block is a initializer for a block in omega that is
@@ -675,16 +678,19 @@ static void parse_omegablock(PARSERESULT* res, char* p)
 /// block of omega by a lower block.
 static void parse_omegasameblock(PARSERESULT* res, char* p)
 {
+	char* after = 0;
 	var endvars = match_brackets(p, 1);
 	if (!endvars)
 		fatal("Could not find ')' to mark end of OMEGASAME()");
+	if (*endvars)
+		after = endvars + 1;
 	*endvars = 0;
 
-	strip_comments(p, "/*", "*/", ' ');
-	strip_comments(p, "//", "\n", '\n');
 	strip_firstlast_space(p);
 
 	string_appendf(&res->omega_init, "\t\t{ OMEGA_SAME, %s, { } },", p);
+
+	check_excess_text(after, "$OMEGASAME()");
 }
 
 /// In the $SIGMA() block is a initializer for an array of residual
@@ -694,23 +700,19 @@ static void parse_sigma(PARSERESULT* res, char* p)
 	if (vector_size(res->sigma_init))
 		fatal("more than one $SIGMA \"%s\"", p);
 
+	char* after = 0;
 	var endvars = match_brackets(p, 1);
 	if (!endvars)
 		fatal("Could not find ')' to mark end of SIGMA()");
-	if (*endvars != ')')
-		fatal("End of file within $SIGMA()");
+	if (*endvars)
+		after = endvars + 1;
 	*endvars = 0;
 
-	strip_comments(p, "/*", "*/", ' ');
-	strip_comments(p, "//", "\n", '\n');
 	strip_firstlast_space(p);
 
 	string_append(&res->sigma_init, p);
 
-	var after = endvars + 1;
-	strip_firstlast_space(after);
-	if (*after != 0)
-		fatal("Unknown text \"%s\" in $SIGMA", after);
+	check_excess_text(after, "$SIGMA()");
 }
 
 /// The $MAIN block contains the C code for the main analysis.
@@ -753,6 +755,9 @@ int main(int argc, char* argv[])
 //	fprintf(stdout, "read \"%s\"\n", grfilename);
 	var grfile = read_file(grfilename);
 	string_append(&res.filename, grfilename);
+
+	strip_comments(grfile, "/*", "*/", ' ');
+	strip_comments(grfile, "//", "\n", '\n');
 
 /// Everything in a control file before the first block starting with $
 /// is just ignored. This is useful for a description of the intent of

@@ -96,7 +96,7 @@ static void idata_resample_err(const IDATA* const idata,
 	}
 }
 
-/// For simulation andom ETA values are chosen according to the omega
+/// For simulation random ETA values are chosen according to the omega
 /// matrix
 static void idata_resample_eta(IDATA* const idata,
 							   const POPMODEL* const popmodel,
