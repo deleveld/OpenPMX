@@ -22,7 +22,9 @@
 #include <stdarg.h>
 
 #include "print.h"
+#include "defines.h"
 #include "utils/c22.h"
+#include "utils/various.h"
 
 #include "buildflags.h"
 
@@ -117,20 +119,47 @@ static void mutex_unlock(void)
 	}
 }
 
+/* if its a server, flush every once in a while */
+#ifdef OPENPMX_SERVER
+static bool server_flush(void)
+{
+	static bool init_flush = false;
+	static struct timespec last_flush;
+
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	if (!init_flush || timespec_time_difference(&last_flush, &now) > OPENPMX_SERVER_FLUSH_PERIOD_MS) {
+		init_flush = true;
+		last_flush = now;
+		return true;
+	}
+	return false;
+}
+#endif
+
 void openpmx_fputs(FILE* stream1, FILE* stream2, const char* prefix, const char* v)
 {
 	mutex_lock();
+
+	bool must_flush = false;
+#ifdef OPENPMX_SERVER
+	must_flush = server_flush();
+#endif
 
 	/* actually send the string */
 	if (stream1) {
 		if (prefix)
 			fputs(prefix, stream1);
 		fputs(v, stream1);
+		if (must_flush)
+			fflush(stream1);
 	}
 	if (stream2) {
 		if (prefix)
 			fputs(prefix, stream2);
 		fputs(v, stream2);
+		if (must_flush)
+			fflush(stream2);
 	}
 	
 	mutex_unlock();

@@ -38,6 +38,8 @@ extern "C" {
 #define OPENPMX_HEADER_FORMAT 			" %24s"
 #define OPENPMX_TABLE_FORMAT 			" %24.17g"
 
+#define OPENPMX_SERVER_FLUSH_PERIOD_MS	5000
+
 #ifdef __cplusplus
 }
 #endif

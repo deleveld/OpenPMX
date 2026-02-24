@@ -441,8 +441,7 @@ static void outfile_header(FILE* f2,
 	info(f2, "config %s %i %s %s\n", 
 		parallel_message, options->nthread, server_message, OPENPMX_INSTALL_PLATFORM);
 
-	info(f2, "data records %i\n", advanfuncs->recordinfo.dataconfig->nrecords);
-	info(f2, "data individuals %i observations %i\n", idata->nindivid, idata->nobs);
+	info(f2, "data records %i observations %i individuals %i\n", advanfuncs->recordinfo.dataconfig->nrecords, idata->nobs, idata->nindivid);
 	info(f2, "data table offset %s\n", advanfuncs->recordinfo.dataconfig->_offset1 ? "true" : "false");
 
 	advanfuncs->info(advanfuncs, stdout);
