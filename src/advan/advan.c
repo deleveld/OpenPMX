@@ -95,7 +95,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 
 	if (reset_state || advanconfig->firstonly == false) {
 		if (reset_state) {
-			/*	If we dont zero the model it keeps the values from the previous
+			/* If we dont zero the model it keeps the values from the previous
 			 * time we called. This seems to be somewhat elegant in the user code.
 			 * Since the model retains values from the previous record. 
 			 * memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size); */
