@@ -531,8 +531,10 @@ static void get_field_names(char* p, STRINGS* namevec)
 	let delim = ", \t\n";
 	while ((token = strtok_r(rest, delim, &rest))) {
 		strip_firstlast_space(token);
-		let s = strdup(token);
-		vector_append(*namevec, s);
+		if (strlen(token)) {
+			let s = strdup(token);
+			vector_append(*namevec, s);
+		}
 	}
 }
 
