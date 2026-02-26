@@ -89,6 +89,7 @@ rm -vf "${OPENPMXPATH}"/lib/*.a
 rm -vf "${OPENPMXPATH}/openpmx"
 rm -vf "${OPENPMXPATH}/src/buildflags.h"
 if [ "${TARGET}" = "clean" ]; then
+	EXITMESSAGE="clean success"
     exit 0
 fi
 
