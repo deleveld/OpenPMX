@@ -23,27 +23,55 @@ BASE=$(basename "${FILE}")
 OBJFILE="${BASE}.o"
 EXECFILE="${FILE}.bin"
 
-# dont allow recursive runs, for server the lock is in the OpenPMX
-# install directory so only a single run per install is done.
-MAX_RETRIES=60  # (60 retries * 10s = 10 minute total timeout)
-RETRY_COUNT=0
-while ! mkdir "$LOCKDIR" 2>/dev/null; do
-    if [ "$RETRY_COUNT" -ge "$MAX_RETRIES" ]; then
-        printf "error: timeout reached. Could not acquire lock after %ds.\n" $((MAX_RETRIES * 10)) >&2
-        exit 1
+# setup the queue
+MYPID=$$
+MYTICKET=$(date +%s%N)-$MYPID
+mkdir -p "$QUEUEDIR"
+touch "$QUEUEDIR/$MYTICKET"
+
+LAST_REPORTED_RANK=-1
+while true; do
+	# find my rank in the queue
+    ALL_TICKETS=$(ls -1 "$QUEUEDIR" | sort)
+    OLDEST_TICKET=$(echo "$ALL_TICKETS" | head -n 1)
+    MY_RANK=$(echo "$ALL_TICKETS" | grep -n "^${MYTICKET}$" | cut -d: -f1)
+
+	# if rank gets lost, remake it
+    if [ -z "$MY_RANK" ]; then
+        echo "queue: ticket lost, re-entering"
+        touch "$QUEUEDIR/$MYTICKET"
+        continue
     fi
-    printf "... waiting 10s for previous run to finish (attempt %d/%d)\n" $((RETRY_COUNT + 1)) "$MAX_RETRIES" >&2
-    sleep 10
-    RETRY_COUNT=$((RETRY_COUNT + 1))
+
+	# report rank if changed
+    if [ "$MY_RANK" -ne "$LAST_REPORTED_RANK" ] && [ "$MY_RANK" -gt 1 ]; then
+        echo "queue: rank is $MY_RANK"
+        LAST_REPORTED_RANK=$MY_RANK
+    fi
+
+	# is it our turn to run
+    if [ "$OLDEST_TICKET" = "$MYTICKET" ]; then
+        break
+    fi
+
+	# find stale tickets and remove
+    LEADER_PID=${OLDEST_TICKET##*-}
+    if ! kill -0 "$LEADER_PID" 2>/dev/null; then
+        echo "queue: removing stale $QUEUEDIR/$OLDEST_TICKET"
+        rm -f "$QUEUEDIR/$OLDEST_TICKET"
+        continue
+    fi
+
+    sleep 2
 done
 
 # cleanup when done
 EXITMESSAGE="error: openpmx failed\n"
 cleanup() {
-	printf "${EXITMESSAGE}"
-	rm "${OBJFILE}" 2>/dev/null || true
-	rm "${EXECFILE}" 2>/dev/null || true
-	rmdir "$LOCKDIR" 2>/dev/null || true
+	printf "${EXITMESSAGE}" || true
+	rm "${OBJFILE}" || true
+	rm "${EXECFILE}" || true
+	rm -f "$QUEUEDIR/$MYTICKET" || true
 }
 trap cleanup EXIT
 

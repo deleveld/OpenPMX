@@ -89,7 +89,6 @@ rm -vf "${OPENPMXPATH}"/lib/*.a
 rm -vf "${OPENPMXPATH}/openpmx"
 rm -vf "${OPENPMXPATH}/src/buildflags.h"
 if [ "${TARGET}" = "clean" ]; then
-	EXITMESSAGE="clean success"
     exit 0
 fi
 
@@ -162,15 +161,15 @@ case "${TARGET}" in
         ;;
 esac
 
-# for server the lockdir is in the install dir so only a single instance
+# for server the queue is in the install dir so only a single instance
 # can run per install, others wait until they can
 case "${SERVER}" in
     server)
-		LOCKDIR="${OPENPMXPATH}/openpmx.lockdir"
+		QUEUEDIR="${OPENPMXPATH}/openpmx.queue"
         printf "#define OPENPMX_SERVER\n" >> "${OPENPMXPATH}/src/buildflags.h"
 		;;
     notserver)
-		LOCKDIR="openpmx.lockdir"
+		QUEUEDIR="openpmx.queue"
         printf "#define OPENPMX_NOTSERVER\n" >> "${OPENPMXPATH}/src/buildflags.h"
         ;;
     *)
@@ -219,7 +218,7 @@ printf "write openpmx script\n"
     printf "LFLAGS=\"%s\"\n" "${LFLAGS}"
     printf "OPENPMXPATH=\"%s\"\n" "${OPENPMXPATH}"
     printf "PLATFORM=\"%s\"\n" "${PLATFORM}"
-    printf "LOCKDIR=\"%s\"\n" "${LOCKDIR}"
+    printf "QUEUEDIR=\"%s\"\n" "${QUEUEDIR}"
     cat "${OPENPMXPATH}/src/_openpmx_template"
 } > "${OPENPMXPATH}/openpmx"
 
