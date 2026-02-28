@@ -43,5 +43,3 @@ cp -v datasim/rmse.csv	table_datasim_rmse.csv
 
 do_run schnider_1core_default	extra_1	extra_supplement_1	extra_supplement_2
 do_run schnider_1core_firstonly	extra_2	extra_supplement_2	extra_supplement_3
-
-
