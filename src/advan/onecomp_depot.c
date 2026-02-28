@@ -117,6 +117,14 @@ static void advancer_onecomp_depot_advance_interval(ADVAN* advan,
 #pragma pop_macro("A2")
 }
 
+static inline void ensure(const int flag, const char* message)
+{
+	if (!flag) {
+		printf("%s\n", message);
+		exit(EXIT_FAILURE);
+	}
+}
+
 ADVANFUNCS* pmx_advan_onecomp_depot(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig)
 {
 	assert(advanconfig->init);
@@ -141,9 +149,9 @@ ADVANFUNCS* pmx_advan_onecomp_depot(const DATACONFIG* const dataconfig, const AD
 		.offsetCL = structinfo_find_offset("CL", &advanconfig->imodelfields),
 		.offsetKA = structinfo_find_offset("KA", &advanconfig->imodelfields),
 	};
-	assert(retinit.offsetV >= 0);
-	assert(retinit.offsetCL >= 0);
-	assert(retinit.offsetKA >= 0);
+	ensure(retinit.offsetV >= 0, "fatal: could not find V");
+	ensure(retinit.offsetCL >= 0, "fatal: could not find CL");
+	ensure(retinit.offsetKA >= 0, "fatal: could not find KA");
 
 	ADVANTABLE_ONECOMP_DEPOT* ret = malloc(sizeof(ADVANTABLE_ONECOMP_DEPOT));
 	assert(ret);

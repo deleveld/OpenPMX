@@ -188,6 +188,11 @@ static bool focei(STAGE2_PARAMS* const params)
 	let options = params->options;
 
 	let n = params->test.nparam;
+	if (n == 0) {
+		info(params->outstream, "optim no parameters to estimate\n");
+		return true;
+	}
+	
 	var initial = mallocvar(double, n);
 	var lower = mallocvar(double, n);
 	var upper = mallocvar(double, n);
@@ -486,8 +491,8 @@ static STAGE2_PARAMS stage2_params(const char* filename,
 		.filename = filename,
 	};
 	clock_gettime(CLOCK_REALTIME, &params.begin);
-	assert(idata->nindivid > 0);
-	assert(idata->nomega > 0);
+	if (idata->nindivid <= 0)
+		fatal(outstream, "optim cannot estimate, no individuals\n");
 
 	params.best = params.test.popmodel; /* will set objfn to invalid */
 	params.besteta = callocvar(double, neta);

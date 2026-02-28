@@ -22,6 +22,9 @@ DATA="${2:-}"
 BASE=$(basename "${FILE}")
 OBJFILE="${BASE}.o"
 EXECFILE="${FILE}.bin"
+if [[ "$PLATFORM" == "msys2" ]]; then
+	EXECFILE="${FILE}.exe"
+fi
 
 # setup the queue
 MYPID=$$
@@ -32,7 +35,7 @@ touch "$QUEUEDIR/$MYTICKET"
 LAST_REPORTED_RANK=-1
 while true; do
 	# find my rank in the queue
-    ALL_TICKETS=$(ls -1 "$QUEUEDIR" | sort)
+	ALL_TICKETS=$(find "$QUEUEDIR" -maxdepth 1 -mindepth 1 -printf '%f\n' | sort)
     OLDEST_TICKET=$(echo "$ALL_TICKETS" | head -n 1)
     MY_RANK=$(echo "$ALL_TICKETS" | grep -n "^${MYTICKET}$" | cut -d: -f1)
 
@@ -65,7 +68,8 @@ while true; do
     sleep 2
 done
 
-# cleanup when done
+# cleanup when done, the object and excutable files are removed
+# but the .c file remains for debugging purposes
 EXITMESSAGE="error: openpmx failed\n"
 cleanup() {
 	printf "${EXITMESSAGE}" || true
@@ -74,11 +78,6 @@ cleanup() {
 	rm -f "$QUEUEDIR/$MYTICKET" || true
 }
 trap cleanup EXIT
-
-# Set platform-specific variables
-if [[ "$PLATFORM" == "msys2" ]]; then
-	EXECFILE="${FILE}.exe"
-fi
 
 # translate control file to C code
 if [ "${FILE##*.}" != "c" ]; then

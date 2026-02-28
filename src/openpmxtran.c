@@ -241,6 +241,21 @@ static int match_recordname(const char* p, const char* q, int* i, const bool whi
 	return 0;
 }
 
+static void check_reserved_name(const char* s, const char* source)
+{
+	if (streq(s, "PRED") ||
+		streq(s, "pred") ||
+		streq(s, "YHAT") ||
+		streq(s, "yhat") ||
+		streq(s, "YHATVAR") ||
+		streq(s, "yhatvar")||
+		streq(s, "OBJ") ||
+		streq(s, "obj") ||
+		streq(s, "INEVAL") ||
+		streq(s, "ineval"))
+		fatal("reserved name \"%s\" in %s", s, source);
+}
+
 static void load_datafile_write_dataconfig(const char* datafile, STRING* data, STRINGS* fieldnames, STRING* config)
 {
 //	fprintf(stdout, "data \"%s\"\n", datafile);
@@ -285,17 +300,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 
 				/* error on reserved names in data, do this after
 				 * strip_firstlast_space() so we have the correct name */
-				if (streq(s, "PRED") ||
-					streq(s, "pred") ||
-					streq(s, "YHAT") ||
-					streq(s, "yhat") ||
-					streq(s, "YHATVAR") ||
-					streq(s, "yhatvar")||
-					streq(s, "OBJ") ||
-					streq(s, "obj") ||
-					streq(s, "INEVAL") ||
-					streq(s, "ineval"))
-					fatal("reserved name \"%s\" in data\n", s);
+				check_reserved_name(s, "datafile");
 
 				if (vector_size(*fieldnames) != 1)
 					string_append(data, ", ");
@@ -518,7 +523,7 @@ static void parse_advan_init(PARSERESULT* res, char* p)
 		res->advan_method = "pmx_advan_diffeqn_libgsl";
 		res->needs_diffeqn = true;
 	} else
-		fatal("Could not identify ADVAN() method name");
+		fatal("\"%s\" is not an ADVAN() method name", p);
 
 	strip_firstlast_space(endvars + 1);
 	string_append(&res->advan_init, endvars + 1);
@@ -555,6 +560,8 @@ static void parse_imodel(PARSERESULT* res, char* p)
 
 	strip_firstlast_space(p);
 	get_field_names(p, &res->imodel_field_names);
+	forvector(i, res->imodel_field_names)
+		check_reserved_name(res->imodel_field_names.ptr[i], "IMODEL()");
 
 /// In the $IMODEL() block is code called to initialize each
 /// individual model.
@@ -580,6 +587,8 @@ static void parse_predict(PARSERESULT* res, char* p)
 
 	strip_firstlast_space(p);
 	get_field_names(p, &res->predict_field_names);
+	forvector(i, res->predict_field_names)
+		check_reserved_name(res->predict_field_names.ptr[i], "PREDICT()");
 
 /// In the $PREDICT() block is code called to calculate the prediction
 /// variables and the observation prediction Y.
@@ -844,6 +853,19 @@ extern char openpmxtran_template[];
 	if (*begin == 0)
 		fatal("could not find any markers in \"%s\"", grfilename);
 
+	/* fatal error is advan method is missing, init can be empty if no options passed */
+	if (res.advan_method == 0)
+		fatal("$ADVAN() method missing");
+
+	if (vector_size(res.imodel_fields_code) == 0)
+		fatal("$IMODEL() code missing");
+
+	if (vector_size(res.predict_fields_code) == 0)
+		fprintf(stdout, "warning: $PREDICT() code missing\n");
+
+	if (vector_size(res.analysis_code) == 0)
+		fatal("$MAIN code missing");
+
 	const char last_begin = *begin;
 	*begin = 0;
 	string_append(&res.output, template_file);
@@ -965,7 +987,8 @@ extern char openpmxtran_template[];
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_PREDICT_CODE}\n", &i, false)) {
 			string_append(&res.output, res.predict_state_maybe_unused);
-			string_appendf(&res.output, "\t%s\n", res.predict_fields_code.ptr);
+			if (vector_size(res.predict_fields_code) != 0)
+				string_appendf(&res.output, "\t%s\n", res.predict_fields_code.ptr);
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_PREDPARAMS_FIELDS_SET}\n", &i, false)) {

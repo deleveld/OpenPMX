@@ -333,8 +333,6 @@ static double table_value(const TABLE* const table, const char* const name, cons
 /// THETA(1) is accessible as theta(1), THETA(1), theta[1], or THETA[1].
 	if (sscanf(name, "theta(%i)", &i) == 1 ||
 		sscanf(name, "THETA(%i)", &i) == 1 ||
-		sscanf(name, "theta[%i]", &i) == 1 ||
-		sscanf(name, "THETA[%i]", &i) == 1 ||
 		sscanf(name, "theta%i", &i) == 1 ||
 		sscanf(name, "THETA%i", &i) == 1) {
 		i -= off;
@@ -348,8 +346,6 @@ static double table_value(const TABLE* const table, const char* const name, cons
 /// is accessible as eta(1), ETA(1), eta[1], or ETA[1].
 	if (sscanf(name, "eta(%i)", &i) == 1 ||
 		sscanf(name, "ETA(%i)", &i) == 1 ||
-		sscanf(name, "eta[%i]", &i) == 1 ||
-		sscanf(name, "ETA[%i]", &i) == 1 ||
 		sscanf(name, "eta%i", &i) == 1 ||
 		sscanf(name, "ETA%i", &i) == 1) {
 		i -= off;
@@ -366,12 +362,8 @@ static double table_value(const TABLE* const table, const char* const name, cons
 /// or STATE[1].
 	if (sscanf(name, "a(%i)", &i) == 1 ||
 		sscanf(name, "A(%i)", &i) == 1 || 
-		sscanf(name, "a[%i]", &i) == 1 ||
-		sscanf(name, "A[%i]", &i) == 1 || 
 		sscanf(name, "state(%i)", &i) == 1 ||
-		sscanf(name, "STATE(%i)", &i) == 1 ||
-		sscanf(name, "state[%i]", &i) == 1 ||
-		sscanf(name, "STATE[%i]", &i) == 1) {
+		sscanf(name, "STATE(%i)", &i) == 1) {
 		i -= off;
 		let state = individ->istate + table->individ_i * idata->nstate;
 		if (i >= 0 && i < idata->nstate)
@@ -385,9 +377,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 /// likely to be non-zero. The values are accessible as err(1), ERR(1),
 /// err[1], ERR[1].
 	if ((sscanf(name, "err(%i)", &i) == 1) ||
-		(sscanf(name, "ERR(%i)", &i) == 1) ||
-		(sscanf(name, "err[%i]", &i) == 1) ||
-		(sscanf(name, "ERR[%i]", &i) == 1)) {
+		(sscanf(name, "ERR(%i)", &i) == 1)) {
 		i -= off;
 		if (i >= 0 && i < idata->nsigma)
 			return table->err[i];

@@ -221,6 +221,14 @@ static void advancer_threecomp_advance_interval(ADVAN* advan,
 #pragma pop_macro("A3")
 }
 
+static inline void ensure(const int flag, const char* message)
+{
+	if (!flag) {
+		printf("%s\n", message);
+		exit(EXIT_FAILURE);
+	}
+}
+
 ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig)
 {
 	assert(advanconfig->init);
@@ -248,12 +256,12 @@ ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANC
 		.offsetQ2 = structinfo_find_offset("Q2", &advanconfig->imodelfields),
 		.offsetQ3 = structinfo_find_offset("Q3", &advanconfig->imodelfields),
 	};
-	assert(retinit.offsetV1 >= 0);
-	assert(retinit.offsetV2 >= 0);
-	assert(retinit.offsetV3 >= 0);
-	assert(retinit.offsetCL >= 0);
-	assert(retinit.offsetQ2 >= 0);
-	assert(retinit.offsetQ3 >= 0);
+	ensure(retinit.offsetV1 >= 0, "fatal: could not find V1");
+	ensure(retinit.offsetV2 >= 0, "fatal: could not find V2");
+	ensure(retinit.offsetV3 >= 0, "fatal: could not find V3");
+	ensure(retinit.offsetCL >= 0, "fatal: could not find CL");
+	ensure(retinit.offsetQ2 >= 0, "fatal: could not find Q2");
+	ensure(retinit.offsetQ3 >= 0, "fatal: could not find Q3");
 
 	/* make binary copy so init can have const members */
 	ADVANTABLE_THREECOMP* ret = malloc(sizeof(ADVANTABLE_THREECOMP));

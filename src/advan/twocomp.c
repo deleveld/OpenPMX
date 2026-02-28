@@ -127,6 +127,14 @@ static void advancer_twocomp_advance_interval(ADVAN* advan,
 #pragma pop_macro("A2")
 }
 
+static inline void ensure(const int flag, const char* message)
+{
+	if (!flag) {
+		printf("%s\n", message);
+		exit(EXIT_FAILURE);
+	}
+}
+
 ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig)
 {
 	assert(advanconfig->init);
@@ -152,10 +160,10 @@ ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCON
 		.offsetCL = structinfo_find_offset("CL", &advanconfig->imodelfields),
 		.offsetQ2 = structinfo_find_offset("Q2", &advanconfig->imodelfields),
 	};
-	assert(retinit.offsetV1 >= 0);
-	assert(retinit.offsetV2 >= 0);
-	assert(retinit.offsetCL >= 0);
-	assert(retinit.offsetQ2 >= 0);
+	ensure(retinit.offsetV1 >= 0, "fatal: could not find V1");
+	ensure(retinit.offsetV2 >= 0, "fatal: could not find V2");
+	ensure(retinit.offsetCL >= 0, "fatal: could not find CL");
+	ensure(retinit.offsetQ2 >= 0, "fatal: could not find Q2");
 
 	ADVANTABLE_TWOCOMP* ret = malloc(sizeof(ADVANTABLE_TWOCOMP));
 	assert(ret);
