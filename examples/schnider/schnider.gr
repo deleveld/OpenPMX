@@ -32,7 +32,6 @@ $THETA
 	{   -.1,   0,   .1,  ESTIMATE     },
 $OMEGA(0.1, 0.1, 0.1, 0.1, 0., 0.)
 $SIGMA(0.1)
-$MAIN
+$MAIN 
 	estimate();
-	table("ID AGE WT HT M1F2", .name="covariates");
-
+	table("ID AGE WT HT M1F2", .stream=stdout, .firstonly=true);
