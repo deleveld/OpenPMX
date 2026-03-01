@@ -529,7 +529,7 @@ static void parse_advan_init(PARSERESULT* res, char* p)
 	string_append(&res->advan_init, endvars + 1);
 }
 
-static void get_field_names(char* p, STRINGS* namevec)
+static void get_delim_tokens(char* p, STRINGS* namevec)
 {
 	char* token;
 	char* rest = p;
@@ -559,7 +559,7 @@ static void parse_imodel(PARSERESULT* res, char* p)
 	*endvars = 0;
 
 	strip_firstlast_space(p);
-	get_field_names(p, &res->imodel_field_names);
+	get_delim_tokens(p, &res->imodel_field_names);
 	forvector(i, res->imodel_field_names)
 		check_reserved_name(res->imodel_field_names.ptr[i], "IMODEL()");
 
@@ -586,7 +586,7 @@ static void parse_predict(PARSERESULT* res, char* p)
 	*endvars = 0;
 
 	strip_firstlast_space(p);
-	get_field_names(p, &res->predict_field_names);
+	get_delim_tokens(p, &res->predict_field_names);
 	forvector(i, res->predict_field_names)
 		check_reserved_name(res->predict_field_names.ptr[i], "PREDICT()");
 
@@ -642,7 +642,7 @@ static void parse_omega(PARSERESULT* res, char* p)
 	strip_firstlast_space(p);
 
 	STRINGS s = { 0 };
-	get_field_names(p, &s);
+	get_delim_tokens(p, &s);
 	let ndim = vector_size(s);
 	string_appendf(&res->omega_init, "\t\t{ OMEGA_DIAG, %i, { ", ndim);
 	forvector(i, s)
@@ -670,7 +670,7 @@ static void parse_omegablock(PARSERESULT* res, char* p)
 	/* calculate dimensions */
 	/* https://www.wolframalpha.com/input?i2d=true&i=solve+k%5C%2844%29+n%3Dk*Divide%5B%5C%2840%29k%2B1%5C%2841%29%2C2%5D */
 	STRINGS s = { 0 };
-	get_field_names(p, &s);
+	get_delim_tokens(p, &s);
 	let n = vector_size(s);
 	let ndim = (int)floor((sqrt(8 * n + 1) - 1) / 2);
 
@@ -721,7 +721,13 @@ static void parse_sigma(PARSERESULT* res, char* p)
 
 	strip_firstlast_space(p);
 
-	string_append(&res->sigma_init, p);
+	/* get tokens and print with comma delimiter */
+	STRINGS s = { 0 };
+	get_delim_tokens(p, &s);
+	forvector(i, s)
+		string_appendf(&res->sigma_init, "%s, ", s.ptr[i]);
+	strings_free(&s);
+//	string_append(&res->sigma_init, p);
 
 	check_excess_text(after, "$SIGMA()");
 }
