@@ -50,7 +50,7 @@ static void simulate_with_error_thread(INDIVID* const individ,
 		etacopy[i] = NAN;
 	memcpy(etacopy, individ->eta, nomega * sizeof(double));
 
-	let ievaluate_args = ievaluate_args_init(individ->record,
+	let ievaluate_args = ievaluate_args_init(individ->datainfo,
 											 individ->nrecord,
 											 advanfuncs,
 											 popmodel->theta,

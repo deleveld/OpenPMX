@@ -143,8 +143,7 @@ static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 						 rhobeg, rhoend,
 						 iprint, neval, w);
 		if (retcode != BOBYQA_SUCCESS) {
-			let recordinfo = &stage1_params->ievaluate_args.advanfuncs->recordinfo;
-			let id = RECORDINFO_ID(recordinfo, stage1_params->ievaluate_args.record);
+			let id = stage1_params->ievaluate_args.datainfo->ID;
 			warning(0, "BOBYQA error %i: ID %f eta (initial) not successful\n", retcode, id);
 		}
 	}
@@ -160,8 +159,7 @@ static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 					 rhobeg, rhoend,
 					 iprint, neval, w);
 	if (retcode != BOBYQA_SUCCESS) {
-		let recordinfo = &stage1_params->ievaluate_args.advanfuncs->recordinfo;
-		let id = RECORDINFO_ID(recordinfo, stage1_params->ievaluate_args.record);
+		let id = stage1_params->ievaluate_args.datainfo->ID;
 		warning(0, "BOBYQA error %i: ID %f eta (refine) not successful\n", retcode, id);
 	}
 	free(w);
@@ -201,10 +199,6 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 	var J = gsl_matrix_alloc(nrecord, nreta);
 	let nomega = popparam->nomega;
 	assert(gradient_step != 0.);
-
-	let advanfuncs = ievaluate_args->advanfuncs;
-	let record = ievaluate_args->record;
-	let recordinfo = &advanfuncs->recordinfo;
 
 	double xx[OPENPMX_OMEGA_MAX] = { };
 	forcount(j, nreta) {
@@ -251,19 +245,18 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 		*(params->neval) += 1;
 
 		/* calculate derivatives, scaling by yhatvar */
-		const RECORD* ptr = record;
+		var datainfo = ievaluate_args->datainfo;
 		forcount(k, nrecord) {
-			let evid = RECORDINFO_EVID(recordinfo, ptr);
+			let evid = datainfo->EVID;
 			var deriv = 0.;
 			if (evid == 0) {
-				let dv = RECORDINFO_DV(recordinfo, ptr);
+				let dv = datainfo->DV;
 				let upper = (f_plus_h[k] - dv) / sqrt(yhatvar_plus_h[k]);
 				let lower = (f_minus_h[k] - dv) / sqrt(yhatvar_minus_h[k]);
 				deriv = (upper - lower) / (above - below);
 			}
 			gsl_matrix_set(J, k, j, deriv);
-
-			ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
+			++datainfo;
 		}
 	}
 	/* we made J such that tJ*J is tGi*invVi*Gi in Term 5 from Bae and Yim */
@@ -445,7 +438,7 @@ void stage1_thread(INDIVID* const individ,
 		.nonzero = nonzero,
 		.neval = &stage1_ineval,
 		.stage1 = &options->estimate.stage1,
-		.ievaluate_args = ievaluate_args_init(individ->record,
+		.ievaluate_args = ievaluate_args_init(individ->datainfo,
 											  individ->nrecord,
 											  advanfuncs,
 											  popmodel->theta,

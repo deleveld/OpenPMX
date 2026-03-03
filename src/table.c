@@ -77,7 +77,7 @@ typedef struct {
 	 * we could do that when asked actually */
 	const IMODEL* imodel;
 	const PREDICTVARS* predictvars;
-	const RECORD* record;
+	const DATAINFO* datainfo;
 	const double* err;
 } TABLE;
 
@@ -167,7 +167,7 @@ static TABLE table_open(const IDATA* const idata,
 
 		.imodel = 0,
 		.predictvars = 0,
-		.record = 0,
+		.datainfo = 0,
 		.err = 0,
 	};
 
@@ -213,10 +213,9 @@ static int table_row(TABLE* const table)
 {
 	assert(table);
 	let idata = table->idata;
-	let advanfuncs = table->advanfuncs;
 
 	/* for first iteration setup, everything is 0 */
-	if (table->record == 0) {
+	if (table->datainfo == 0) {
 		table->individ = 0;
 		table->individ_i = 0;
 
@@ -245,7 +244,7 @@ static int table_row(TABLE* const table)
 		}
 		/* stop at the end of the last individual, reset so we start over next time */
 		if (table->individ >= idata->nindivid) {
-			table->record = 0;
+			table->datainfo = 0;
 			table->individ = 0;
 			table->individ_i = 0;
 			return 0;
@@ -253,11 +252,10 @@ static int table_row(TABLE* const table)
 	}
 
 	/* prepare information about the table row for user */
-	let record_size = advanfuncs->recordinfo.dataconfig->recordfields.size;
 	let individ = &idata->individ[table->individ];
 	table->imodel = (const IMODEL*)((char*)individ->imodel + table->individ_i * idata->imodel_size);
 	table->predictvars = (const PREDICTVARS*)((char*)individ->predictvars + table->individ_i * idata->predictvars_size);
-	table->record = RECORD_INDEX(individ->record, record_size, table->individ_i);
+	table->datainfo = &individ->datainfo[table->individ_i];
 
 	table->err = table->zeroerr;
 	if (individ->isimerr) {
@@ -279,7 +277,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	let recordfields = &recordinfo->dataconfig->recordfields;
 	var recordoffset = structinfo_find_offset(name, recordfields);
 	if (recordoffset >= 0)
-		return DATA_FIELD(table->record, recordoffset);
+		return DATA_FIELD(table->datainfo->record, recordoffset);
 
 /// All of the fields of $IMODEL(...) are accessible.
 	let modelfields = &advanfuncs->advanconfig->imodelfields;
@@ -314,17 +312,13 @@ static double table_value(const TABLE* const table, const char* const name, cons
 		return individ->ineval; 
 	if (strcmp(name, "evid") == 0 ||
 		strcmp(name, "EVID") == 0) 
-		return RECORDINFO_EVID(recordinfo, table->record);
-	if (strcmp(name, "MDV") == 0)
-		return RECORDINFO_MDV(recordinfo, table->record);
-	if (strcmp(name, "EVID") == 0)
-		return RECORDINFO_EVID(recordinfo, table->record);
+		return table->datainfo->EVID;
 	if (strcmp(name, "AMT") == 0)
-		return RECORDINFO_AMT(recordinfo, table->record);
+		return table->datainfo->AMT;
 	if (strcmp(name, "RATE") == 0)
-		return RECORDINFO_RATE(recordinfo, table->record);
+		return table->datainfo->RATE;
 	if (strcmp(name, "CMT") == 0)
-		return RECORDINFO_CMT(recordinfo, table->record);
+		return table->datainfo->CMT;
 
 	/* Table entries for THETA, ETA, STATE, or ERR values */
 	const int off = _offset1 ? 1 : 0;

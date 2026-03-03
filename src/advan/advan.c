@@ -68,17 +68,18 @@ ADVANFUNCS* advanfuncs_alloc(const DATACONFIG* dataconfig, const ADVANCONFIG* co
 
 void advanfuncs_free(ADVANFUNCS* advanfuncs)
 {
+	recordinfo_free(&advanfuncs->recordinfo);
 	free(advanfuncs);
 }
 
 PREDICTSTATE advan_advance(ADVAN* const advan,
 						   IMODEL* const imodel,
-						   const RECORD* const record,
+						   const DATAINFO* const datainfo,
 						   const POPPARAM* const popparam)
 {
+	let record = datainfo->record;
 	let advanfuncs = advan->advanfuncs;
 	let advanconfig = advanfuncs->advanconfig;
-	let recordinfo = &advanfuncs->recordinfo;
 	var state = advan->state;
 	let nstate = advanfuncs->nstate;
 
@@ -90,7 +91,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 /// + First record of an individual
 /// + EVID is 3 (reset event) or EVID is 4 (reset-and-dose event)
 	/* reset the state on first start or on EVID==3 or EVID==4 events */
-	let evid = RECORDINFO_EVID(recordinfo, record);
+	let evid = datainfo->EVID;
 	let reset_state = (advan->initcount == 0 || evid == 3 || evid == 4);
 
 	if (reset_state || advanconfig->firstonly == false) {
@@ -101,7 +102,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			 * memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size); */
 			if (nstate)
 				memset(state, 0, nstate * sizeof(double));
-			advan->time = RECORDINFO_TIME(recordinfo, record);
+			advan->time = datainfo->TIME;
 			vector_resize(advan->infusions, 0);
 
 			/* for reset and reset-and-dose we should treat it like a discontinuitiy
@@ -131,12 +132,12 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 /// processing. Subsequent changes in lag do not change the moment when 
 /// the dose is actually applied.
 	if (evid == 1 || evid == 4) {
-		let amt = RECORDINFO_AMT(recordinfo, record);
+		let amt = datainfo->AMT;
 		if (amt > 0.) {
-			let cmt = RECORDINFO_CMT_0offset(recordinfo, record);
+			let cmt = datainfo->CMT0;
 			let lagtime = advan->amtlag[cmt];
-			let start = RECORDINFO_TIME(recordinfo, record) + lagtime;
-			let rate = RECORDINFO_RATE(recordinfo, record);
+			let start = datainfo->TIME + lagtime;
+			let rate = datainfo->RATE;
 			let duration = (rate != 0.) ? (amt / rate) : (0.);
 			let end = start + duration;
 
@@ -152,7 +153,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	
 	/* advance through time and handle infusions and doses when they start
 	 * or stop up until the time of the current record */
-	assert(advan->time <= RECORDINFO_TIME(recordinfo, record));
+	assert(advan->time <= datainfo->TIME);
 	do {
 		let currenttime = advan->time;
 
@@ -173,7 +174,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 /// + If `pmx_advan_inittime()` has been called, which is INITTIME() in 
 /// openpmxtran
 		/* find the first place we have to stop at going to the next record */
-		let recordtime = RECORDINFO_TIME(recordinfo, record);
+		let recordtime = datainfo->TIME;
 		double intervalstop = recordtime;
 		forvector(i, advan->infusions) {
 			let v = &advan->infusions.ptr[i];
@@ -241,7 +242,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		}
 
 	/* keep going till we have the state equal to the required record time */
-	} while (advan->time < RECORDINFO_TIME(recordinfo, record));
+	} while (advan->time < datainfo->TIME);
 
 	/* return the state useful for calling predict */
 	return (PREDICTSTATE) {

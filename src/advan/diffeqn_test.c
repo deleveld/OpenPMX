@@ -176,7 +176,7 @@ ADVANFUNCS* pmx_advan_diffeqn_test(const DATACONFIG* const dataconfig, const ADV
 			.interval = advancer_diffeqn_advance_interval,
 
 			.advanconfig = advanconfig,
-			.recordinfo = recordinfo_init(dataconfig),
+			.recordinfo = recordinfo_alloc(dataconfig),
 			.nstate = advanconfig->nstate,
 		},
 		.diffeqn = advanconfig->diffeqn,

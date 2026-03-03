@@ -81,7 +81,7 @@ ADVANFUNCS* pmx_advan_pred(const DATACONFIG* const dataconfig, const ADVANCONFIG
 		.interval = advancer_pred_advance_interval,
 
 		.advanconfig = advanconfig,
-		.recordinfo = recordinfo_init(dataconfig),
+		.recordinfo = recordinfo_alloc(dataconfig),
 		.nstate = 0,
 	};
 

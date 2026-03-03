@@ -124,8 +124,6 @@ typedef struct {
 double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 {
 	let advanfuncs = ievaluate_args->advanfuncs;
-	let record = ievaluate_args->record;
-	let nrecord = ievaluate_args->nrecord;
 	let popparam = &ievaluate_args->popparam;
 
 	char advan_memory[advanfuncs->advan_size];
@@ -140,20 +138,20 @@ double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 	let advanconfig = advanfuncs->advanconfig;
 	let predict = advanconfig->predict;
 	let recordinfo = &advanfuncs->recordinfo;
-	let recordsize = recordinfo->dataconfig->recordfields.size;
 	let no_dvlow_present = recordinfo->offsetDVLOW == -1;
 	var obs_min2ll = 0.; /* separate sums to avoid loss of precision if magnitudes differ strongly */
 	var obs_lndet = 0.;
-	const RECORD* ptr = record;
+	var datainfo = ievaluate_args->datainfo;
+	let nrecord = ievaluate_args->nrecord;
 	forcount(i, nrecord) {
-		let predictstate = advan_advance(advan, imodel, ptr, popparam);
-		if (RECORDINFO_EVID(recordinfo, ptr) == 0) {
+		let predictstate = advan_advance(advan, imodel, datainfo, popparam);
+		if (datainfo->EVID == 0) {
 			let yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 
-			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
+			let dvlow = no_dvlow_present ? 0. : datainfo->DVLOW;
 			if (dvlow == 0.) {
-				let dv = RECORDINFO_DV(recordinfo, ptr);
+				let dv = datainfo->DV;
 				let err = dv - yhat;
 				obs_min2ll += (err * err) / yhatvar;
 				obs_lndet += log(yhatvar);
@@ -163,7 +161,7 @@ double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 				/* obs_lndet += 0.; This term does not take part I think. FIXME */
 			}
 		}
-		ptr = RECORD_INDEX(ptr, recordsize, 1);	
+		++datainfo;
 	}
 	advanfuncs->destruct(advan);
 
@@ -187,8 +185,6 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 						 double* const ret_obs_min2ll)
 {
 	let advanfuncs = ievaluate_args->advanfuncs;
-	let record = ievaluate_args->record;
-	let nrecord = ievaluate_args->nrecord;
 	let popparam = &ievaluate_args->popparam;
 
 	char advan_memory[advanfuncs->advan_size];
@@ -210,11 +206,12 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	let predictvars_size = advanconfig->predictfields.size;
 	var obs_min2ll = 0.;
 	var obs_lndet = 0.;
-	const RECORD* ptr = record;
+	var datainfo = ievaluate_args->datainfo;
+	let nrecord = ievaluate_args->nrecord;
 	forcount(i, nrecord) {
-		let predictstate = advan_advance(advan, imodel, ptr, popparam);
+		let predictstate = advan_advance(advan, imodel, datainfo, popparam);
 
-		let evid = RECORDINFO_EVID(recordinfo, ptr);
+		let evid = datainfo->EVID;
 		var yhat = 0.;
 		if (evid == 0 || predictall) 
 			yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
@@ -238,8 +235,8 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 			if (YHATVAR)
 				YHATVAR[i] = yhatvar;
 
-			let dv = RECORDINFO_DV(recordinfo, ptr);
-			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
+			let dv = datainfo->DV;
+			let dvlow = no_dvlow_present ? 0. : datainfo->DVLOW;
 			if (dvlow == 0.) {
 				let err = dv - yhat;
 				obs_min2ll += (err * err) / yhatvar;
@@ -254,7 +251,7 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 			if (YHATVAR)
 				YHATVAR[i] = 0.;
 		}
-		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
+		++datainfo;
 	}
 	advanfuncs->destruct(advan);
 
@@ -292,8 +289,6 @@ static bool check_state(const double* const a, const int n, FILE* logstream, con
 void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 {
 	let advanfuncs = ievaluate_args->advanfuncs;
-	let record = ievaluate_args->record;
-	let nrecord = ievaluate_args->nrecord;
 	let popparam = &ievaluate_args->popparam;
 	let logstream = ievaluate_args->logstream;
 
@@ -319,20 +314,21 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	let predictall = advanconfig->predictall;
 	let recordinfo = &advanfuncs->recordinfo;
 	let no_dvlow_present = recordinfo->offsetDVLOW == -1;
-	const RECORD* ptr = record;
-	let id = RECORDINFO_ID(recordinfo, ptr);
+	var datainfo = ievaluate_args->datainfo;
+	let id = datainfo->ID;
 	/// + Non-integer ID is an error.
 	if (id != floor(id))
 		warning(logstream, "ID (%f) should probably be an integer\n", id);
 	let _offset1 = recordinfo->_offset1;
 	let record_offset = _offset1 ? 1 : 0;
+	let nrecord = ievaluate_args->nrecord;
 	forcount(i, nrecord) {
-		let time = RECORDINFO_TIME(recordinfo, ptr);
-		let dv = RECORDINFO_DV(recordinfo, ptr);
-		let evid = RECORDINFO_EVID(recordinfo, ptr);
+		let time = datainfo->TIME;
+		let dv = datainfo->DV;
+		let evid = datainfo->EVID;
 
 		/// + Non-integer CMT is an error.
-		let cmt = RECORDINFO_CMT(recordinfo, ptr);
+		let cmt = datainfo->CMT;
 		if (cmt != floor(cmt))
 			fatal(logstream, "CMT (%f) should probably be an integer: ID %f time %f record %i\n", cmt, id, time, i + record_offset);
 
@@ -355,11 +351,11 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			if (!gsl_finite(dv))
 				fatal(logstream, "DV not finite for observation: ID %f time %f record %i\n", id, time, i + record_offset);
 
-			let amt = RECORDINFO_AMT(recordinfo, ptr);
+			let amt = datainfo->AMT;
 			if (gsl_finite(amt) && amt != 0.)
 				warning(logstream, "AMT non-zero (%f) for observation: ID %f time %f record %i\n", amt, id, time, i + record_offset);
 
-			let rate = RECORDINFO_RATE(recordinfo, ptr);
+			let rate = datainfo->RATE;
 			if (gsl_finite(rate) && rate != 0.)
 				warning(logstream, "RATE non-zero (%f) for observation: ID %f time %f record %i\n", rate, id, time, i + record_offset);
 
@@ -367,18 +363,18 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		} else if (evid == 1 || evid == 4) {
 
 			/* compartment must be within the number of states */
-			let cmt = RECORDINFO_CMT_0offset(recordinfo, ptr);
+			let cmt = datainfo->CMT0;
 			if (cmt < 0 || cmt >= advanfuncs->nstate) {
-				let _cmt = RECORDINFO_CMT(recordinfo, ptr);
+				let _cmt = datainfo->CMT;
 				fatal(logstream, "CMT (%i) not within number of states (%i): ID %f time %f record %i\n", _cmt, advanfuncs->nstate, id, time, i + record_offset);
 			}
 
-			let amt = RECORDINFO_AMT(recordinfo, ptr);
+			let amt = datainfo->AMT;
 			if (!gsl_finite(amt))
 				fatal(logstream, "AMT not finite (%f): ID %f time %f record %i\n", amt, id, time, i + record_offset);
 			if (amt <= 0.)
 				fatal(logstream, "AMT less than or equal to zero (%f): ID %f time %f record %i \n", amt, id, time, i + record_offset);
-			let rate = RECORDINFO_RATE(recordinfo, ptr);
+			let rate = datainfo->RATE;
 			if (rate < 0.)
 				fatal(logstream, "RATE less than zero (%f): ID %f record %i\n", rate, id, i + record_offset);
 
@@ -393,11 +389,11 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		/* reset event */
 		} else if (evid == 3) {
 
-			let amt = RECORDINFO_AMT(recordinfo, ptr);
+			let amt = datainfo->AMT;
 			if (gsl_finite(amt) && amt != 0.)
 				warning(logstream, "AMT non-zero (%f) for reset: ID %f time %f record %i\n", amt, id, time, i + record_offset);
 
-			let rate = RECORDINFO_RATE(recordinfo, ptr);
+			let rate = datainfo->RATE;
 			if (gsl_finite(rate) && rate != 0.)
 				warning(logstream, "RATE non-zero (%f) for reset: ID %f time %f record %i\n", rate, id, time, i + record_offset);
 
@@ -412,7 +408,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 
 		/* dvlow implies observation */
 		if (evid != 0) {
-			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
+			let dvlow = no_dvlow_present ? 0. : datainfo->DVLOW;
 			if (dvlow != 0.) 
 				fatal(logstream, "DVLOW (%f) present for non-observation: ID %f record %i\n", dvlow, id, i + record_offset);
 		}
@@ -421,7 +417,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			fatal(logstream, "non-finite state before advance: ID %f time %f record %i\n", id, time, i + record_offset);
 
 		/* advance to the record time */
-		let predictstate = advan_advance(advan, imodel, ptr, popparam);
+		let predictstate = advan_advance(advan, imodel, datainfo, popparam);
 
 		/* now check record after advance */
 
@@ -450,7 +446,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 				fatal(logstream, "YHATVAR zero (%f): ID %f time %f record %i\n", yhatvar, id, time, i + record_offset);
 		}
 
-		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
+		++datainfo;
 	}
 	advanfuncs->destruct(advan);
 }
@@ -465,8 +461,6 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 						 const double* const isimerr)
 {
 	let advanfuncs = ievaluate_args->advanfuncs;
-	let record = ievaluate_args->record;
-	let nrecord = ievaluate_args->nrecord;
 
 	char advan_memory[advanfuncs->advan_size];
 	var advan = (ADVAN*)advan_memory;
@@ -481,16 +475,16 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 	let predict = advanconfig->predict;
 	let popparam = &ievaluate_args->popparam;
 	let nsigma = popparam->nsigma;
-	let recordinfo = &advanfuncs->recordinfo;
-	const RECORD* ptr = record;
+	var datainfo = ievaluate_args->datainfo;
+	let nrecord = ievaluate_args->nrecord;
 	forcount(i, nrecord) {
-		let advanstate = advan_advance(advan, imodel, ptr, popparam);
+		let advanstate = advan_advance(advan, imodel, datainfo, popparam);
 
 		/* do prediction *without* the random error, put into yhat */
 		/* yhat contains the prediction (*without* noise) */
 		/* we dont to all predictions, otherwise it will be non-zero for infusions */
 		var yhat = 0.;
-		if (RECORDINFO_EVID(recordinfo, ptr) == 0)
+		if (datainfo->EVID == 0)
 			yhat = evaluate_yhat(imodel, &advanstate, predict, advanmem.errarray, predictvars);
 		individ_yhat[i] = yhat;
 		individ_yhatvar[i] = 0.;
@@ -500,7 +494,7 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 		/* point to residual error with non-zero err values */
 		let errarray = &isimerr[i * nsigma];
 		var pred = 0.;
-		if (RECORDINFO_EVID(recordinfo, ptr) == 0)
+		if (datainfo->EVID == 0)
 			pred = evaluate_yhat(imodel, &advanstate, predict, errarray, predictvars);
 		individ_pred[i] = pred;
 
@@ -516,12 +510,12 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 		let nstate = advanfuncs->nstate;
 		memcpy(&istate[i * nstate], advanstate.state, nstate * sizeof(double));
 
-		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
+		++datainfo;
 	}
 	advanfuncs->destruct(advan);
 }
 
-IEVALUATE_ARGS ievaluate_args_init(const RECORD* const record,
+IEVALUATE_ARGS ievaluate_args_init(const DATAINFO* const datainfo,
 								   const int nrecord,
 								   const ADVANFUNCS* const advanfuncs,
 								   const double* const theta,
@@ -533,7 +527,7 @@ IEVALUATE_ARGS ievaluate_args_init(const RECORD* const record,
 								   FILE* logstream)
 {	
 	return (IEVALUATE_ARGS) {
-		.record = record,
+		.datainfo = datainfo,
 		.nrecord = nrecord,
 		.advanfuncs = advanfuncs,
 		.popparam = { 

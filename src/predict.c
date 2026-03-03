@@ -46,7 +46,7 @@ static void idata_predict_yhat_thread(INDIVID* const individ,
 		etaarray[i] = NAN;
 	memcpy(etaarray, individ->eta, popmodel->nomega * sizeof(double));
 
-	let ievaluate_args = ievaluate_args_init(individ->record,
+	let ievaluate_args = ievaluate_args_init(individ->datainfo,
 											 individ->nrecord,
 											 advanfuncs,
 											 popmodel->theta,
@@ -93,7 +93,7 @@ static void idata_predict_pred_thread(INDIVID* const individ,
 	forcount(i, popmodel->nomega)
 		etaarray[i] = 0.;
 
-	let ievaluate_args = ievaluate_args_init(individ->record,
+	let ievaluate_args = ievaluate_args_init(individ->datainfo,
 											 individ->nrecord,
 											 advanfuncs,
 											 popmodel->theta,

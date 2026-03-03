@@ -189,7 +189,7 @@ ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const A
 			.interval = advancer_diffeqn_libgsl_advance_interval,
 
 			.advanconfig = advanconfig,
-			.recordinfo = recordinfo_init(dataconfig),
+			.recordinfo = recordinfo_alloc(dataconfig),
 			.nstate = advanconfig->nstate,
 		},
 		.diffeqn = advanconfig->diffeqn,

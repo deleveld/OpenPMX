@@ -20,7 +20,8 @@
 
 #include <stdio.h>
 
-#include "openpmx.h"
+#include "openpmx.h"	
+#include "dataconfig/dataconfig.h"	
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,14 +30,14 @@ extern "C" {
 /* --------------------------------------------------------------------*/
 
 typedef struct {
-	const RECORD* const record;
+	const DATAINFO* const datainfo;
 	const int nrecord;
 	const ADVANFUNCS* const advanfuncs;
 	const POPPARAM popparam;
 	FILE* logstream;
 } IEVALUATE_ARGS;
 
-IEVALUATE_ARGS ievaluate_args_init(const RECORD* const record,
+IEVALUATE_ARGS ievaluate_args_init(const DATAINFO* const datainfo,
 								   const int nrecord,
 								   const ADVANFUNCS* const advanfuncs,
 								   const double* const theta,

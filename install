@@ -82,7 +82,6 @@ printf "path %s\n" "${OPENPMXPATH}"
 
 # cleaup previous build
 mkdir -p "${OPENPMXPATH}/build" "${OPENPMXPATH}/bin" "${OPENPMXPATH}/lib"
-printf "clean\n"
 rm -vf "${OPENPMXPATH}"/build/*.o
 rm -vf "${OPENPMXPATH}"/bin/openpmxtran
 rm -vf "${OPENPMXPATH}"/lib/*.a

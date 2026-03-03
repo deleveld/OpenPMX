@@ -55,7 +55,7 @@ void advanfuncs_free(ADVANFUNCS* advan);
 
 PREDICTSTATE advan_advance(ADVAN* const advan,
 						   IMODEL* const imodel,
-						   const RECORD* const record,
+						   const DATAINFO* const datainfo,
 						   const POPPARAM* const popparam);
 
 typedef struct {

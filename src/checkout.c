@@ -55,7 +55,7 @@ static void idata_checkout_thread(INDIVID* const individ,
 	forcount(i, popmodel->nomega)
 		eta[i] = 0.;
 	
-	let ievaluate_args = ievaluate_args_init(individ->record,
+	let ievaluate_args = ievaluate_args_init(individ->datainfo,
 											 individ->nrecord,
 											 advanfuncs,
 											 popmodel->theta,

@@ -41,7 +41,6 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 					  const int imodel_size,
 					  const int predictvars_size)
 {
-	let data = recordinfo->dataconfig->records;
 	let ndata = recordinfo->ndata;
 	let nindivid = recordinfo->nindivid;
 	let nobs = recordinfo->nobs;
@@ -59,6 +58,7 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 	var yhatvar = callocvar(double, ndata);
 	var pred = callocvar(double, ndata);
 	var predictvars = (PREDICTVARS*)calloc(ndata, predictvars_size);
+	let datainfo = recordinfo->datainfo;
 
 	/* fill in individual information */
 	var individ = mallocvar(INDIVID, nindivid);
@@ -67,10 +67,10 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 	while (i < ndata) {
 		var nobsi = 0;
 		var nrecordi = 0;
-		let thisid = RECORDINFO_ID(recordinfo, RECORDINFO_INDEX(recordinfo, data, i));
-		while (i+nrecordi < ndata && RECORDINFO_ID(recordinfo, RECORDINFO_INDEX(recordinfo, data, i+nrecordi)) == thisid) {
-			let dv = RECORDINFO_DV(recordinfo, RECORDINFO_INDEX(recordinfo, data, i+nrecordi)); 
-			let evid = RECORDINFO_EVID(recordinfo, RECORDINFO_INDEX(recordinfo, data, i+nrecordi)); 
+		let thisid = datainfo[i].ID;
+		while (i+nrecordi < ndata && datainfo[i+nrecordi].ID == thisid) {
+			let dv = datainfo[i+nrecordi].DV; 
+			let evid = datainfo[i+nrecordi].EVID; 
 			if (!isnan(dv) && evid == 0)
 				++nobsi;
 			++nrecordi;
@@ -82,7 +82,7 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 		 * const struct members if the memory has been malloced. */
 		var temp = (INDIVID) {
 			.ID = thisid,
-			.record = RECORDINFO_INDEX(recordinfo, data, i),
+			.datainfo = &datainfo[i],
 			.nrecord = nrecordi,
 			.nobs = nobsi,
 

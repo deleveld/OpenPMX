@@ -219,12 +219,18 @@ int main(void)
 
 	/* advance over individuals data */
 	let predict = openpmx.advan.predict;
+	let datainfo = advanfuncs->recordinfo.datainfo;
 	forcount(i, ARRAYSIZE(data)) {
-		let ptr = &data[i];
+		let ptr = &datainfo[i];
 		let predictstate = advan_advance(advan, &imodel, ptr, 0);
 		let yhat = predict(&imodel, &predictstate, errarray, &predictvars);
 		
-		printf("%f %f %f %f %f A1=%f A2=%f A3=%f\n", ptr->ID, ptr->TIME, ptr->DV, yhat, predictvars.IPRED,
+		let p = ptr->record;
+		assert(ptr->ID == p->ID);
+		assert(ptr->TIME == p->TIME);
+		assert(ptr->DV == p->DV);
+		
+		printf("%f %f %f %f %f A1=%f A2=%f A3=%f\n", p->ID, p->TIME, p->DV, yhat, predictvars.IPRED,
 													predictstate.state[0],
 													predictstate.state[1],
 													predictstate.state[2]);

@@ -152,7 +152,7 @@ ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCON
 			.interval = advancer_twocomp_advance_interval,
 
 			.advanconfig = advanconfig,
-			.recordinfo = recordinfo_init(dataconfig),
+			.recordinfo = recordinfo_alloc(dataconfig),
 			.nstate = 2,
 		},
 		.offsetV1 = structinfo_find_offset("V1", &advanconfig->imodelfields),

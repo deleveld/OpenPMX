@@ -26,7 +26,7 @@ extern "C" {
 
 typedef struct {
 	const double ID;
-	const RECORD* const record;	/* view into data in RECORDINFO */
+	const DATAINFO* const datainfo;	/* view into data in RECORDINFO */
 	const int nrecord;
 	const int nobs;
 
