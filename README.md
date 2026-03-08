@@ -87,7 +87,10 @@ The PK-PD analysis example is:
 - `../../openpmx warfarin.gr`
 
 # Contributors
-- Your name here (your@email.com) Massively important thing elegantly coded.
+- Your name (yourname@email.com) Very important thing elegantly coded.
+- Jona Joachim () Contributed eigensystem advancer $ADVAN(eigen) which uses eigendecomposition to obtain exact, analytical solutions for any linear
+	compartmental model. In can replace both the hardcoded analytical ADVANs and
+	the ODE solver for any linear model. It is exact (no step size error) and general (any number of compartments, any topology).
 - Douglas Eleveld (deleveld@dds.nl) Initial codebase. 
 
 # Wish-list / TODO

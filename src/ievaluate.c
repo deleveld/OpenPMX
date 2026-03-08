@@ -84,7 +84,8 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
 			 * to zero the entire errarray each time we call this */
 			errarray[j] = 0;
 			
-/*			var deriv = (ya1 - ya2) / (above - below);
+/*			This is the way I used to do this: 
+			var deriv = (ya1 - ya2) / (above - below);
 			yhatvar += (deriv*deriv) * sigma[j]; */
 
 			/* Gemini suggests this */
@@ -531,7 +532,7 @@ IEVALUATE_ARGS ievaluate_args_init(const RECORD* const record,
 								   const double* const sigma,
 								   const int nsigma,
 								   FILE* logstream)
-{	
+{
 	return (IEVALUATE_ARGS) {
 		.record = record,
 		.nrecord = nrecord,

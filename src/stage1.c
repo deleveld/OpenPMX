@@ -467,6 +467,7 @@ void stage1_thread(INDIVID* const individ,
 	if (nreta == 0 || individ->nobs == 0) {
 		memset(ieta, 0, nomega * sizeof(double));
 		memset(icov, 0, nomega * nomega * sizeof(double));
+		memset(testeta, 0, nomega * sizeof(double)); /* we evaluate at zero eta */
 
 	/* we have etas so we can minimize, start with the current value */
 	} else {

@@ -174,6 +174,9 @@ void scatter_threads(const IDATA* const idata,
 /// The main thread does work as well so we make nthread-1 worker
 /// threads.
 	var nthread = options->nthread;
+#if defined(OPENPMX_PARALLEL_SINGLETHREAD)
+	nthread = 1;
+#endif
 	if (nthread > nindivid && scatteroptions->checkout_errors) {
 		info(logstream, "nthread (%i) limited to number of individuals (%i)\n", nthread, idata->nindivid);
 		nthread = nindivid;
@@ -181,9 +184,14 @@ void scatter_threads(const IDATA* const idata,
 	int nworker = nthread - 1;
 	if (nworker <= 0)
 		nworker = 0;
-#if defined(OPENPMX_PARALLEL_SERIAL)
-	nworker = 0;
-#endif
+
+	/* just handle the individuals serially and skip any threading stuff
+	 * if we dont use any worker threads. */
+	if (nworker == 0) {
+		for (int i=0; i<nindivid; i++)
+			threadtask(&individ[i], advanfuncs, popmodel, nonzero, options, scatteroptions);
+		return;
+	}
 
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 	/* if we are already running and the number of threads dont match
@@ -209,13 +217,6 @@ void scatter_threads(const IDATA* const idata,
 		individs[i] = index_time[i].individ;
 	free(index_time);
 
-	/* just handle the individuals serially and skip any threading stuff
-	 * if we dont use any worker threads. */
-	if (nworker == 0) {
-		for (int i=0; i<nindivid; i++)
-			threadtask(individs[i], advanfuncs, popmodel, nonzero, options, scatteroptions);
-		goto done;
-	}
 
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 	if (!tpool.init) {
@@ -297,7 +298,6 @@ void scatter_threads(const IDATA* const idata,
 	print_serialize(false);
 #endif
 
-done:
 	free(individs);
 }
 

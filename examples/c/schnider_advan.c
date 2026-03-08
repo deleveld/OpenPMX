@@ -198,7 +198,7 @@ int main(void)
 			.predict = imodel_predict,
 			.diffeqn = imodel_diffeqn,
 			.method = pmx_advan_diffeqn_libgsl,
-			.firstonly = 1,
+//			.firstonly = true,
 			.nstate = 3,
 		},
 		.theta = { },

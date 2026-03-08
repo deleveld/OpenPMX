@@ -93,6 +93,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	let evid = RECORDINFO_EVID(recordinfo, record);
 	let reset_state = (advan->initcount == 0 || evid == 3 || evid == 4);
 
+	let final_time = RECORDINFO_TIME(recordinfo, record);
 	if (reset_state || advanconfig->firstonly == false) {
 		if (reset_state) {
 			/* If we dont zero the model it keeps the values from the previous
@@ -101,7 +102,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			 * memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size); */
 			if (nstate)
 				memset(state, 0, nstate * sizeof(double));
-			advan->time = RECORDINFO_TIME(recordinfo, record);
+			advan->time = final_time;
 			vector_resize(advan->infusions, 0);
 
 			/* for reset and reset-and-dose we should treat it like a discontinuitiy
@@ -135,7 +136,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		if (amt > 0.) {
 			let cmt = RECORDINFO_CMT_0offset(recordinfo, record);
 			let lagtime = advan->amtlag[cmt];
-			let start = RECORDINFO_TIME(recordinfo, record) + lagtime;
+			let start = final_time + lagtime;
 			let rate = RECORDINFO_RATE(recordinfo, record);
 			let duration = (rate != 0.) ? (amt / rate) : (0.);
 			let end = start + duration;
@@ -152,7 +153,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	
 	/* advance through time and handle infusions and doses when they start
 	 * or stop up until the time of the current record */
-	assert(advan->time <= RECORDINFO_TIME(recordinfo, record));
+	assert(advan->time <= final_time);
 	do {
 		let currenttime = advan->time;
 
@@ -173,8 +174,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 /// + If `pmx_advan_inittime()` has been called, which is INITTIME() in 
 /// openpmxtran
 		/* find the first place we have to stop at going to the next record */
-		let recordtime = RECORDINFO_TIME(recordinfo, record);
-		double intervalstop = recordtime;
+		double intervalstop = final_time;
 		forvector(i, advan->infusions) {
 			let v = &advan->infusions.ptr[i];
 			if (v->end < intervalstop)
@@ -241,7 +241,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		}
 
 	/* keep going till we have the state equal to the required record time */
-	} while (advan->time < RECORDINFO_TIME(recordinfo, record));
+	} while (advan->time < final_time);
 
 	/* return the state useful for calling predict */
 	return (PREDICTSTATE) {
@@ -254,7 +254,9 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 
 /* We dont have to worry that this function might be called outside of
  * init function because the ADVANSTATE is only available there */
-void pmx_advan_amtlag(const ADVANSTATE* advanstate, const int cmt, const double t)
+void pmx_advan_amtlag(const ADVANSTATE* advanstate,
+					  const int cmt,
+					  const double t)
 {
 	var advan = advanstate->advan;
 	let advanfuncs = advan->advanfuncs;
@@ -272,7 +274,9 @@ void pmx_advan_amtlag(const ADVANSTATE* advanstate, const int cmt, const double 
 
 /* We dont have to worry that this function might be called outside of
  * init function because the ADVANSTATE is only available there */
-void pmx_advan_bioaval(const ADVANSTATE* advanstate, const int cmt, const double f)
+void pmx_advan_bioaval(const ADVANSTATE* advanstate,
+					   const int cmt,
+					   const double f)
 {
 	var advan = advanstate->advan;
 	let advanfuncs = advan->advanfuncs;
@@ -287,7 +291,7 @@ void pmx_advan_bioaval(const ADVANSTATE* advanstate, const int cmt, const double
 
 /* We dont have to worry that this function might be called outside of
  * init function because the ADVANSTATE is only available there */
-void pmx_advan_inittime(const ADVANSTATE* advanstate, const double t)
+bool pmx_advan_inittime(const ADVANSTATE* advanstate, const double t)
 {
 	var advan = advanstate->advan;
 
@@ -295,11 +299,11 @@ void pmx_advan_inittime(const ADVANSTATE* advanstate, const double t)
 
 	/* ignores setting in the past */
 	if (t <= advan->time)
-		return;
+		return false;
 
-	/* its kind of not clear whether we should or shouldnt ignore the extra
-	 * inittime if another kind of event occurs at the intended time, for
-	 * example an infusion */
+	/* its kind of not clear whether we should or shouldnt ignore the
+	 * extra inittime if another kind of event occurs at the intended
+	 * time, for example an infusion */
 	bool found_already = false;
 	forvector(i, advan->infusions) {
 		let v = &advan->infusions.ptr[i];
@@ -316,6 +320,7 @@ void pmx_advan_inittime(const ADVANSTATE* advanstate, const double t)
 						.start = t,
 						.end = t });
 	}
+	return !found_already;
 }
 
 void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const double v)
@@ -332,6 +337,18 @@ void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const dou
 		assert(cmt < nstate);
 		advan->state[cmt] = v;
 	}
+}
+
+void pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate, const int i, const int j, const double value)
+{
+	let sysmat = advanstate->advan->eigen_sysmat_data;
+	if (!sysmat) {
+		fprintf(stderr, "fatal: setting eigensystem value with incorrect advancer\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	let ndim = advanstate->advan->advanfuncs->nstate;
+	sysmat[i * ndim + j] = value;
 }
 
 /*

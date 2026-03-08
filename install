@@ -82,7 +82,6 @@ printf "path %s\n" "${OPENPMXPATH}"
 
 # cleaup previous build
 mkdir -p "${OPENPMXPATH}/build" "${OPENPMXPATH}/bin" "${OPENPMXPATH}/lib"
-printf "clean\n"
 rm -vf "${OPENPMXPATH}"/build/*.o
 rm -vf "${OPENPMXPATH}"/bin/openpmxtran
 rm -vf "${OPENPMXPATH}"/lib/*.a
@@ -192,6 +191,7 @@ SOURCEFILES="pmxstate.c options.c ievaluate.c predict.c stage1.c
 			 advan/advan.c advan/pred.c advan/onecomp.c
 			 advan/onecomp_depot.c advan/twocomp.c advan/threecomp.c
 			 advan/diffeqn_test.c advan/diffeqn_libgsl.c
+			 advan/eigen.c
 			 utils/vector.c utils/various.c
 			 bobyqa/bobyqa.c"
 OBJECTFILES=""

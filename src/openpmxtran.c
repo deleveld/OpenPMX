@@ -522,7 +522,12 @@ static void parse_advan_init(PARSERESULT* res, char* p)
 	} else if (streq(p, "diffeqn_libgsl")) {
 		res->advan_method = "pmx_advan_diffeqn_libgsl";
 		res->needs_diffeqn = true;
-	} else
+	/// + `eigen` calls `pmx_advan_eigen()` a linear eigensystem solver.
+	/// In the $IMODEL() function the eigensystem matrix must be
+	/// specified by SYSMAT(). 
+	} else if (streq(p, "eigen")) 
+		res->advan_method = "pmx_advan_eigen";
+	else
 		fatal("\"%s\" is not an ADVAN() method name", p);
 
 	strip_firstlast_space(endvars + 1);
@@ -1125,6 +1130,7 @@ char openpmxtran_template[] =
 "#define STATETIME 		((const double)_advanstate->current,statetime)\n"
 "#define INITTIME(t) 	pmx_advan_inittime(_advanstate, (t))\n"
 "#define A_0(i,v) 		pmx_advan_state_init(_advanstate, (i)-1, (v))\n"
+"#define SYSMAT(r,c,v)	pmx_advan_eigen_sysmat(_advanstate, (r)-1, (c)-1, (v))\n"
 "\n"
 "/* begin user code to init the IMODEL */\n"
 "${OPENPMXTRAN_IMODEL_FIELDS_CODE}\n"
@@ -1140,6 +1146,7 @@ char openpmxtran_template[] =
 "#undef INITCOUNT\n"
 "#undef INITTIME\n"
 "#undef A_0\n"
+"#undef SYSMAT\n"
 "\n"
 "	/* set IMODEL fields */\n"
 "${OPENPMXTRAN_IMODEL_FIELDS_SET}\n"

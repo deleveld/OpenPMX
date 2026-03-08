@@ -48,6 +48,10 @@ typedef struct ADVANFUNCS {
 	const ADVANCONFIG* const advanconfig;
 	const RECORDINFO recordinfo;
 	const int nstate;
+
+	/* non-zero for the eigensystem solver. Needed for $IMODEL() to be
+	 * able to define the sigensystem. */
+	double* eigen_sysmat;
 } ADVANFUNCS;
 
 ADVANFUNCS* advanfuncs_alloc(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
@@ -77,6 +81,9 @@ typedef struct ADVAN {
 	VECTOR(ADVANINFUSION) infusions;
 
 	int initcount;
+
+	/* only for eigensystem advancer */
+	double* eigen_sysmat_data;
 } ADVAN;
 
 void advan_base_construct(ADVAN* advanbase, const ADVANFUNCS* advanfuncs);
