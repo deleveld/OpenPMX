@@ -56,6 +56,10 @@ char(&countof_helper(T(&)[N]))[N];
 #define mallocvar(t, n)	((t*)malloc((size_t)(n) * sizeof(t)))
 #define callocvar(t, n) ((t*)calloc((size_t)(n), sizeof(t)))
 
+/* object casting */
+#define container_of(ptr, type, member) \
+    ((type *)((char *)(ptr) - offsetof(type, member)))
+
 /* min and max */
 /* https://stackoverflow.com/questions/5595593/what-is-the-function-of-void-min1-min2-in-the-min-macro-in-kernel-h */
 #ifndef min

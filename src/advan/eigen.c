@@ -74,8 +74,11 @@ typedef struct {
     double V[OPENPMX_STATE_MAX * OPENPMX_STATE_MAX];  	/* right eigenvector matrix */
     double Vinv[OPENPMX_STATE_MAX * OPENPMX_STATE_MAX];	/* inverse of V */
 
-    /* GSL workspaces -- allocated once in constructor, reused */
+    /* GSL workspaces allocated once in constructor, reused */
     gsl_eigen_nonsymmv_workspace* eigen_ws;
+	gsl_vector_complex* eval;
+	gsl_matrix_complex* evec;
+	gsl_permutation* perm;    
 } ADVANCER_EIGEN;
 
 /*------------------------------------------------------------------------
@@ -94,7 +97,7 @@ static void advancer_eigen_info(const struct ADVANFUNCS* const advanfuncs,
 static void advancer_eigen_construct(ADVAN* advan,
                                      const struct ADVANFUNCS* const advanfuncs)
 {
-    ADVANCER_EIGEN* self = (ADVANCER_EIGEN*)advan;
+    var self = container_of(advan, ADVANCER_EIGEN, advan);
 
     assert(advanfuncs->advan_size == sizeof(ADVANCER_EIGEN));
     advan_base_construct(&self->advan, advanfuncs);
@@ -104,7 +107,13 @@ static void advancer_eigen_construct(ADVAN* advan,
 
     /* Allocate the GSL eigen workspace once; reused at each decomposition */
     self->eigen_ws = gsl_eigen_nonsymmv_alloc(self->n);
+    self->eval = gsl_vector_complex_alloc(self->n);
+    self->evec = gsl_matrix_complex_alloc(self->n, self->n);    
+    self->perm = gsl_permutation_alloc(self->n);
     assert(self->eigen_ws);
+    assert(self->eval);
+    assert(self->evec);
+    assert(self->perm);
 
     /* point to our sysmat so users can see it and update */
     advan->eigen_sysmat_data = self->sysmat_data;
@@ -115,14 +124,14 @@ static void advancer_eigen_construct(ADVAN* advan,
  *----------------------------------------------------------------------*/
 static void advancer_eigen_destruct(ADVAN* advan)
 {
-    ADVANCER_EIGEN* self = (ADVANCER_EIGEN*)advan;
+	var self = container_of(advan, ADVANCER_EIGEN, advan);
 
-    if (self->eigen_ws) {
-        gsl_eigen_nonsymmv_free(self->eigen_ws);
-        self->eigen_ws = NULL;
-    }
+    gsl_permutation_free(self->perm);
+    gsl_vector_complex_free(self->eval);
+    gsl_matrix_complex_free(self->evec);
+	gsl_eigen_nonsymmv_free(self->eigen_ws);
 
-    advan_base_destruct(advan);
+	advan_base_destruct(advan);
 }
 
 /*------------------------------------------------------------------------
@@ -137,22 +146,20 @@ static void advancer_eigen_destruct(ADVAN* advan)
  *----------------------------------------------------------------------*/
 static void eigen_decompose(ADVANCER_EIGEN* self)
 {
-    const int n = self->n;
-
     /* Get system matrix that the user updated in thier $IMODEL call */
-    double* sysmat_data = self->sysmat_data;
+    let sysmat_data = self->sysmat_data;
 
     /* Wrap in a GSL matrix view (row-major, which is GSL's native layout).
      * gsl_eigen_nonsymmv destroys the input, so we work on a copy. */
+    let n = self->n;
     double A_work[OPENPMX_STATE_MAX * OPENPMX_STATE_MAX];
     memcpy(A_work, sysmat_data, n * n * sizeof(double));
-    gsl_matrix_view A_view = gsl_matrix_view_array(A_work, n, n);
+    var A_view = gsl_matrix_view_array(A_work, n, n);
 
     /* 2. Eigendecomposition via GSL */
-    gsl_vector_complex* eval = gsl_vector_complex_alloc(n);
-    gsl_matrix_complex* evec = gsl_matrix_complex_alloc(n, n);
-
-    int status = gsl_eigen_nonsymmv(&A_view.matrix, eval, evec, self->eigen_ws);
+    var eval = self->eval;
+    var evec = self->evec;
+    var status = gsl_eigen_nonsymmv(&A_view.matrix, eval, evec, self->eigen_ws);
     if (status != GSL_SUCCESS) {
         fprintf(stderr, "fatal: eigen ADVAN: gsl_eigen_nonsymmv failed "
                 "(status=%d)\n", status);
@@ -164,15 +171,14 @@ static void eigen_decompose(ADVANCER_EIGEN* self)
     gsl_eigen_nonsymmv_sort(eval, evec, GSL_EIGEN_SORT_ABS_ASC);
 
     /* 3. Extract real eigenvalues and eigenvectors */
-    for (int i = 0; i < n; i++) {
-        gsl_complex eval_i = gsl_vector_complex_get(eval, i);
+    forcount(i, n) {
+        let eval_i = gsl_vector_complex_get(eval, i);
 
         /* Verify eigenvalue is real (imaginary part negligible) */
         if (fabs(GSL_IMAG(eval_i)) > 1e-10) {
             fprintf(stderr, "fatal: eigen ADVAN: complex eigenvalue detected "
                     "(lambda[%d] = %g + %gi). System matrix is not a "
-                    "valid PK model.\n", i, GSL_REAL(eval_i),
-                    GSL_IMAG(eval_i));
+                    "valid PK model.\n", i, GSL_REAL(eval_i), GSL_IMAG(eval_i));
             exit(EXIT_FAILURE);
         }
 
@@ -189,8 +195,8 @@ static void eigen_decompose(ADVANCER_EIGEN* self)
         /* Extract real parts of eigenvectors into V (row-major).
          * GSL returns complex eigenvectors even for real eigenvalues;
          * for PK systems the imaginary parts should be negligible. */
-        for (int j = 0; j < n; j++) {
-            gsl_complex v_ji = gsl_matrix_complex_get(evec, j, i);
+        forcount(j, n) {
+            let v_ji = gsl_matrix_complex_get(evec, j, i);
             if (fabs(GSL_IMAG(v_ji)) > 1e-10) {
                 fprintf(stderr, "fatal: eigen ADVAN: complex eigenvector "
                         "component at (%d,%d). PK systems should have "
@@ -202,39 +208,33 @@ static void eigen_decompose(ADVANCER_EIGEN* self)
         }
     }
 
-    gsl_vector_complex_free(eval);
-    gsl_matrix_complex_free(evec);
-
     /* 4. Compute V^-1 via GSL LU decomposition */
     double Vcopy[OPENPMX_STATE_MAX * OPENPMX_STATE_MAX];
     memcpy(Vcopy, self->V, n * n * sizeof(double));
-    gsl_matrix_view V_view = gsl_matrix_view_array(Vcopy, n, n);
+    var V_view = gsl_matrix_view_array(Vcopy, n, n);
 
-    gsl_permutation* perm = gsl_permutation_alloc(n);
+    var perm = self->perm;
     int signum;
     status = gsl_linalg_LU_decomp(&V_view.matrix, perm, &signum);
     if (status != GSL_SUCCESS) {
         fprintf(stderr, "fatal: eigen ADVAN: LU decomposition of eigenvector "
                 "matrix failed (status=%d).\n", status);
-        gsl_permutation_free(perm);
         exit(EXIT_FAILURE);
     }
 
-    gsl_matrix_view Vinv_view = gsl_matrix_view_array(self->Vinv, n, n);
+    var Vinv_view = gsl_matrix_view_array(self->Vinv, n, n);
     status = gsl_linalg_LU_invert(&V_view.matrix, perm, &Vinv_view.matrix);
     if (status != GSL_SUCCESS) {
         fprintf(stderr, "fatal: eigen ADVAN: matrix inversion failed "
                 "(status=%d).\n", status);
-        gsl_permutation_free(perm);
         exit(EXIT_FAILURE);
     }
 
-    gsl_permutation_free(perm);
-
+#if 0
     /* 5. Verify reconstruction: S = V * diag(eigvals) * Vinv */
-    for (int i = 0; i < n; i++) {
-        for (int j = 0; j < n; j++) {
-            double sum = 0.0;
+    forcount(i, n) {
+        forcount(j, n) {
+            double sum = 0.;
             for (int k = 0; k < n; k++) {
                 /* V[i,k] * eigvals[k] * Vinv[k,j] (all row-major) */
                 sum += self->V[i * n + k] * self->eigvals[k]
@@ -248,6 +248,7 @@ static void eigen_decompose(ADVANCER_EIGEN* self)
             }
         }
     }
+#endif
 }
 
 /*------------------------------------------------------------------------
@@ -285,7 +286,7 @@ static void advancer_eigen_advance_interval(ADVAN* advan,
                                             const double endtime,
                                             const double* rates)
 {
-    ADVANCER_EIGEN* self = (ADVANCER_EIGEN*)advan;
+    var self = container_of(advan, ADVANCER_EIGEN, advan);
 
     (void)imodel;
     (void)record;
@@ -300,16 +301,13 @@ static void advancer_eigen_advance_interval(ADVAN* advan,
         self->last_reset_count = advan->initcount;
     }
 
-    const int n = self->n;
-    const double dt = endtime - advan->time;
-    assert(dt > 0.0);
-
     /* Step 1: Transform state to modal coordinates
      * x_modal = Vinv * state  (row-major matrix-vector multiply) */
     double x_modal[OPENPMX_STATE_MAX];
-    for (int i = 0; i < n; i++) {
-        double sum = 0.0;
-        for (int j = 0; j < n; j++)
+    let n = self->n;
+    forcount(i, n) {
+        var sum = 0.;
+        forcount(j, n)
             sum += self->Vinv[i * n + j] * state[j];
         x_modal[i] = sum;
     }
@@ -317,9 +315,9 @@ static void advancer_eigen_advance_interval(ADVAN* advan,
     /* Step 2: Project input rates into modal coordinates
      * j_modal = Vinv * rates */
     double j_modal[OPENPMX_STATE_MAX];
-    for (int i = 0; i < n; i++) {
-        double sum = 0.0;
-        for (int j = 0; j < n; j++)
+    forcount(i, n) {
+        var sum = 0.;
+        forcount(j, n)
             sum += self->Vinv[i * n + j] * rates[j];
         j_modal[i] = sum;
     }
@@ -334,10 +332,12 @@ static void advancer_eigen_advance_interval(ADVAN* advan,
      * This is exactly STANPUMP's p_coef mechanism generalized to n
      * dimensions -- see Minto's equation (57).
      */
+    let dt = endtime - advan->time;
+    assert(dt > 0.);
     double x_modal_new[OPENPMX_STATE_MAX];
-    for (int i = 0; i < n; i++) {
-        const double eigval = self->eigvals[i];
-        const double decay = exp(eigval * dt);
+    forcount(i, n) {
+        let eigval = self->eigvals[i];
+        let decay = exp(eigval * dt);
 
         if (fabs(eigval) > 1e-15) {
             /* Normal case: mode decays and accumulates */
@@ -353,9 +353,9 @@ static void advancer_eigen_advance_interval(ADVAN* advan,
 
     /* Step 4: Transform back to compartment coordinates
      * state = V * x_modal_new */
-    for (int i = 0; i < n; i++) {
-        double sum = 0.0;
-        for (int j = 0; j < n; j++)
+    forcount(i, n) {
+        var sum = 0.;
+        forcount(j, n)
             sum += self->V[i * n + j] * x_modal_new[j];
         state[i] = sum;
     }

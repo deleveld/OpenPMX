@@ -54,7 +54,7 @@ typedef struct {
 
 static void advancer_diffeqn_libgsl_info(const struct ADVANFUNCS* const advanfuncs, FILE* f)
 {
-	let libgsl = (const ADVANTABLE_LIBGSL*)advanfuncs;
+	let libgsl = container_of(advanfuncs, ADVANTABLE_LIBGSL, advanfuncs);
 
 	fprintf(f, "advan model GNU Scientific Library ODE\n");
 	fprintf(f, "advan stepper %s\n", libgsl->steptype_name);
@@ -66,18 +66,14 @@ __attribute__ ((hot))
 static int advancer_diffeqn_libgsl_wrapper(double T, const double* A, double* DADT, void *params)
 {
 	let args = (const ADVANCER_DIFFEQN_CALLBACK_ARGS*)params;
-	let diffeqn = args->diffeqn;
-	let imodel = args->imodel;
-	let record = args->record;
-	let popparam = args->popparam;
-	let rates = args->rates;
-	let nstate = args->nstate;
 
 	/* pass imodel down to user DES */
-	memset(DADT, 0, nstate * sizeof(double));
-	diffeqn(DADT, imodel, record, A, popparam, T);
+//	memset(DADT, 0, nstate * sizeof(double));
+	args->diffeqn(DADT, args->imodel, args->record, A, args->popparam, T);
 
 	/* after user DES we add the infusion rates, so the user does not see these */
+	let nstate = args->nstate;
+	let rates = args->rates;
 	assert(rates);
 	forcount(i, nstate)
 		DADT[i] += rates[i];
@@ -87,8 +83,8 @@ static int advancer_diffeqn_libgsl_wrapper(double T, const double* A, double* DA
 
 static void advancer_diffeqn_libgsl_construct(ADVAN* advan, const ADVANFUNCS* const advanfuncs)
 {
-	var advandes = (ADVANCER_LIBGSL*)advan; /* cast up */
-	let libgsl = (ADVANTABLE_LIBGSL*)advanfuncs;
+	let advandes = container_of(advan, ADVANCER_LIBGSL, advan);
+	let libgsl = container_of(advanfuncs, ADVANTABLE_LIBGSL, advanfuncs);
 
 	assert(advanfuncs->advan_size == sizeof(ADVANCER_LIBGSL));
 	advan_base_construct(advan, advanfuncs); /* zeros full size */
@@ -111,7 +107,7 @@ static void advancer_diffeqn_libgsl_construct(ADVAN* advan, const ADVANFUNCS* co
 
 static void advancer_diffeqn_libgsl_destruct(ADVAN * advan)
 {
-	var advandes = (ADVANCER_LIBGSL*)advan; /* cast up */
+	let advandes = container_of(advan, ADVANCER_LIBGSL, advan);
 
 	gsl_odeiv2_driver_free(advandes->d);
 
@@ -120,8 +116,8 @@ static void advancer_diffeqn_libgsl_destruct(ADVAN * advan)
 
 static void advancer_diffeqn_libgsl_reset(ADVAN * advan, const int full)
 {
-	var advandes = (ADVANCER_LIBGSL*)advan; /* cast up */
-	let libgsl = (ADVANTABLE_LIBGSL*)advan->advanfuncs;
+	let advandes = container_of(advan, ADVANCER_LIBGSL, advan);
+	let libgsl = container_of(advan->advanfuncs, ADVANTABLE_LIBGSL, advanfuncs);
 
 	gsl_odeiv2_driver_reset(advandes->d);
 	if (full)
@@ -136,7 +132,7 @@ static void advancer_diffeqn_libgsl_advance_interval(ADVAN* advan,
 													 const double endtime,
 													 const double* rates)
 {
-	var advandes = (ADVANCER_LIBGSL*)advan;	/* up cast */
+	let advandes = container_of(advan, ADVANCER_LIBGSL, advan);
 
 	/* advandes->args.diffeqn already set in constructor */
 	advandes->args.advan = advan;

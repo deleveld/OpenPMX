@@ -42,7 +42,7 @@ static void advancer_onecomp_depot_info(const struct ADVANFUNCS* const advanfunc
 }
 static void advancer_onecomp_depot_construct(ADVAN* advan, const ADVANFUNCS* const advanfuncs)
 {
-	ADVANCER_ONECOMP_DEPOT* advanonecomp = (ADVANCER_ONECOMP_DEPOT*)advan; /* cast up */
+    var advanonecomp = container_of(advan, ADVANCER_ONECOMP_DEPOT, advan);
 
 	assert(advanfuncs->advan_size == sizeof(ADVANCER_ONECOMP_DEPOT));
 	advan_base_construct(&advanonecomp->advan, advanfuncs); /* will zero entire object */

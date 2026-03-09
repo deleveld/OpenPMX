@@ -57,7 +57,8 @@ static void advancer_threecomp_info(const struct ADVANFUNCS* const advanfuncs,
 void advancer_threecomp_construct(ADVAN* advan,
 								  const struct ADVANFUNCS* const advanfuncs)
 {
-	ADVANCER_THREECOMP* advanthreecomp = (ADVANCER_THREECOMP*)advan; /* cast up */
+    var advanthreecomp = container_of(advan, ADVANCER_THREECOMP, advan);
+
 
 	assert(advanfuncs->advan_size == sizeof(ADVANCER_THREECOMP));
 	advan_base_construct(&advanthreecomp->advan, advanfuncs); /* will zero full size */
@@ -83,7 +84,7 @@ typedef struct {
 
 static inline void imodel_threecomp_reset_macro_constants(ADVANCER_THREECOMP* advanthreecomp, const IMODEL* imodel)
 {
-	const ADVANTABLE_THREECOMP* const imodeloffsets = (const ADVANTABLE_THREECOMP*)advanthreecomp->advan.advanfuncs;
+	let imodeloffsets = (const ADVANTABLE_THREECOMP*)advanthreecomp->advan.advanfuncs;
 
 	const double V1 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV1);
 	const double V2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV2);
@@ -141,7 +142,7 @@ static void advancer_threecomp_advance_interval(ADVAN* advan,
 												const double endtime,
 												const double* rates)
 {
-	ADVANCER_THREECOMP* advanthreecomp = (ADVANCER_THREECOMP*)advan;	/* up cast */
+    var advanthreecomp = container_of(advan, ADVANCER_THREECOMP, advan);
 
 	(void)record;
 	(void)popparam;

@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <math.h>
 #include <float.h>
+#include <string.h>
 
 #include "print.h"
 #include "advan/advan.h"
@@ -341,7 +342,12 @@ void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const dou
 
 double* pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate)
 {
-	return advanstate->advan->eigen_sysmat_data;
+	let ret = advanstate->advan->eigen_sysmat_data;
+	if (!ret) {
+		fprintf(stderr, "fatal: advancer isnt eigensystem, but asking for system matrix\n");
+		exit(EXIT_FAILURE);
+	}
+	return ret;
 }
 
 /*

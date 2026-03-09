@@ -88,9 +88,11 @@ The PK-PD analysis example is:
 
 # Contributors
 - Your name (yourname@email.com) Very important thing elegantly coded.
-- Jona Joachim (jona@joachim.cc) Contributed eigensystem advancer $ADVAN(eigen) which uses eigendecomposition to obtain exact, analytical solutions for any linear
-	compartmental model. It can replace both the hardcoded analytical ADVANs and
-	the ODE solver for any linear model. It is exact (no step size error) and general (any number of compartments, any topology). See the [blogpost](https://jaj42.github.io/blog/posts/202603_eigen/).
+- Jona Joachim (jona@joachim.cc) Contributed the eigensystem advancer `$ADVAN(eigen)`
+	which uses eigendecomposition to obtain exact, analytical solutions for any linear
+	compartmental model. It can replace both the analytical ADVANs and
+	the ODE solver, and is exact (no step size error) and general (any number of compartments, any topology).
+	See the [blogpost](https://jaj42.github.io/blog/posts/202603_eigen/).
 - Douglas Eleveld (deleveld@dds.nl) Initial codebase. 
 
 # Wish-list / TODO

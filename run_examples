@@ -11,6 +11,8 @@ fi
 
 ./install
 
+(cd examples/c; gcc -W -Wall -Wextra -O2 theo_eigen.c     -I../../include -I../../src -lgsl -lgslcblas -lm; ./${BINARY}; rm ${BINARY})
+
 (cd examples/c; gcc -W -Wall -Wextra -O2 schnider_threecomp.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./${BINARY}; rm ${BINARY})
 (cd examples/c; gcc -W -Wall -Wextra -O2 schnider_eigen.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./${BINARY}; rm ${BINARY})
 

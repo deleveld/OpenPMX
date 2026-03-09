@@ -75,7 +75,7 @@ static void advancer_diffeqn_wrapper(double TIME,
 
 static void advancer_diffeqn_construct(ADVAN* advan, const ADVANFUNCS* const advanfuncs)
 {
-	var advandes = (ADVANCER_TESTRK4*)advan; /* cast up */
+	var advandes = container_of(advan, ADVANCER_TESTRK4, advan);
 	let destest = (ADVANTABLE_TESTRK4*)advanfuncs;
 
 	assert(advanfuncs->advan_size == sizeof(ADVANCER_TESTRK4));
@@ -108,7 +108,8 @@ static void advancer_diffeqn_advance_interval(ADVAN* advan,
 											  const double endtime,
 											  const double* rates)
 {
-	ADVANCER_TESTRK4* advandes = (ADVANCER_TESTRK4*)advan;	/* up cast */
+	var advandes = container_of(advan, ADVANCER_TESTRK4, advan);
+
 	/* advandes->args.diffeqn = already set in constructor */
 	advandes->args.advan = advan;
 	advandes->args.imodel = imodel;

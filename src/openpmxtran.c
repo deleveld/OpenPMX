@@ -800,7 +800,7 @@ int main(int argc, char* argv[])
 		if (match_recordname(begin, "$DATA(", &i, false)) {
 			/* must not pass data filename */
 			if (datafilename && strlen(datafilename))
-				fatal("$DATA(\"...\") exists, but data filename passed as argument as well");
+				fatal("$DATA(\"...\") exists, but data filename also passed as argument");
 	
 			parse_data_with_filename(&res, begin + i);
 

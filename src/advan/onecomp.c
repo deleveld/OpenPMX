@@ -36,7 +36,7 @@ static void advancer_onecomp_info(const struct ADVANFUNCS* const advanfuncs, FIL
 }
 static void advancer_onecomp_construct(ADVAN* advan, const ADVANFUNCS* const advanfuncs)
 {
-	ADVANCER_ONECOMP* advanonecomp = (ADVANCER_ONECOMP*)advan; /* cast up */
+    var advanonecomp = container_of(advan, ADVANCER_ONECOMP, advan);
 
 	assert(advanfuncs->advan_size == sizeof(ADVANCER_ONECOMP));
 	advan_base_construct(&advanonecomp->advan, advanfuncs); /* will zero entire object */
