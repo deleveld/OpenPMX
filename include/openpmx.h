@@ -105,7 +105,7 @@ void pmx_advan_amtlag(const ADVANSTATE* advanstate, const int cmt, const double 
 void pmx_advan_bioaval(const ADVANSTATE* advanstate, const int cmt, const double f);
 bool pmx_advan_inittime(const ADVANSTATE* advanstate, const double t);
 void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const double v);
-void pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate, const int i, const int j, const double value);
+double* pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate);
 
 /* prediction function */
 typedef struct PREDICTVARS PREDICTVARS;

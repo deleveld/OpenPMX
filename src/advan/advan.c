@@ -339,16 +339,9 @@ void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const dou
 	}
 }
 
-void pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate, const int i, const int j, const double value)
+double* pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate)
 {
-	let sysmat = advanstate->advan->eigen_sysmat_data;
-	if (!sysmat) {
-		fprintf(stderr, "fatal: setting eigensystem value with incorrect advancer\n");
-		exit(EXIT_FAILURE);
-	}
-	
-	let ndim = advanstate->advan->advanfuncs->nstate;
-	sysmat[i * ndim + j] = value;
+	return advanstate->advan->eigen_sysmat_data;
 }
 
 /*
