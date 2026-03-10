@@ -25,7 +25,7 @@ $IMODEL(V1, V2, V3, CL, Q2, Q3)
 	double k21 = Q2 / V2;
 	double k13 = Q3 / V1;
 	double k31 = Q3 / V3;
-	SYSMAT(-(k10+k12+k13),	k21,	k31,
+	SYSMAT(-k10-k12-k13,	k21,	k31,
 		   k12,				-k21,	0.,
 		   k13, 			0., 	-k31); 
 			

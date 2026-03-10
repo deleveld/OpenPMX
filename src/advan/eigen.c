@@ -47,6 +47,7 @@
 #include <gsl/gsl_complex_math.h>
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_permutation.h>
+#include <gsl/gsl_blas.h>
 
 /*------------------------------------------------------------------------
  * sysmat is stored in row-major order (C convention, GSL convention):
@@ -67,7 +68,8 @@ typedef struct {
 	double sysmat_data[OPENPMX_STATE_MAX * OPENPMX_STATE_MAX];
 	/* cached sysmat to avoid unnecessary recalculation */
 	double last_sysmat_data[OPENPMX_STATE_MAX * OPENPMX_STATE_MAX];
-
+	int last_recalc_initcount;
+	
 	/* Cached eigendecomposition results */
 	int n;                             					/* matrix dimension */
 	double eigvals[OPENPMX_STATE_MAX];         			/* eigenvalues (real parts) */
@@ -107,6 +109,7 @@ static void advancer_eigen_construct(ADVAN* advan,
 		self->last_sysmat_data[i] = NAN;
 	}
 	self->n = advanfuncs->nstate;
+	self->last_recalc_initcount = -1;
 
 	/* Allocate the GSL eigen workspace once; reused at each decomposition */
 	self->eigen_ws = gsl_eigen_nonsymmv_alloc(self->n);
@@ -147,6 +150,7 @@ static void advancer_eigen_destruct(ADVAN* advan)
  * modes). We assert this -- complex eigenvalues would indicate a
  * malformed PK model.
  *----------------------------------------------------------------------*/
+__attribute__ ((hot))
 static void eigen_decompose(ADVANCER_EIGEN* self, 
 							const double sysmat_data[static OPENPMX_STATE_MAX * OPENPMX_STATE_MAX])
 {
@@ -279,6 +283,7 @@ static void eigen_decompose(ADVANCER_EIGEN* self,
  *
  * All matrices are row-major (GSL convention).
  *----------------------------------------------------------------------*/
+__attribute__ ((hot))
 static void advancer_eigen_advance_interval(ADVAN* advan,
 											const IMODEL* const imodel,
 											const RECORD* const record,
@@ -295,41 +300,53 @@ static void advancer_eigen_advance_interval(ADVAN* advan,
 
 	assert(advan->initcount > 0);
 
-	/* Re-decompose only if system matrix is changed, otherwise the 
-	 * result would be exactly the same. This considerably speeds up
-	 * estimation in many cases if the user omits .firstonly=true */
-	var recalc = (advan->initcount == 0) ? true : false;
+	/* Re-decompose only if system matrix changed. memcmp is
+	 * SIMD-vectorized by libc and far faster than the previous scalar
+	 * element loop. */
 	let n = self->n;
-	for (int i=0; i<n*n && !recalc; i++) {
-		if (self->sysmat_data[i] != self->last_sysmat_data[i]) 
-			recalc = true;
+	if (self->last_recalc_initcount != advan->initcount) {
+		if (memcmp(self->sysmat_data, self->last_sysmat_data,
+		           n * n * sizeof(double)) != 0) {
+			eigen_decompose(self, self->sysmat_data);
+			memcpy(self->last_sysmat_data, self->sysmat_data,
+			       n * n * sizeof(double));
+		}
+		self->last_recalc_initcount = advan->initcount;
 	}
-	if (recalc)  {
-		eigen_decompose(self, self->sysmat_data);
-		memcpy(self->last_sysmat_data, self->sysmat_data, n * n * sizeof(double));
-    }
 
-	/* Step 1: Transform state to modal coordinates
-	 * x_modal = Vinv * state  (row-major matrix-vector multiply) */
+	/* Wrap cached matrices and working vectors as GSL views.
+	 * gsl_matrix_view_array / gsl_vector_view_array are zero-cost: they
+	 * only fill a small header struct pointing at the existing arrays. */
+	var Vinv_m = gsl_matrix_view_array(self->Vinv, n, n);
+	var V_m    = gsl_matrix_view_array(self->V, n, n);
+
+	/* Steps 1+2: project state and rates into modal coordinates via Vinv.
+	 *
+	 * x_modal = Vinv * state
+	 * j_modal = Vinv * rates
+	 *
+	 * cblas_dgemv with CblasRowMajor / CblasNoTrans computes:
+	 *   y = alpha * A * x + beta * y
+	 * where A is (n x n) row-major, x and y are length-n vectors.
+	 * alpha=1, beta=0 gives a plain matrix-vector product.
+	 *
+	 * The two calls share the same matrix Vinv; BLAS will use optimised
+	 * SIMD kernels (SSE2/AVX on x86, NEON on ARM) automatically.
+	 */
 	double x_modal[OPENPMX_STATE_MAX];
-	forcount(i, n) {
-		var sum = 0.;
-		forcount(j, n)
-			sum += self->Vinv[i * n + j] * state[j];
-		x_modal[i] = sum;
-	}
-
-	/* Step 2: Project input rates into modal coordinates
-	 * j_modal = Vinv * rates */
 	double j_modal[OPENPMX_STATE_MAX];
-	forcount(i, n) {
-		var sum = 0.;
-		forcount(j, n)
-			sum += self->Vinv[i * n + j] * rates[j];
-		j_modal[i] = sum;
-	}
+	var x_modal_v = gsl_vector_view_array(x_modal, n);
+	var j_modal_v = gsl_vector_view_array(j_modal, n);
+	var state_v   = gsl_vector_view_array(state, n);
+	/* rates is const double*; gsl_vector_const_view_array avoids the cast */
+	var rates_v   = gsl_vector_const_view_array(rates, n);
 
-	/* Step 3: Advance each mode analytically
+	gsl_blas_dgemv(CblasNoTrans, 1.0, &Vinv_m.matrix,
+	               &state_v.vector, 0.0, &x_modal_v.vector);   /* x_modal = Vinv * state */
+	gsl_blas_dgemv(CblasNoTrans, 1.0, &Vinv_m.matrix,
+	               &rates_v.vector, 0.0, &j_modal_v.vector);   /* j_modal = Vinv * rates */
+
+	/* Step 3: advance each mode analytically.
 	 *
 	 * For each eigenvalue lambda_i (negative for stable systems):
 	 *   decay = exp(lambda_i * dt)
@@ -342,30 +359,31 @@ static void advancer_eigen_advance_interval(ADVAN* advan,
 	let dt = endtime - advan->time;
 	assert(dt > 0.);
 	double x_modal_new[OPENPMX_STATE_MAX];
-	forcount(i, n) {
+	for (int i = 0; i < n; i++) {
 		let eigval = self->eigvals[i];
-		let decay = exp(eigval * dt);
+		let decay  = exp(eigval * dt);
 
 		if (fabs(eigval) > 1e-15) {
 			/* Normal case: mode decays and accumulates */
-			const double step_coef = (1.0 - decay) / (-eigval);
+			let step_coef = (1.0 - decay) / (-eigval);
 			x_modal_new[i] = x_modal[i] * decay + j_modal[i] * step_coef;
 		} else {
-			/* Degenerate case: eigenvalue ~ 0 means pure accumulation
-			 * (no elimination from this mode). In the limit as
-			 * eigval -> 0: (1 - exp(eigval*dt)) / (-eigval) -> dt */
+			/* Degenerate case: eigenvalue ~ 0, pure accumulation.
+			 * Limit as eigval -> 0: (1 - exp(eigval*dt)) / (-eigval) -> dt */
 			x_modal_new[i] = x_modal[i] + j_modal[i] * dt;
 		}
 	}
 
-	/* Step 4: Transform back to compartment coordinates
-	 * state = V * x_modal_new */
-	forcount(i, n) {
-		var sum = 0.;
-		forcount(j, n)
-			sum += self->V[i * n + j] * x_modal_new[j];
-		state[i] = sum;
-	}
+	/* Step 4: transform back to compartment coordinates.
+	 *
+	 * state = V * x_modal_new
+	 *
+	 * state_v still points at the `state` array so the result is written
+	 * back in-place — no extra copy needed.
+	 */
+	var x_modal_new_v = gsl_vector_view_array(x_modal_new, n);
+	gsl_blas_dgemv(CblasNoTrans, 1.0, &V_m.matrix,
+	               &x_modal_new_v.vector, 0.0, &state_v.vector); /* state = V * x_modal_new */
 }
 
 /*------------------------------------------------------------------------

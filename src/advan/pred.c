@@ -48,6 +48,7 @@ static void advancer_pred_destruct(ADVAN * advan)
 	advan_base_destruct(advan);
 }
 
+__attribute__ ((hot))
 static void advancer_pred_advance_interval(ADVAN* advan,
 										   const IMODEL* const imodel,
 										   const RECORD* const record,

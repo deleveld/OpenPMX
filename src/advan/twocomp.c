@@ -61,6 +61,7 @@ typedef struct {
 	int offsetQ2;
 } ADVANTABLE_TWOCOMP;
 
+__attribute__ ((hot))
 static void advancer_twocomp_advance_interval(ADVAN* advan,
 											  const IMODEL* const imodel,
 											  const RECORD* const record,
@@ -84,7 +85,8 @@ static void advancer_twocomp_advance_interval(ADVAN* advan,
 	assert(rates[0] >= 0.);
 	assert(rates[1] == 0.);
 
-	const ADVANTABLE_TWOCOMP* const imodeloffsets = (const ADVANTABLE_TWOCOMP*)advan->advanfuncs;
+//	const ADVANTABLE_TWOCOMP* const imodeloffsets = (const ADVANTABLE_TWOCOMP*)advan->advanfuncs;
+	let imodeloffsets = container_of(advan->advanfuncs, ADVANTABLE_TWOCOMP, advanfuncs);
 	const double V1 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV1);
 	const double V2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV2);
 	const double CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
@@ -103,8 +105,6 @@ static void advancer_twocomp_advance_interval(ADVAN* advan,
     const double lambda1 = 0.5*((E1+E2)+sqrt(pow(E1+E2,2)-4.*(E1*E2-k12*k21)));
     const double lambda2 = 0.5*((E1+E2)-sqrt(pow(E1+E2,2)-4.*(E1*E2-k12*k21)));
 
-#pragma push_macro("A1")
-#pragma push_macro("A2")
 #define A1 (state[0])
 #define A2 (state[1])
 	const double t = endtime - time; /* change in time */
@@ -123,8 +123,8 @@ static void advancer_twocomp_advance_interval(ADVAN* advan,
 	const double A2term1 = (((A2last*E1+A1last*k12)-A2last*lambda1)*exp_t_lambda1-((A2last*E1+A1last*k12)-A2last*lambda2)*exp_t_lambda2)/(lambda2-lambda1);
 	const double A2term2 = Doserate*k12*(1./(lambda1*lambda2)+exp_t_lambda1/(lambda1*(lambda1-lambda2))-exp_t_lambda2/(lambda2*(lambda1-lambda2)));
 	A2 = A2term1+A2term2; /* Amount in the peripheral compartment */
-#pragma pop_macro("A1")
-#pragma pop_macro("A2")
+#undef A1
+#undef A2
 }
 
 static inline void ensure(const int flag, const char* message)

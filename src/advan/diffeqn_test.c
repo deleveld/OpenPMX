@@ -100,6 +100,7 @@ static void advancer_diffeqn_reset(ADVAN * advan, const int full)
 	(void) full;
 }
 
+__attribute__ ((hot))
 static void advancer_diffeqn_advance_interval(ADVAN* advan,
 											  const IMODEL* const imodel,
 											  const RECORD* const record,

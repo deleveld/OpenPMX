@@ -84,43 +84,43 @@ typedef struct {
 
 static inline void imodel_threecomp_reset_macro_constants(ADVANCER_THREECOMP* advanthreecomp, const IMODEL* imodel)
 {
-	let imodeloffsets = (const ADVANTABLE_THREECOMP*)advanthreecomp->advan.advanfuncs;
+	let imodeloffsets = container_of(advanthreecomp->advan.advanfuncs, ADVANTABLE_THREECOMP, advanfuncs);
 
-	const double V1 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV1);
-	const double V2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV2);
-	const double V3 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV3);
-	const double CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
-	const double Q12 = *(const double*)(((char*)imodel) + imodeloffsets->offsetQ2);
-	const double Q13 = *(const double*)(((char*)imodel) + imodeloffsets->offsetQ3);
-	const double k10 = CL/V1;
-	const double k12 = Q12/V1;
-	const double k21 = k12*V1/V2;
-	const double k13 = Q13/V1;
-	const double k31 = k13*V1/V3;
-	const double k20 = 0.;
-	const double k30 = 0.;
-	const double E1 = k10+k12+k13;
-	const double E2 = k21+k20;
-	const double E3 = k31+k30;
+	let V1 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV1);
+	let V2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV2);
+	let V3 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV3);
+	let CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
+	let Q12 = *(const double*)(((char*)imodel) + imodeloffsets->offsetQ2);
+	let Q13 = *(const double*)(((char*)imodel) + imodeloffsets->offsetQ3);
+	let k10 = CL/V1;
+	let k12 = Q12/V1;
+	let k21 = k12*V1/V2;
+	let k13 = Q13/V1;
+	let k31 = k13*V1/V3;
+	let k20 = 0.;
+	let k30 = 0.;
+	let E1 = k10+k12+k13;
+	let E2 = k21+k20;
+	let E3 = k31+k30;
 
 	/* calculate hybrid rate constants */
-	const double a = E1+E2+E3;
-	const double b = E1*E2+E3*(E1+E2)-k12*k21-k13*k31;
-	const double c = E1*E2*E3-E3*k12*k21-E2*k13*k31;
+	let a = E1+E2+E3;
+	let b = E1*E2+E3*(E1+E2)-k12*k21-k13*k31;
+	let c = E1*E2*E3-E3*k12*k21-E2*k13*k31;
 
-	const double m = (3.*b - pow(a,2.))/3.;
-	const double n = (2.*pow(a,3.) - 9.*a*b + 27.*c)/27.;
-	const double Q = (pow(n,2.))/4. + (pow(m,3.))/27.;
+	let m = (3.*b - (a*a))/3.;
+	let n = (2.*(a*a*a) - 9.*a*b + 27.*c)/27.;
+	let Q = ((n*n))/4. + ((m*m*m))/27.;
 
-	const double alpha = sqrt(-1.*Q);
-	const double beta = -1.*n/2.;
-	const double gamma = sqrt(pow(beta,2.)+pow(alpha,2.));
-	const double theta = atan2(alpha,beta);
+	let alpha = sqrt(-1.*Q);
+	let beta = -1.*n/2.;
+	let gamma = sqrt((beta*beta)+(alpha*alpha));
+	let theta = atan2(alpha,beta);
 
-	const double pow_gamma_1_3 = cbrt(gamma);
-	const double lambda1 = a/3. + pow_gamma_1_3*(cos(theta/3.) + sqrt(3.)*sin(theta/3.));
-	const double lambda2 = a/3. + pow_gamma_1_3*(cos(theta/3.) - sqrt(3.)*sin(theta/3.));
-	const double lambda3 = a/3. -(2.*pow_gamma_1_3*cos(theta/3.));
+	let pow_gamma_1_3 = cbrt(gamma);
+	let lambda1 = a/3. + pow_gamma_1_3*(cos(theta/3.) + sqrt(3.)*sin(theta/3.));
+	let lambda2 = a/3. + pow_gamma_1_3*(cos(theta/3.) - sqrt(3.)*sin(theta/3.));
+	let lambda3 = a/3. -(2.*pow_gamma_1_3*cos(theta/3.));
 
 	advanthreecomp->k12 = k12;
 	advanthreecomp->k21 = k21;
@@ -134,6 +134,7 @@ static inline void imodel_threecomp_reset_macro_constants(ADVANCER_THREECOMP* ad
 	advanthreecomp->lambda3 = lambda3;
 }
 
+__attribute__ ((hot))
 static void advancer_threecomp_advance_interval(ADVAN* advan,
 												const IMODEL* const imodel,
 												const RECORD* const record,
@@ -159,67 +160,103 @@ static void advancer_threecomp_advance_interval(ADVAN* advan,
 		advanthreecomp->last_reset_count = advan->initcount;
 	}
 
-	const double time = advan->time;
+	let time = advan->time;
 
 	assert (endtime > time);
 
 	/* ADVAN 3-compartment code obtained from: Abuhelwa AY, Foster DJ, Upton RN.
 	 * ADVAN-style analytical solutions for common pharmacokinetic imodels.
 	   Journal of pharmacological and toxicological methods. 2015 Jun 30;73:42-8. */
-	const double k12 = advanthreecomp->k12;
-	const double k21 = advanthreecomp->k21;
-	const double k13 = advanthreecomp->k13;
-	const double k31 = advanthreecomp->k31;
-	const double E1 = advanthreecomp->E1;
-	const double E2 = advanthreecomp->E2;
-	const double E3 = advanthreecomp->E3;
-	const double lambda1 = advanthreecomp->lambda1;
-	const double lambda2 = advanthreecomp->lambda2;
-	const double lambda3 = advanthreecomp->lambda3;
+	let k12 = advanthreecomp->k12;
+	let k21 = advanthreecomp->k21;
+	let k13 = advanthreecomp->k13;
+	let k31 = advanthreecomp->k31;
+	let E1 = advanthreecomp->E1;
+	let E2 = advanthreecomp->E2;
+	let E3 = advanthreecomp->E3;
+	let lambda1 = advanthreecomp->lambda1;
+	let lambda2 = advanthreecomp->lambda2;
+	let lambda3 = advanthreecomp->lambda3;
 
-#pragma push_macro("A1")
-#pragma push_macro("A2")
-#pragma push_macro("A3")
 #define A1 (state[0])
 #define A2 (state[1])
 #define A3 (state[2])
-	const double t = endtime - time; /* change in time */
-	const double A1last = A1;
-	const double A2last = A2;
-	const double A3last = A3;
-	const double Doserate = rates[0];
+	let t = endtime - time; /* change in time */
+	let A1last = A1;
+	let A2last = A2;
+	let A3last = A3;
+	let Doserate = rates[0];
 
-	const double B = A2last*k21+A3last*k31;
-	const double C = E3*A2last*k21+E2*A3last*k31;
-	const double I = A1last*k12*E3-A2last*k13*k31+A3last*k12*k31;
-	const double J = A1last*k13*E2+A2last*k13*k21-A3last*k12*k21;
+	let B = A2last*k21+A3last*k31;
+	let C = E3*A2last*k21+E2*A3last*k31;
+	let I = A1last*k12*E3-A2last*k13*k31+A3last*k12*k31;
+	let J = A1last*k13*E2+A2last*k13*k21-A3last*k12*k21;
 
 	/* cached values for greater speed */
-	const double exp_t_lambda1 = exp(-t*lambda1);
-	const double exp_t_lambda2 = exp(-t*lambda2);
-	const double exp_t_lambda3 = exp(-t*lambda3);
+	let exp_t_lambda1 = exp(-t*lambda1);
+	let exp_t_lambda2 = exp(-t*lambda2);
+	let exp_t_lambda3 = exp(-t*lambda3);
+	let div_lambda2131 = 1./((lambda2-lambda1)*(lambda3-lambda1));
+	let div_lambda1213 = 1./((lambda1-lambda2)*(lambda1-lambda3));
+	let div_lambda1223 = 1./((lambda1-lambda2)*(lambda2-lambda3));
+	let div_lambda1232 = 1./((lambda1-lambda2)*(lambda3-lambda2));
+	let div_lambda1323 = 1./((lambda1-lambda3)*(lambda2-lambda3));
+	let div_lambda1332 = 1./((lambda1-lambda3)*(lambda3-lambda2));
+	let div_lambda12131 = 1./(lambda1*(lambda2-lambda1)*(lambda3-lambda1));
+	let div_lambda21232 = 1./(lambda2*(lambda1-lambda2)*(lambda3-lambda2));
+	let div_lambda31323 = 1./(lambda3*(lambda1-lambda3)*(lambda2-lambda3));
+	let div_lambda123 = 1./(lambda1*lambda2*lambda3);
+	let E1l1 = E1-lambda1;
+	let E2l1 = E2-lambda1;
+	let E3l1 = E3-lambda1;
+	let E2l2 = E2-lambda2;
+	let E2l3 = E2-lambda3;
+	let E3l3 = E3-lambda3;
+	let E3l2 = E3-lambda2;
 
-	const double A1term1 = A1last*(exp_t_lambda1*(E2-lambda1)*(E3-lambda1)/((lambda2-lambda1)*(lambda3-lambda1))+exp_t_lambda2*(E2-lambda2)*(E3-lambda2)/((lambda1-lambda2)*(lambda3-lambda2))+exp_t_lambda3*(E2-lambda3)*(E3-lambda3)/((lambda1-lambda3)*(lambda2-lambda3)));
-	const double A1term2 = exp_t_lambda1*(C-B*lambda1)/((lambda1-lambda2)*(lambda1-lambda3))+exp_t_lambda2*(B*lambda2-C)/((lambda1-lambda2)*(lambda2-lambda3))+exp_t_lambda3*(B*lambda3-C)/((lambda1-lambda3)*(lambda3-lambda2));
+	let A1term1 = A1last*(exp_t_lambda1*E2l1*E3l1*div_lambda2131
+						  + exp_t_lambda2*E2l2*E3l2*div_lambda1232
+						  + exp_t_lambda3*E2l3*E3l3*div_lambda1323);
+	let A1term2 = exp_t_lambda1*(C-B*lambda1)*div_lambda1213
+				+ exp_t_lambda2*(B*lambda2-C)*div_lambda1223
+				+ exp_t_lambda3*(B*lambda3-C)*div_lambda1332;
 	/* small optimization where large term does not have to be calulated in Doserate is zero */
-	const double A1term3 = (Doserate == 0.) ? 0. : Doserate*((E2*E3)/(lambda1*lambda2*lambda3)-exp_t_lambda1*(E2-lambda1)*(E3-lambda1)/(lambda1*(lambda2-lambda1)*(lambda3-lambda1))-exp_t_lambda2*(E2-lambda2)*(E3-lambda2)/(lambda2*(lambda1-lambda2)*(lambda3-lambda2))-exp_t_lambda3*(E2-lambda3)*(E3-lambda3)/(lambda3*(lambda1-lambda3)*(lambda2-lambda3)));
-	A1 = A1term1+A1term2+A1term3;    /* Amount in the central compartment */
+	let A1term3 = (Doserate == 0.) ? 0. : Doserate*((E2*E3)*div_lambda123
+													 - exp_t_lambda1*E2l1*E3l1*div_lambda12131
+													 - exp_t_lambda2*E2l2*E3l2*div_lambda21232
+													 - exp_t_lambda3*E2l3*E3l3*div_lambda31323);
+	A1 = A1term1 + A1term2 + A1term3;    /* Amount in the central compartment */
 
-	const double A2term1 = A2last*(exp_t_lambda1*(E1-lambda1)*(E3-lambda1)/((lambda2-lambda1)*(lambda3-lambda1))+exp_t_lambda2*(E1-lambda2)*(E3-lambda2)/((lambda1-lambda2)*(lambda3-lambda2))+exp_t_lambda3*(E1-lambda3)*(E3-lambda3)/((lambda1-lambda3)*(lambda2-lambda3)));
-	const double A2term2 = exp_t_lambda1*(I-A1last*k12*lambda1)/((lambda1-lambda2)*(lambda1-lambda3))+exp_t_lambda2*(A1last*k12*lambda2-I)/((lambda1-lambda2)*(lambda2-lambda3))+exp_t_lambda3*(A1last*k12*lambda3-I)/((lambda1-lambda3)*(lambda3-lambda2));
+	let A2term1 = A2last*(exp_t_lambda1*E1l1*E3l1*div_lambda2131
+						  + exp_t_lambda2*(E1-lambda2)*E3l2*div_lambda1232
+						  + exp_t_lambda3*(E1-lambda3)*E3l3*div_lambda1323);
+	let A1last_k12 = A1last*k12;
+	let A2term2 = exp_t_lambda1*(I-A1last_k12*lambda1)*div_lambda1213
+				+ exp_t_lambda2*(A1last_k12*lambda2-I)*div_lambda1223
+				+ exp_t_lambda3*(A1last_k12*lambda3-I)*div_lambda1332;
 	/* small optimization where large term does not have to be calulated in Doserate is zero */
-	const double A2term3 = (Doserate == 0.) ? 0. : Doserate*k12*(E3/(lambda1*lambda2*lambda3)-exp_t_lambda1*(E3-lambda1)/(lambda1*(lambda2-lambda1)*(lambda3-lambda1))-exp_t_lambda2*(E3-lambda2)/(lambda2*(lambda1-lambda2)*(lambda3-lambda2))-exp_t_lambda3*(E3-lambda3)/(lambda3*(lambda1-lambda3)*(lambda2-lambda3)));
-	A2 = A2term1+A2term2+A2term3;    /* Amount in the first-peripheral compartment */
+	let A2term3 = (Doserate == 0.) ? 0. : Doserate*k12*(E3*div_lambda123
+														 - exp_t_lambda1*E3l1*div_lambda12131
+														 - exp_t_lambda2*E3l2*div_lambda21232
+														 - exp_t_lambda3*E3l3*div_lambda31323);
+	A2 = A2term1 + A2term2 + A2term3;    /* Amount in the first-peripheral compartment */
 
-	const double A3term1 = A3last*(exp_t_lambda1*(E1-lambda1)*(E2-lambda1)/((lambda2-lambda1)*(lambda3-lambda1))+exp_t_lambda2*(E1-lambda2)*(E2-lambda2)/((lambda1-lambda2)*(lambda3-lambda2))+exp_t_lambda3*(E1-lambda3)*(E2-lambda3)/((lambda1-lambda3)*(lambda2-lambda3)));
-	const double A3term2 = exp_t_lambda1*(J-A1last*k13*lambda1)/((lambda1-lambda2)*(lambda1-lambda3))+exp_t_lambda2*(A1last*k13*lambda2-J)/((lambda1-lambda2)*(lambda2-lambda3))+exp_t_lambda3*(A1last*k13*lambda3-J)/((lambda1-lambda3)*(lambda3-lambda2));
+	let A3term1 = A3last*(exp_t_lambda1*E1l1*E2l1*div_lambda2131
+						  + exp_t_lambda2*(E1-lambda2)*E2l2*div_lambda1232
+						  + exp_t_lambda3*(E1-lambda3)*E2l3*div_lambda1323);
+	let A1last_k13 = A1last*k13;
+	let A3term2 = exp_t_lambda1*(J-A1last_k13*lambda1)*div_lambda1213
+				+ exp_t_lambda2*(A1last_k13*lambda2-J)*div_lambda1223
+				+ exp_t_lambda3*(A1last_k13*lambda3-J)*div_lambda1332;
 	/* small optimization where large term does not have to be calulated in Doserate is zero */
-	const double A3term3 = (Doserate == 0.) ? 0. : Doserate*k13*(E2/(lambda1*lambda2*lambda3)-exp_t_lambda1*(E2-lambda1)/(lambda1*(lambda2-lambda1)*(lambda3-lambda1))-exp_t_lambda2*(E2-lambda2)/(lambda2*(lambda1-lambda2)*(lambda3-lambda2))-exp_t_lambda3*(E2-lambda3)/(lambda3*(lambda1-lambda3)*(lambda2-lambda3)));
-	A3 = A3term1+A3term2+A3term3;  /* Amount in the second-peripheral compartment */
-
-#pragma pop_macro("A1")
-#pragma pop_macro("A2")
-#pragma pop_macro("A3")
+	let A3term3 = (Doserate == 0.) ? 0. : Doserate*k13*(E2*div_lambda123
+														- exp_t_lambda1*E2l1*div_lambda12131
+														- exp_t_lambda2*E2l2*div_lambda21232
+														- exp_t_lambda3*E2l3*div_lambda31323);
+	A3 = A3term1 + A3term2 + A3term3;  /* Amount in the second-peripheral compartment */
+#undef A1
+#undef A2
+#undef A3
 }
 
 static inline void ensure(const int flag, const char* message)

@@ -124,6 +124,7 @@ static void advancer_diffeqn_libgsl_reset(ADVAN * advan, const int full)
 		gsl_odeiv2_driver_reset_hstart(advandes->d, libgsl->hstart);
 }
 
+__attribute__ ((hot))
 static void advancer_diffeqn_libgsl_advance_interval(ADVAN* advan,
 													 const IMODEL* const imodel,
 													 const RECORD* const record,

@@ -61,6 +61,7 @@ typedef struct {
 	int offsetKA;
 } ADVANTABLE_ONECOMP_DEPOT;
 
+__attribute__ ((hot))
 static void advancer_onecomp_depot_advance_interval(ADVAN* advan,
 													const IMODEL* const imodel,
 													const RECORD* const record,
@@ -77,30 +78,28 @@ static void advancer_onecomp_depot_advance_interval(ADVAN* advan,
 
 	assert(advan->initcount > 0);
 
-	const double time = advan->time;
+	let time = advan->time;
 
 	/* this advancer can only allow doses to first compartment */
 	assert(endtime > time);
 	assert(rates[0] >= 0.);
 	assert(rates[1] == 0.);
 
-	const ADVANTABLE_ONECOMP_DEPOT* const imodeloffsets = (const ADVANTABLE_ONECOMP_DEPOT*)advan->advanfuncs;
-	const double V = *(const double*)(((char*)imodel) + imodeloffsets->offsetV);
-	const double CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
-	const double KA = *(const double*)(((char*)imodel) + imodeloffsets->offsetKA);
+	let imodeloffsets = container_of(advan->advanfuncs, ADVANTABLE_ONECOMP_DEPOT, advanfuncs);
+	let V = *(const double*)(((char*)imodel) + imodeloffsets->offsetV);
+	let CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
+	let KA = *(const double*)(((char*)imodel) + imodeloffsets->offsetKA);
 
 	/* ADVAN 1-compartment code obtained from: Abuhelwa AY, Foster DJ, Upton RN. ADVAN-style analytical solutions for common pharmacokinetic imodels.
 	   Journal of pharmacological and toxicological methods. 2015 Jun 30;73:42-8. */
-	const double k10 = CL/V;
+	let k10 = CL/V;
 
-#pragma push_macro("A1")
-#pragma push_macro("A2")
 #define A1 (state[0])
 #define A2 (state[1])
-	const double t = endtime - time; /* change in time */
-	double A1last = A1;
-	double A2last = A2;
-	const double Doserate = rates[0];
+	let t = endtime - time; /* change in time */
+	var A1last = A1;
+	var A2last = A2;
+	let Doserate = rates[0];
 	
 /// This advancer does not yet support infusions. See the GitHub issue. 
 /// The workaround is to code the model as a differential equation.
@@ -112,9 +111,8 @@ static void advancer_onecomp_depot_advance_interval(ADVAN* advan,
 
     A2 = A2last;
     A1 = A1last;
-    
-#pragma pop_macro("A1")
-#pragma pop_macro("A2")
+#undef A1    
+#undef A2    
 }
 
 static inline void ensure(const int flag, const char* message)

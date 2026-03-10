@@ -239,6 +239,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 									.popparam = popparam,
 								},
 							});
+			++advan->initcount;
 		}
 
 	/* keep going till we have the state equal to the required record time */

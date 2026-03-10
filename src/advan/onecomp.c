@@ -54,6 +54,7 @@ typedef struct {
 	int offsetCL;
 } ADVANTABLE_ONECOMP;
 
+__attribute__ ((hot))
 static void advancer_onecomp_advance_interval(ADVAN* advan,
 											  const IMODEL* const imodel,
 											  const RECORD* const record,
