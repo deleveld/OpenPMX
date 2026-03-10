@@ -7,7 +7,7 @@
 //	 - changed CP name to DV
 //
 $DATA("data.csv")
-$ADVAN(diffeqn_libgsl)
+$ADVAN(eigen) 
 	.firstonly = true,
 	.nstate = 3,
 $IMODEL(V1, V2, V3, CL, Q2, Q3)
@@ -18,16 +18,17 @@ $IMODEL(V1, V2, V3, CL, Q2, Q3)
 	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4));
 	Q2 = THETA(5) * pow(V2/THETA(2), 0.75) * exp(ETA(5));
 	Q3 = THETA(6) * pow(V3/THETA(3), 0.75) * exp(ETA(6));
-$DIFFEQN
-	const double K10 = CL/V1;
-	const double K12 = Q2/V1;
-	const double K21 = Q2/V2;
-	const double K13 = Q3/V1;
-	const double K31 = Q3/V3;
-	const double K1023 = K10 + K12 + K13;
-	DADT(1) = A(2)*K21 + A(3)*K31 - A(1)*K1023;
-	DADT(2) = A(1)*K12 - A(2)*K21;
-	DADT(3) = A(1)*K13 - A(3)*K31;
+	
+	// define the eigensystem
+	double k10 = CL / V1;
+	double k12 = Q2 / V1;
+	double k21 = Q2 / V2;
+	double k13 = Q3 / V1;
+	double k31 = Q3 / V3;
+	SYSMAT(-(k10+k12+k13),	k21,	k31,
+		   k12,				-k21,	0.,
+		   k13, 			0., 	-k31); 
+			
 $PREDICT(IPRED)
 	IPRED = A(1)/V1;
 	Y = IPRED*(1 + ERR(1));

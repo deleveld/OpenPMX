@@ -30,9 +30,9 @@ If you just want to use the latest stable version then you should look at the [R
 
 - First-order conditional estimation with interation (FOCEI) results similar to industry standard [NONMEM](https://www.iconplc.com/solutions/technologies/nonmem)
 - Code and simulate/estimate models using text files and C allows scripting and integration with other tools
-- Analytic models for common comparmental models, ODE solver for complex models
+- Analytic models for common comparmental models, ODE solver for complex models, eigensystem solver for linear models of any topology.
 - Utilize multi-core CPUs via [OpenMP](https://www.openmp.org/) or [pthreads](https://man7.org/linux/man-pages/man7/pthreads.7.html)
-- Estimation speed comparable with NONMEM (faster for small data sets, similar for large data sets)
+- Estimation speed comparable with NONMEM 
 - Limited project scope and complexity, focused on simulation and estimation
 - Few dependencies: [gcc](https://gcc.gnu.org/), [GSL](https://www.gnu.org/software/gsl/)
 
@@ -74,8 +74,11 @@ volunteers. Anesthesiology 1998;88:1170-82.
 In this example a 3-compartment allometric model is estimated.
 - `../../openpmx schnider.gr`
 
-The same example, but using a differential equation solver.
+The same example, but using the differential equation solver.
 - `../../openpmx schnider_diffeqn.gr`
+
+The same example, but using the eigensystem solver.
+- `../../openpmx schnider_eigen.gr`
 
 ### Theophylline
 In directory `examples/theo` these are the Theophylline data from the NONMEM distribution.
