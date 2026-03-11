@@ -80,6 +80,9 @@ The same example, but using the differential equation solver.
 The same example, but using the eigensystem solver.
 - `../../openpmx schnider_eigen.gr`
 
+The same example, but using the eigensystem solver specialized to a three compartment model.
+- `../../openpmx schnider_eigen_threecomp.gr`
+
 ### Theophylline
 In directory `examples/theo` these are the Theophylline data from the NONMEM distribution.
 - `../../openpmx theo.gr`

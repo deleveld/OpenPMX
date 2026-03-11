@@ -80,11 +80,11 @@ typedef struct {
 	int offsetCL;
 	int offsetQ2;
 	int offsetQ3;
-} ADVANTABLE_THREECOMP;
+} ADVANFUNCS_THREECOMP;
 
 static inline void imodel_threecomp_reset_macro_constants(ADVANCER_THREECOMP* advanthreecomp, const IMODEL* imodel)
 {
-	let imodeloffsets = container_of(advanthreecomp->advan.advanfuncs, ADVANTABLE_THREECOMP, advanfuncs);
+	let imodeloffsets = container_of(advanthreecomp->advan.advanfuncs, ADVANFUNCS_THREECOMP, advanfuncs);
 
 	let V1 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV1);
 	let V2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV2);
@@ -259,21 +259,13 @@ static void advancer_threecomp_advance_interval(ADVAN* advan,
 #undef A3
 }
 
-static inline void ensure(const int flag, const char* message)
-{
-	if (!flag) {
-		printf("%s\n", message);
-		exit(EXIT_FAILURE);
-	}
-}
-
 ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig)
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
 	assert(advanconfig->nstate == 0 || advanconfig->nstate == 3);
 
-	let retinit = (ADVANTABLE_THREECOMP) {
+	let retinit = (ADVANFUNCS_THREECOMP) {
 		.advanfuncs = {
 			.advan_size = sizeof(ADVANCER_THREECOMP),
 			.construct = advancer_threecomp_construct,
@@ -294,17 +286,17 @@ ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANC
 		.offsetQ2 = structinfo_find_offset("Q2", &advanconfig->imodelfields),
 		.offsetQ3 = structinfo_find_offset("Q3", &advanconfig->imodelfields),
 	};
-	ensure(retinit.offsetV1 >= 0, "fatal: could not find V1");
-	ensure(retinit.offsetV2 >= 0, "fatal: could not find V2");
-	ensure(retinit.offsetV3 >= 0, "fatal: could not find V3");
-	ensure(retinit.offsetCL >= 0, "fatal: could not find CL");
-	ensure(retinit.offsetQ2 >= 0, "fatal: could not find Q2");
-	ensure(retinit.offsetQ3 >= 0, "fatal: could not find Q3");
+	advan_ensure(retinit.offsetV1 >= 0, __func__, "could not find V1");
+	advan_ensure(retinit.offsetV2 >= 0, __func__, "could not find V2");
+	advan_ensure(retinit.offsetV3 >= 0, __func__, "could not find V3");
+	advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
+	advan_ensure(retinit.offsetQ2 >= 0, __func__, "could not find Q2");
+	advan_ensure(retinit.offsetQ3 >= 0, __func__, "could not find Q3");
 
 	/* make binary copy so init can have const members */
-	ADVANTABLE_THREECOMP* ret = malloc(sizeof(ADVANTABLE_THREECOMP));
+	ADVANFUNCS_THREECOMP* ret = malloc(sizeof(ADVANFUNCS_THREECOMP));
 	assert(ret);
-	memcpy(ret, &retinit, sizeof(ADVANTABLE_THREECOMP));
+	memcpy(ret, &retinit, sizeof(ADVANFUNCS_THREECOMP));
 
 	return &ret->advanfuncs;
 }

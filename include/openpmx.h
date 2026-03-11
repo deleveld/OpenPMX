@@ -158,6 +158,8 @@ ADVANFUNCS* pmx_advan_onecomp_depot(const DATACONFIG* const dataconfig, const AD
 ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_eigen(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
+ADVANFUNCS* pmx_advan_eigen_threecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
+ADVANFUNCS* pmx_advan_eigen_twocomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 
 /* differential equation advan methods */
 ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);

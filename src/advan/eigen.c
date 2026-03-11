@@ -305,11 +305,13 @@ static void advancer_eigen_advance_interval(ADVAN* advan,
 	 * element loop. */
 	let n = self->n;
 	if (self->last_recalc_initcount != advan->initcount) {
-		if (memcmp(self->sysmat_data, self->last_sysmat_data,
-		           n * n * sizeof(double)) != 0) {
+		if (memcmp(self->sysmat_data,
+				   self->last_sysmat_data,
+				   n * n * sizeof(double)) != 0) {
 			eigen_decompose(self, self->sysmat_data);
-			memcpy(self->last_sysmat_data, self->sysmat_data,
-			       n * n * sizeof(double));
+			memcpy(self->last_sysmat_data,
+				   self->sysmat_data,
+				   n * n * sizeof(double));
 		}
 		self->last_recalc_initcount = advan->initcount;
 	}
@@ -394,6 +396,10 @@ static void advancer_eigen_advance_interval(ADVAN* advan,
  * and general (any number of compartments, any topology).
  *----------------------------------------------------------------------*/
 
+typedef struct {
+	ADVANFUNCS advanfuncs;
+} ADVANFUNCS_EIGEN;
+
 ADVANFUNCS* pmx_advan_eigen(const DATACONFIG* const dataconfig,
 							const ADVANCONFIG* const advanconfig)
 {
@@ -402,23 +408,267 @@ ADVANFUNCS* pmx_advan_eigen(const DATACONFIG* const dataconfig,
 	assert(advanconfig->nstate > 0);
 	assert(advanconfig->nstate <= OPENPMX_STATE_MAX);
 
-	let retinit = (ADVANFUNCS) {
-		.advan_size = sizeof(ADVANCER_EIGEN),
-		.construct = advancer_eigen_construct,
-		.destruct = advancer_eigen_destruct,
-		.info = advancer_eigen_info,
+	let retinit = (ADVANFUNCS_EIGEN) {
+		.advanfuncs = {
+			.advan_size = sizeof(ADVANCER_EIGEN),
+			.construct = advancer_eigen_construct,
+			.destruct = advancer_eigen_destruct,
+			.info = advancer_eigen_info,
 
-		.reset = 0,
-		.interval = advancer_eigen_advance_interval,
+			.reset = 0,
+			.interval = advancer_eigen_advance_interval,
 
-		.advanconfig = advanconfig,
-		.recordinfo = recordinfo_init(dataconfig),
-		.nstate = advanconfig->nstate,
+			.advanconfig = advanconfig,
+			.recordinfo = recordinfo_init(dataconfig),
+			.nstate = advanconfig->nstate,
+		},
 	};
 
-	ADVANFUNCS* ret = malloc(sizeof(ADVANFUNCS));
+	ADVANFUNCS* ret = malloc(sizeof(ADVANFUNCS_EIGEN));
 	assert(ret);
-	memcpy(ret, &retinit, sizeof(ADVANFUNCS));
+	memcpy(ret, &retinit, sizeof(ADVANFUNCS_EIGEN));
 
 	return ret;
 }
+
+/*------------------------------------------------------------------------
+ * Public constructor: pmx_advan_eigen_threecomp
+ *----------------------------------------------------------------------*/
+
+static void advancer_eigen_threecomp_construct(ADVAN* advan,
+											   const struct ADVANFUNCS* const advanfuncs)
+{
+	advancer_eigen_construct(advan,advanfuncs);
+	
+	/* hide the system matrix pointer that exposes, because we do it 
+	 * ourselves. Any other use would be an error. */
+	advan->eigen_sysmat_data = 0;
+}
+
+static void advancer_eigen_threecomp_destruct(ADVAN* advan)
+{
+	advancer_eigen_destruct(advan);
+}
+
+static void advancer_eigen_threecomp_info(const struct ADVANFUNCS* const advanfuncs,
+                                FILE* f)
+{
+    fprintf(f, "advan model eigensystem (three compartment)\n");
+    fprintf(f, "advan nstate %i\n", advanfuncs->nstate);
+}
+
+typedef struct {
+	ADVANFUNCS_EIGEN eigen;
+	int offsetV1;
+	int offsetV2;
+	int offsetV3;
+	int offsetCL;
+	int offsetQ2;
+	int offsetQ3;
+} ADVANFUNCS_EIGEN_THREECOMP;
+
+__attribute__ ((hot))
+static void advancer_eigen_threecomp_advance_interval(ADVAN* advan,
+													  const IMODEL* const imodel,
+													  const RECORD* const record,
+													  double* const state,
+													  const POPPARAM* const popparam,
+													  const double endtime,
+													  const double* rates)
+{
+    var self = container_of(advan, ADVANCER_EIGEN, advan);
+    
+    /* do we need to update the eigensystem matrix? */
+	if (self->last_recalc_initcount != advan->initcount) {
+		var eigen_funcs   = container_of(advan->advanfuncs, ADVANFUNCS_EIGEN,           advanfuncs);
+		var imodeloffsets = container_of(eigen_funcs,       ADVANFUNCS_EIGEN_THREECOMP, eigen); 
+	 
+		let V1 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV1);
+		let V2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV2);
+		let V3 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV3);
+		let CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
+		let Q2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetQ2);
+		let Q3 = *(const double*)(((char*)imodel) + imodeloffsets->offsetQ3);
+		
+		/* define the eigensystem */
+		let k10 = CL / V1;
+		let k12 = Q2 / V1;
+		let k21 = Q2 / V2;
+		let k13 = Q3 / V1;
+		let k31 = Q3 / V3;
+		double sysmat_data[OPENPMX_STATE_MAX * OPENPMX_STATE_MAX] = { 
+				-k10-k12-k13,	k21,	k31,
+				k12,			-k21,	0.,
+				k13, 			0., 	-k31 
+		};
+		
+		/* update the system matrix for the eigen advance */
+		let n = self->n;
+		assert(n == advan->advanfuncs->nstate);
+		memcpy(self->sysmat_data, sysmat_data, n * n * sizeof(double));
+
+		/* resetting the last_recalc_initcount should be done in the 
+		 * advancer_eigen_advance_interval() function, dont do it here */
+	}
+ 	advancer_eigen_advance_interval(advan, imodel, record, state, popparam, endtime, rates);
+}
+
+ADVANFUNCS* pmx_advan_eigen_threecomp(const DATACONFIG* const dataconfig,
+									  const ADVANCONFIG* const advanconfig)
+{
+	assert(advanconfig->init);
+	assert(advanconfig->predict);
+	assert(advanconfig->nstate == 0 || advanconfig->nstate == 3);
+
+	let retinit = (ADVANFUNCS_EIGEN_THREECOMP) {
+		.eigen = {
+			.advanfuncs = {
+				.advan_size = sizeof(ADVANCER_EIGEN),
+				.construct = advancer_eigen_threecomp_construct,
+				.destruct = advancer_eigen_threecomp_destruct,
+				.info = advancer_eigen_threecomp_info,
+
+				.reset = 0,
+				.interval = advancer_eigen_threecomp_advance_interval,
+
+				.advanconfig = advanconfig,
+				.recordinfo = recordinfo_init(dataconfig),
+				.nstate = 3, /* dont allow user to set */
+			},
+		},
+		.offsetV1 = structinfo_find_offset("V1", &advanconfig->imodelfields),
+		.offsetV2 = structinfo_find_offset("V2", &advanconfig->imodelfields),
+		.offsetV3 = structinfo_find_offset("V3", &advanconfig->imodelfields),
+		.offsetCL = structinfo_find_offset("CL", &advanconfig->imodelfields),
+		.offsetQ2 = structinfo_find_offset("Q2", &advanconfig->imodelfields),
+		.offsetQ3 = structinfo_find_offset("Q3", &advanconfig->imodelfields),
+	};
+	advan_ensure(retinit.offsetV1 >= 0, __func__, "could not find V1");
+	advan_ensure(retinit.offsetV2 >= 0, __func__, "could not find V2");
+	advan_ensure(retinit.offsetV3 >= 0, __func__, "could not find V3");
+	advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
+	advan_ensure(retinit.offsetQ2 >= 0, __func__, "could not find Q2");
+	advan_ensure(retinit.offsetQ3 >= 0, __func__, "could not find Q3");
+	
+	ADVANFUNCS* ret = malloc(sizeof(ADVANFUNCS_EIGEN_THREECOMP));
+	assert(ret);
+	memcpy(ret, &retinit, sizeof(ADVANFUNCS_EIGEN_THREECOMP));
+
+	return ret;
+}
+
+/*------------------------------------------------------------------------
+ * Public constructor: pmx_advan_eigen_twocomp
+ *----------------------------------------------------------------------*/
+
+static void advancer_eigen_twocomp_construct(ADVAN* advan,
+											   const struct ADVANFUNCS* const advanfuncs)
+{
+	advancer_eigen_construct(advan,advanfuncs);
+	
+	/* hide the system matrix pointer that exposes, because we do it 
+	 * ourselves. Any other use would be an error. */
+	advan->eigen_sysmat_data = 0;
+}
+
+static void advancer_eigen_twocomp_destruct(ADVAN* advan)
+{
+	advancer_eigen_destruct(advan);
+}
+
+static void advancer_eigen_twocomp_info(const struct ADVANFUNCS* const advanfuncs,
+										FILE* f)
+{
+    fprintf(f, "advan model eigensystem (two compartment)\n");
+    fprintf(f, "advan nstate %i\n", advanfuncs->nstate);
+}
+
+typedef struct {
+	ADVANFUNCS_EIGEN eigen;
+	int offsetV1;
+	int offsetV2;
+	int offsetCL;
+	int offsetQ2;
+} ADVANFUNCS_EIGEN_TWOCOMP;
+
+__attribute__ ((hot))
+static void advancer_eigen_twocomp_advance_interval(ADVAN* advan,
+													const IMODEL* const imodel,
+													const RECORD* const record,
+													double* const state,
+													const POPPARAM* const popparam,
+													const double endtime,
+													const double* rates)
+{
+    var self = container_of(advan, ADVANCER_EIGEN, advan);
+    
+    /* do we need to update the eigensystem matrix? */
+	if (self->last_recalc_initcount != advan->initcount) {
+		var eigen_funcs   = container_of(advan->advanfuncs, ADVANFUNCS_EIGEN, advanfuncs);
+		var imodeloffsets = container_of(eigen_funcs, ADVANFUNCS_EIGEN_TWOCOMP, eigen); 
+	 
+		let V1 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV1);
+		let V2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV2);
+		let CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
+		let Q2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetQ2);
+		
+		/* define the eigensystem */
+		let k10 = CL / V1;
+		let k12 = Q2 / V1;
+		let k21 = Q2 / V2;
+		double sysmat_data[OPENPMX_STATE_MAX * OPENPMX_STATE_MAX] = { 
+			-k10-k12,  k21,
+			k12,     -k21,
+		};
+		/* update the system matrix for the eigen advance */
+		let n = self->n;
+		assert(n == advan->advanfuncs->nstate);
+		memcpy(self->sysmat_data, sysmat_data, n * n * sizeof(double));
+
+		/* resetting the last_recalc_initcount should be done in the 
+		 * advancer_eigen_advance_interval() function, dont do it here */
+	}
+ 	advancer_eigen_advance_interval(advan, imodel, record, state, popparam, endtime, rates);
+}
+
+ADVANFUNCS* pmx_advan_eigen_twocomp(const DATACONFIG* const dataconfig,
+									const ADVANCONFIG* const advanconfig)
+{
+	assert(advanconfig->init);
+	assert(advanconfig->predict);
+	assert(advanconfig->nstate == 0 || advanconfig->nstate == 2);
+
+	let retinit = (ADVANFUNCS_EIGEN_TWOCOMP) {
+		.eigen = {
+			.advanfuncs = {
+				.advan_size = sizeof(ADVANCER_EIGEN),
+				.construct = advancer_eigen_twocomp_construct,
+				.destruct = advancer_eigen_twocomp_destruct,
+				.info = advancer_eigen_twocomp_info,
+
+				.reset = 0,
+				.interval = advancer_eigen_twocomp_advance_interval,
+
+				.advanconfig = advanconfig,
+				.recordinfo = recordinfo_init(dataconfig),
+				.nstate = 2, /* dont allow user to set */
+			},
+		},
+		.offsetV1 = structinfo_find_offset("V1", &advanconfig->imodelfields),
+		.offsetV2 = structinfo_find_offset("V2", &advanconfig->imodelfields),
+		.offsetCL = structinfo_find_offset("CL", &advanconfig->imodelfields),
+		.offsetQ2 = structinfo_find_offset("Q2", &advanconfig->imodelfields),
+	};
+	advan_ensure(retinit.offsetV1 >= 0, __func__, "could not find V1");
+	advan_ensure(retinit.offsetV2 >= 0, __func__, "could not find V2");
+	advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
+	advan_ensure(retinit.offsetQ2 >= 0, __func__, "could not find Q2");
+	
+	ADVANFUNCS* ret = malloc(sizeof(ADVANFUNCS_EIGEN_TWOCOMP));
+	assert(ret);
+	memcpy(ret, &retinit, sizeof(ADVANFUNCS_EIGEN_TWOCOMP));
+
+	return ret;
+}
+
+

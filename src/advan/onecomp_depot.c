@@ -59,7 +59,7 @@ typedef struct {
 	int offsetV;
 	int offsetCL;
 	int offsetKA;
-} ADVANTABLE_ONECOMP_DEPOT;
+} ADVANFUNCS_ONECOMP_DEPOT;
 
 __attribute__ ((hot))
 static void advancer_onecomp_depot_advance_interval(ADVAN* advan,
@@ -85,7 +85,7 @@ static void advancer_onecomp_depot_advance_interval(ADVAN* advan,
 	assert(rates[0] >= 0.);
 	assert(rates[1] == 0.);
 
-	let imodeloffsets = container_of(advan->advanfuncs, ADVANTABLE_ONECOMP_DEPOT, advanfuncs);
+	let imodeloffsets = container_of(advan->advanfuncs, ADVANFUNCS_ONECOMP_DEPOT, advanfuncs);
 	let V = *(const double*)(((char*)imodel) + imodeloffsets->offsetV);
 	let CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
 	let KA = *(const double*)(((char*)imodel) + imodeloffsets->offsetKA);
@@ -104,7 +104,7 @@ static void advancer_onecomp_depot_advance_interval(ADVAN* advan,
 /// This advancer does not yet support infusions. See the GitHub issue. 
 /// The workaround is to code the model as a differential equation.
 	if (Doserate != 0.)
-		fatal(0, "ADVANTABLE_ONECOMP_DEPOT fails with infusions, see GitHub issue. Use DIFFEQN.");
+		fatal(0, "ADVANFUNCS_ONECOMP_DEPOT fails with infusions, see GitHub issue. Use DIFFEQN.");
 
     A2last = A1last*KA/(KA-k10)*(exp(-t*k10)-exp(-t*KA))+A2last*exp(-t*k10);
     A1last = A1last*exp(-1.*t*KA);
@@ -115,21 +115,13 @@ static void advancer_onecomp_depot_advance_interval(ADVAN* advan,
 #undef A2    
 }
 
-static inline void ensure(const int flag, const char* message)
-{
-	if (!flag) {
-		printf("%s\n", message);
-		exit(EXIT_FAILURE);
-	}
-}
-
 ADVANFUNCS* pmx_advan_onecomp_depot(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig)
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
 	assert(advanconfig->nstate == 0 || advanconfig->nstate == 2);
 
-	let retinit = (ADVANTABLE_ONECOMP_DEPOT) {
+	let retinit = (ADVANFUNCS_ONECOMP_DEPOT) {
 		.advanfuncs = {
 			.advan_size = sizeof(ADVANCER_ONECOMP_DEPOT),
 			.construct = advancer_onecomp_depot_construct,
@@ -147,13 +139,13 @@ ADVANFUNCS* pmx_advan_onecomp_depot(const DATACONFIG* const dataconfig, const AD
 		.offsetCL = structinfo_find_offset("CL", &advanconfig->imodelfields),
 		.offsetKA = structinfo_find_offset("KA", &advanconfig->imodelfields),
 	};
-	ensure(retinit.offsetV >= 0, "fatal: could not find V");
-	ensure(retinit.offsetCL >= 0, "fatal: could not find CL");
-	ensure(retinit.offsetKA >= 0, "fatal: could not find KA");
+	advan_ensure(retinit.offsetV >= 0, __func__, "could not find V");
+	advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
+	advan_ensure(retinit.offsetKA >= 0, __func__, "could not find KA");
 
-	ADVANTABLE_ONECOMP_DEPOT* ret = malloc(sizeof(ADVANTABLE_ONECOMP_DEPOT));
+	ADVANFUNCS_ONECOMP_DEPOT* ret = malloc(sizeof(ADVANFUNCS_ONECOMP_DEPOT));
 	assert(ret);
-	memcpy(ret, &retinit, sizeof(ADVANTABLE_ONECOMP_DEPOT));
+	memcpy(ret, &retinit, sizeof(ADVANFUNCS_ONECOMP_DEPOT));
 
 	return &ret->advanfuncs;
 }

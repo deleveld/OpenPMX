@@ -26,5 +26,6 @@ fi
 
 (cd examples/schnider; ../../openpmx schnider.gr)
 (cd examples/schnider; ../../openpmx schnider_eigen.gr)
+(cd examples/schnider; ../../openpmx schnider_eigen_threecomp.gr)
 (cd examples/schnider; ../../openpmx schnider_diffeqn.gr)
 

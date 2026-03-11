@@ -59,7 +59,7 @@ typedef struct {
 	int offsetV2;
 	int offsetCL;
 	int offsetQ2;
-} ADVANTABLE_TWOCOMP;
+} ADVANFUNCS_TWOCOMP;
 
 __attribute__ ((hot))
 static void advancer_twocomp_advance_interval(ADVAN* advan,
@@ -85,8 +85,8 @@ static void advancer_twocomp_advance_interval(ADVAN* advan,
 	assert(rates[0] >= 0.);
 	assert(rates[1] == 0.);
 
-//	const ADVANTABLE_TWOCOMP* const imodeloffsets = (const ADVANTABLE_TWOCOMP*)advan->advanfuncs;
-	let imodeloffsets = container_of(advan->advanfuncs, ADVANTABLE_TWOCOMP, advanfuncs);
+//	const ADVANFUNCS_TWOCOMP* const imodeloffsets = (const ADVANFUNCS_TWOCOMP*)advan->advanfuncs;
+	let imodeloffsets = container_of(advan->advanfuncs, ADVANFUNCS_TWOCOMP, advanfuncs);
 	const double V1 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV1);
 	const double V2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV2);
 	const double CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
@@ -127,21 +127,13 @@ static void advancer_twocomp_advance_interval(ADVAN* advan,
 #undef A2
 }
 
-static inline void ensure(const int flag, const char* message)
-{
-	if (!flag) {
-		printf("%s\n", message);
-		exit(EXIT_FAILURE);
-	}
-}
-
 ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig)
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
 	assert(advanconfig->nstate == 0 || advanconfig->nstate == 2);
 
-	let retinit = (ADVANTABLE_TWOCOMP) {
+	let retinit = (ADVANFUNCS_TWOCOMP) {
 		.advanfuncs = {
 			.advan_size = sizeof(ADVANCER_TWOCOMP),
 			.construct = advancer_twocomp_construct,
@@ -160,14 +152,14 @@ ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCON
 		.offsetCL = structinfo_find_offset("CL", &advanconfig->imodelfields),
 		.offsetQ2 = structinfo_find_offset("Q2", &advanconfig->imodelfields),
 	};
-	ensure(retinit.offsetV1 >= 0, "fatal: could not find V1");
-	ensure(retinit.offsetV2 >= 0, "fatal: could not find V2");
-	ensure(retinit.offsetCL >= 0, "fatal: could not find CL");
-	ensure(retinit.offsetQ2 >= 0, "fatal: could not find Q2");
+	advan_ensure(retinit.offsetV1 >= 0, __func__, "could not find V1");
+	advan_ensure(retinit.offsetV2 >= 0, __func__, "could not find V2");
+	advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
+	advan_ensure(retinit.offsetQ2 >= 0, __func__, "could not find Q2");
 
-	ADVANTABLE_TWOCOMP* ret = malloc(sizeof(ADVANTABLE_TWOCOMP));
+	ADVANFUNCS_TWOCOMP* ret = malloc(sizeof(ADVANFUNCS_TWOCOMP));
 	assert(ret);
-	memcpy(ret, &retinit, sizeof(ADVANTABLE_TWOCOMP));
+	memcpy(ret, &retinit, sizeof(ADVANFUNCS_TWOCOMP));
 
 	return &ret->advanfuncs;
 }

@@ -345,7 +345,7 @@ double* pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate)
 {
 	let ret = advanstate->advan->eigen_sysmat_data;
 	if (!ret) {
-		fprintf(stderr, "fatal: advancer isnt eigensystem, but asking for system matrix\n");
+		fprintf(stderr, "fatal: advancer does not need eigensystem to be defined\n");
 		exit(EXIT_FAILURE);
 	}
 	return ret;
@@ -366,4 +366,12 @@ double record_variable(const char* name, const POPPARAM* const popparam, const R
 	return DATA_FIELD(record, realoffset);
 }
 */
+
+void advan_ensure(const int flag, const char* fname, const char* message)
+{
+	if (!flag) {
+		printf("fatal: %s: %s\n", fname, message);
+		exit(EXIT_FAILURE);
+	}
+}
 

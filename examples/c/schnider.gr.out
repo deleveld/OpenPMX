@@ -1,132 +1,185 @@
 OpenPMX 0.1.2 hash c8d5137
-config pthread 11 notserver linux
+config pthread 35 notserver linux
 data records 1102 observations 1006 individuals 24
 data table offset true
 advan model eigensystem (general linear)
 advan nstate 3
 optim FOCEI BOBYQA
 checkout begin
-tpool: start (11) 0 1 2 3 4 5 6 7 8 9
+nthread (35) limited to number of individuals (24)
+tpool: start (24) 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22
 checkout end
 stabilize begin
-time 0.010 neval 1 objfn -2687.702196
-time 0.012 neval 2 objfn -2686.942777
-time 0.014 neval 3 objfn -2686.971567
-time 0.016 neval 4 objfn -2686.971085
+time 0.041 neval 1 objfn -2687.702196
+time 0.045 neval 2 objfn -2686.942777
+time 0.050 neval 3 objfn -2686.971567
+time 0.055 neval 4 objfn -2686.971085
 stabilize iter 3
-time 0.016 neval 4 objfn -2686.971085
+time 0.055 neval 4 objfn -2686.971085
 optim rho 0.2 0.05
-time 0.022 neval 6 objfn -2694.303831
-time 0.032 neval 8 objfn -2763.514302
-time 0.164 neval 32 objfn -2854.806797
-time 0.171 neval 33 objfn -2974.123435
-time 0.177 neval 34 objfn -3001.164790
-time 0.188 neval 36 objfn -3008.021027
-time 0.198 neval 38 objfn -3011.701873
-time 0.218 neval 42 objfn -3012.388853
-time 0.225 neval 43 objfn -3014.737398
-time 0.230 neval 44 objfn -3016.180592
-time 0.235 neval 45 objfn -3016.589981
-time 0.241 neval 46 objfn -3021.347333
-time 0.246 neval 47 objfn -3022.823063
-time 0.263 neval 50 objfn -3024.685177
-time 0.284 neval 54 objfn -3025.388146
-time 0.295 neval 56 objfn -3026.473937
-time 0.301 neval 57 objfn -3027.656855
-time 0.306 neval 58 objfn -3028.512674
-time 0.310 neval 59 objfn -3030.066302
-time 0.316 neval 60 objfn -3032.014663
-time 0.322 neval 61 objfn -3032.429935
-time 0.328 neval 62 objfn -3032.989085
-time 0.333 neval 63 objfn -3034.833241
-time 0.337 neval 64 objfn -3035.567014
-time 0.369 neval 70 objfn -3036.757739
-time 0.375 neval 71 objfn -3038.271275
-time 0.384 neval 73 objfn -3038.274226
-time 0.401 neval 76 objfn -3038.675076
-time 0.406 neval 77 objfn -3039.118948
-time 0.411 neval 78 objfn -3039.807886
-time 0.416 neval 79 objfn -3040.420489
-time 0.421 neval 80 objfn -3040.978311
-time 0.436 neval 83 objfn -3041.791875
-time 0.464 neval 88 objfn -3041.983366
-time 0.470 neval 89 objfn -3043.233347
-time 0.476 neval 90 objfn -3043.748671
-time 0.483 neval 91 objfn -3044.533802
-time 0.489 neval 92 objfn -3045.106622
-time 0.504 neval 95 objfn -3046.383238
-time 0.521 neval 98 objfn -3046.626894
-time 0.527 neval 99 objfn -3046.665166
-time 0.574 neval 108 objfn -3047.047944
-time 0.604 neval 114 objfn -3047.386270
-time 0.608 neval 115 objfn -3047.436119
-time 0.614 neval 116 objfn -3047.671675
-time 0.648 neval 123 objfn -3047.846526
-time 0.657 neval 125 objfn -3047.909194
-time 0.682 neval 130 objfn -3047.909194
+time 0.070 neval 6 objfn -2694.303831
+time 0.093 neval 8 objfn -2763.514302
+time 0.444 neval 32 objfn -2854.806797
+time 0.462 neval 33 objfn -2974.123435
+time 0.474 neval 34 objfn -3001.164790
+time 0.500 neval 36 objfn -3008.021027
+time 0.529 neval 38 objfn -3011.701873
+time 0.580 neval 42 objfn -3012.388853
+time 0.592 neval 43 objfn -3014.737398
+time 0.604 neval 44 objfn -3016.180592
+time 0.615 neval 45 objfn -3016.589981
+time 0.628 neval 46 objfn -3021.347333
+time 0.644 neval 47 objfn -3022.823063
+time 0.679 neval 50 objfn -3024.685177
+time 0.727 neval 54 objfn -3025.388146
+time 0.749 neval 56 objfn -3026.473937
+time 0.762 neval 57 objfn -3027.656855
+time 0.774 neval 58 objfn -3028.512674
+time 0.784 neval 59 objfn -3030.066302
+time 0.796 neval 60 objfn -3032.014663
+time 0.807 neval 61 objfn -3032.429935
+time 0.819 neval 62 objfn -3032.989085
+time 0.831 neval 63 objfn -3034.833241
+time 0.842 neval 64 objfn -3035.567014
+time 0.908 neval 70 objfn -3036.757739
+time 0.920 neval 71 objfn -3038.271275
+time 0.942 neval 73 objfn -3038.274226
+time 0.975 neval 76 objfn -3038.675076
+time 0.986 neval 77 objfn -3039.118948
+time 0.995 neval 78 objfn -3039.807886
+time 1.004 neval 79 objfn -3040.420489
+time 1.015 neval 80 objfn -3040.978311
+time 1.050 neval 83 objfn -3041.791875
+time 1.098 neval 88 objfn -3041.983366
+time 1.112 neval 89 objfn -3043.233347
+time 1.124 neval 90 objfn -3043.748671
+time 1.137 neval 91 objfn -3044.533802
+time 1.147 neval 92 objfn -3045.106622
+time 1.180 neval 95 objfn -3046.383238
+time 1.212 neval 98 objfn -3046.626894
+time 1.223 neval 99 objfn -3046.665166
+time 1.316 neval 108 objfn -3047.047944
+time 1.371 neval 114 objfn -3047.386183
+time 1.383 neval 115 objfn -3047.435212
+time 1.395 neval 116 objfn -3047.673776
+time 1.466 neval 123 objfn -3047.849879
+time 1.533 neval 130 objfn -3047.849879
 optim rho 0.05 6.05545e-05
-time 0.685 neval 131 objfn -3047.914682
-time 0.733 neval 142 objfn -3047.920133
-time 0.738 neval 143 objfn -3047.952994
-time 0.783 neval 153 objfn -3048.137607
-time 0.803 neval 158 objfn -3048.439223
-time 0.807 neval 159 objfn -3048.904549
-time 0.811 neval 160 objfn -3049.454592
-time 0.815 neval 161 objfn -3049.636764
-time 0.820 neval 162 objfn -3049.691201
-time 0.824 neval 163 objfn -3049.714020
-time 0.827 neval 164 objfn -3049.729962
-time 0.830 neval 165 objfn -3049.768554
-time 0.834 neval 166 objfn -3049.814542
-time 0.837 neval 167 objfn -3049.858999
-time 0.856 neval 171 objfn -3049.880681
-time 0.893 neval 178 objfn -3050.111326
-time 0.897 neval 179 objfn -3050.153120
-time 0.901 neval 180 objfn -3050.202537
-time 0.905 neval 181 objfn -3050.218968
-time 0.918 neval 184 objfn -3050.253854
-time 0.940 neval 189 objfn -3050.271363
-time 0.943 neval 190 objfn -3050.280983
-time 0.967 neval 196 objfn -3050.298876
-time 0.970 neval 197 objfn -3050.305977
-time 0.977 neval 199 objfn -3050.308196
-time 0.989 neval 202 objfn -3050.416460
-time 1.023 neval 211 objfn -3050.420042
-time 1.027 neval 212 objfn -3050.421882
-time 1.041 neval 216 objfn -3050.423243
-time 1.048 neval 218 objfn -3050.424515
-time 1.053 neval 219 objfn -3050.434069
-time 1.056 neval 220 objfn -3050.436012
-time 1.062 neval 222 objfn -3050.436089
-time 1.103 neval 234 objfn -3050.437936
-time 1.106 neval 235 objfn -3050.438590
-time 1.111 neval 237 objfn -3050.438665
-time 1.117 neval 239 objfn -3050.438999
-time 1.134 neval 245 objfn -3050.439410
-time 1.145 neval 249 objfn -3050.439692
-time 1.150 neval 251 objfn -3050.439865
-time 1.173 neval 259 objfn -3050.439867
-time 1.178 neval 261 objfn -3050.439931
-time 1.187 neval 265 objfn -3050.440110
-time 1.263 neval 293 objfn -3050.440110
+time 1.643 neval 143 objfn -3047.898991
+time 1.736 neval 153 objfn -3048.067416
+time 1.777 neval 158 objfn -3048.384870
+time 1.788 neval 159 objfn -3048.855552
+time 1.800 neval 160 objfn -3049.390976
+time 1.811 neval 161 objfn -3049.623401
+time 1.819 neval 162 objfn -3049.648858
+time 1.827 neval 163 objfn -3049.679542
+time 1.841 neval 165 objfn -3049.721758
+time 1.862 neval 167 objfn -3049.789105
+time 1.954 neval 176 objfn -3049.985928
+time 1.964 neval 177 objfn -3050.068062
+time 1.992 neval 180 objfn -3050.093062
+time 2.000 neval 181 objfn -3050.104982
+time 2.010 neval 182 objfn -3050.150159
+time 2.056 neval 187 objfn -3050.165233
+time 2.065 neval 188 objfn -3050.175102
+time 2.136 neval 196 objfn -3050.215002
+time 2.174 neval 201 objfn -3050.216933
+time 2.183 neval 202 objfn -3050.218918
+time 2.191 neval 203 objfn -3050.222394
+time 2.197 neval 204 objfn -3050.226458
+time 2.204 neval 205 objfn -3050.229022
+time 2.227 neval 208 objfn -3050.233018
+time 2.233 neval 209 objfn -3050.237869
+time 2.241 neval 210 objfn -3050.243165
+time 2.248 neval 211 objfn -3050.244210
+time 2.253 neval 212 objfn -3050.247653
+time 2.261 neval 213 objfn -3050.250207
+time 2.269 neval 214 objfn -3050.254947
+time 2.279 neval 215 objfn -3050.256630
+time 2.304 neval 218 objfn -3050.261798
+time 2.312 neval 219 objfn -3050.274096
+time 2.319 neval 220 objfn -3050.281023
+time 2.336 neval 222 objfn -3050.294298
+time 2.342 neval 223 objfn -3050.297118
+time 2.351 neval 224 objfn -3050.301203
+time 2.377 neval 227 objfn -3050.307194
+time 2.384 neval 228 objfn -3050.312141
+time 2.393 neval 229 objfn -3050.322127
+time 2.417 neval 232 objfn -3050.328147
+time 2.424 neval 233 objfn -3050.335256
+time 2.450 neval 236 objfn -3050.344306
+time 2.478 neval 239 objfn -3050.344505
+time 2.496 neval 241 objfn -3050.368810
+time 2.520 neval 244 objfn -3050.374648
+time 2.542 neval 247 objfn -3050.376324
+time 2.547 neval 248 objfn -3050.379356
+time 2.555 neval 249 objfn -3050.379764
+time 2.569 neval 251 objfn -3050.383442
+time 2.575 neval 252 objfn -3050.383930
+time 2.581 neval 253 objfn -3050.385117
+time 2.589 neval 254 objfn -3050.386106
+time 2.603 neval 256 objfn -3050.390303
+time 2.609 neval 257 objfn -3050.391133
+time 2.615 neval 258 objfn -3050.393167
+time 2.638 neval 261 objfn -3050.397190
+time 2.646 neval 262 objfn -3050.398935
+time 2.672 neval 265 objfn -3050.401017
+time 2.694 neval 268 objfn -3050.401677
+time 2.717 neval 271 objfn -3050.405289
+time 2.723 neval 272 objfn -3050.406485
+time 2.729 neval 273 objfn -3050.408083
+time 2.735 neval 274 objfn -3050.409933
+time 2.792 neval 281 objfn -3050.411222
+time 2.807 neval 283 objfn -3050.413300
+time 2.846 neval 288 objfn -3050.415322
+time 2.881 neval 293 objfn -3050.417726
+time 2.896 neval 295 objfn -3050.418100
+time 2.904 neval 296 objfn -3050.419482
+time 2.933 neval 300 objfn -3050.419754
+time 2.954 neval 303 objfn -3050.422260
+time 3.111 neval 331 objfn -3050.422367
+time 3.138 neval 336 objfn -3050.422403
+time 3.257 neval 359 objfn -3050.422403
 optim rho 0.05 6.05545e-05
-time 1.485 neval 355 objfn -3050.440675
-time 1.561 neval 385 objfn -3050.440675
+time 3.461 neval 383 objfn -3050.428909
+time 3.524 neval 391 objfn -3050.429593
+time 3.551 neval 394 objfn -3050.429605
+time 3.566 neval 396 objfn -3050.430502
+time 3.573 neval 397 objfn -3050.432939
+time 3.606 neval 402 objfn -3050.433031
+time 3.619 neval 404 objfn -3050.434335
+time 3.626 neval 405 objfn -3050.434538
+time 3.640 neval 407 objfn -3050.435193
+time 3.647 neval 408 objfn -3050.436525
+time 3.654 neval 409 objfn -3050.436717
+time 3.668 neval 411 objfn -3050.437264
+time 3.688 neval 414 objfn -3050.437761
+time 3.694 neval 415 objfn -3050.438128
+time 3.707 neval 417 objfn -3050.438607
+time 3.712 neval 418 objfn -3050.439413
+time 3.752 neval 423 objfn -3050.439523
+time 3.767 neval 425 objfn -3050.441538
+time 3.775 neval 426 objfn -3050.442103
+time 3.899 neval 444 objfn -3050.442485
+time 4.044 neval 472 objfn -3050.442485
+optim rho 0.05 6.05545e-05
+time 4.564 neval 538 objfn -3050.442567
+time 4.671 neval 559 objfn -3050.442567
 popmodel final
-time 1.561 neval 385 objfn -3050.440675 nparam 13
+time 4.671 neval 559 objfn -3050.442567 nparam 13
 THETA(6)
-       5.4875
-      24.1747
-      284.859
-      1.93279
-      1.38376
-     0.867905
+      5.49829
+       24.117
+       284.25
+      1.93434
+      1.38253
+     0.867819
 OMEGA(6)
-    0.0815256 
-            0     0.0869254 
-            0             0     0.0314972 
-            0             0             0      0.017428 
-            0             0             0             0      0.107568 
-            0             0             0             0             0      0.022584 
+    0.0819959 
+            0     0.0882077 
+            0             0      0.032528 
+            0             0             0     0.0175302 
+            0             0             0             0      0.106506 
+            0             0             0             0             0     0.0228312 
 SIGMA(1)
-     0.051846 
+    0.0518188 

@@ -50,11 +50,11 @@ typedef struct {
 	double hstart;
 	const gsl_odeiv2_step_type* steptype;
 	char steptype_name[STEPTYPE_NAME_LENGTH];
-} ADVANTABLE_LIBGSL;
+} ADVANFUNCS_LIBGSL;
 
 static void advancer_diffeqn_libgsl_info(const struct ADVANFUNCS* const advanfuncs, FILE* f)
 {
-	let libgsl = container_of(advanfuncs, ADVANTABLE_LIBGSL, advanfuncs);
+	let libgsl = container_of(advanfuncs, ADVANFUNCS_LIBGSL, advanfuncs);
 
 	fprintf(f, "advan model GNU Scientific Library ODE\n");
 	fprintf(f, "advan stepper %s\n", libgsl->steptype_name);
@@ -84,7 +84,7 @@ static int advancer_diffeqn_libgsl_wrapper(double T, const double* A, double* DA
 static void advancer_diffeqn_libgsl_construct(ADVAN* advan, const ADVANFUNCS* const advanfuncs)
 {
 	let advandes = container_of(advan, ADVANCER_LIBGSL, advan);
-	let libgsl = container_of(advanfuncs, ADVANTABLE_LIBGSL, advanfuncs);
+	let libgsl = container_of(advanfuncs, ADVANFUNCS_LIBGSL, advanfuncs);
 
 	assert(advanfuncs->advan_size == sizeof(ADVANCER_LIBGSL));
 	advan_base_construct(advan, advanfuncs); /* zeros full size */
@@ -117,7 +117,7 @@ static void advancer_diffeqn_libgsl_destruct(ADVAN * advan)
 static void advancer_diffeqn_libgsl_reset(ADVAN * advan, const int full)
 {
 	let advandes = container_of(advan, ADVANCER_LIBGSL, advan);
-	let libgsl = container_of(advan->advanfuncs, ADVANTABLE_LIBGSL, advanfuncs);
+	let libgsl = container_of(advan->advanfuncs, ADVANFUNCS_LIBGSL, advanfuncs);
 
 	gsl_odeiv2_driver_reset(advandes->d);
 	if (full)
@@ -175,7 +175,7 @@ ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const A
 	assert(advanconfig->diffeqn);
 	assert(advanconfig->nstate);
 
-	var retinit = (ADVANTABLE_LIBGSL) {
+	var retinit = (ADVANFUNCS_LIBGSL) {
 		.advanfuncs = {
 			.advan_size = sizeof(ADVANCER_LIBGSL),
 			.construct = advancer_diffeqn_libgsl_construct,
@@ -238,9 +238,9 @@ ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const A
 	if (retinit.reltol == 0.)
 		retinit.reltol = DEFAULT_RELTOL;
 
-	ADVANTABLE_LIBGSL* ret = malloc(sizeof(ADVANTABLE_LIBGSL));
+	ADVANFUNCS_LIBGSL* ret = malloc(sizeof(ADVANFUNCS_LIBGSL));
 	assert(ret);
-	memcpy(ret, &retinit, sizeof(ADVANTABLE_LIBGSL));
+	memcpy(ret, &retinit, sizeof(ADVANFUNCS_LIBGSL));
 
 	return &ret->advanfuncs;
 }
