@@ -440,8 +440,8 @@ static void advancer_eigen_threecomp_construct(ADVAN* advan,
 {
 	advancer_eigen_construct(advan,advanfuncs);
 	
-	/* hide the system matrix pointer that exposes, because we do it 
-	 * ourselves. Any other use would be an error. */
+	/* hide the system matrix pointer that eigensolver exposes, because
+	 * we do it ourselves. Any other use would be an error. */
 	advan->eigen_sysmat_data = 0;
 }
 
@@ -451,7 +451,7 @@ static void advancer_eigen_threecomp_destruct(ADVAN* advan)
 }
 
 static void advancer_eigen_threecomp_info(const struct ADVANFUNCS* const advanfuncs,
-                                FILE* f)
+										  FILE* f)
 {
     fprintf(f, "advan model eigensystem (three compartment)\n");
     fprintf(f, "advan nstate %i\n", advanfuncs->nstate);
@@ -510,7 +510,9 @@ static void advancer_eigen_threecomp_advance_interval(ADVAN* advan,
 		/* resetting the last_recalc_initcount should be done in the 
 		 * advancer_eigen_advance_interval() function, dont do it here */
 	}
- 	advancer_eigen_advance_interval(advan, imodel, record, state, popparam, endtime, rates);
+
+	/* pass the advance down to the eigensystem advancer */
+	advancer_eigen_advance_interval(advan, imodel, record, state, popparam, endtime, rates);
 }
 
 ADVANFUNCS* pmx_advan_eigen_threecomp(const DATACONFIG* const dataconfig,
@@ -562,12 +564,12 @@ ADVANFUNCS* pmx_advan_eigen_threecomp(const DATACONFIG* const dataconfig,
  *----------------------------------------------------------------------*/
 
 static void advancer_eigen_twocomp_construct(ADVAN* advan,
-											   const struct ADVANFUNCS* const advanfuncs)
+											 const struct ADVANFUNCS* const advanfuncs)
 {
 	advancer_eigen_construct(advan,advanfuncs);
 	
-	/* hide the system matrix pointer that exposes, because we do it 
-	 * ourselves. Any other use would be an error. */
+	/* hide the system matrix pointer that eigensolver exposes, because
+	 * we do it ourselves. Any other use would be an error. */
 	advan->eigen_sysmat_data = 0;
 }
 
@@ -628,6 +630,8 @@ static void advancer_eigen_twocomp_advance_interval(ADVAN* advan,
 		/* resetting the last_recalc_initcount should be done in the 
 		 * advancer_eigen_advance_interval() function, dont do it here */
 	}
+	
+	/* pass the advance down to the eigensystem advancer */
  	advancer_eigen_advance_interval(advan, imodel, record, state, popparam, endtime, rates);
 }
 

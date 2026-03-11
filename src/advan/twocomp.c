@@ -78,7 +78,7 @@ static void advancer_twocomp_advance_interval(ADVAN* advan,
 
 	assert(advan->initcount > 0);
 
-	const double time = advan->time;
+	let time = advan->time;
 
 	/* this advancer can only allow doses to first compartment */
 	assert(endtime > time);
@@ -87,41 +87,41 @@ static void advancer_twocomp_advance_interval(ADVAN* advan,
 
 //	const ADVANFUNCS_TWOCOMP* const imodeloffsets = (const ADVANFUNCS_TWOCOMP*)advan->advanfuncs;
 	let imodeloffsets = container_of(advan->advanfuncs, ADVANFUNCS_TWOCOMP, advanfuncs);
-	const double V1 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV1);
-	const double V2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV2);
-	const double CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
-	const double Q12 = *(const double*)(((char*)imodel) + imodeloffsets->offsetQ2);
+	let V1 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV1);
+	let V2 = *(const double*)(((char*)imodel) + imodeloffsets->offsetV2);
+	let CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
+	let Q12 = *(const double*)(((char*)imodel) + imodeloffsets->offsetQ2);
 
 	/* ADVAN 2-compartment code obtained from: Abuhelwa AY, Foster DJ, Upton RN. ADVAN-style analytical solutions for common pharmacokinetic imodels.
 	   Journal of pharmacological and toxicological methods. 2015 Jun 30;73:42-8. */
-	const double k10 = CL/V1;
-	const double k12 = Q12/V1;
-	const double k21 = k12*V1/V2;
-	const double k20 = 0.;
-	const double E1 = k10+k12;
-	const double E2 = k21+k20;
+	let k10 = CL/V1;
+	let k12 = Q12/V1;
+	let k21 = k12*V1/V2;
+	let k20 = 0.;
+	let E1 = k10+k12;
+	let E2 = k21+k20;
 
     /* calculate hybrid rate constants */
-    const double lambda1 = 0.5*((E1+E2)+sqrt(pow(E1+E2,2)-4.*(E1*E2-k12*k21)));
-    const double lambda2 = 0.5*((E1+E2)-sqrt(pow(E1+E2,2)-4.*(E1*E2-k12*k21)));
+    let lambda1 = 0.5*((E1+E2)+sqrt(pow(E1+E2,2)-4.*(E1*E2-k12*k21)));
+    let lambda2 = 0.5*((E1+E2)-sqrt(pow(E1+E2,2)-4.*(E1*E2-k12*k21)));
 
 #define A1 (state[0])
 #define A2 (state[1])
-	const double t = endtime - time; /* change in time */
-	const double A1last = A1;
-	const double A2last = A2;
-	const double Doserate = rates[0];
+	let t = endtime - time; /* change in time */
+	let A1last = A1;
+	let A2last = A2;
+	let Doserate = rates[0];
 
 	/* cached values for greater speed */
-	const double exp_t_lambda1 = exp(-t*lambda1);
-	const double exp_t_lambda2 = exp(-t*lambda2);
+	let exp_t_lambda1 = exp(-t*lambda1);
+	let exp_t_lambda2 = exp(-t*lambda2);
 
-	const double A1term1 = (((A1last*E2+Doserate+A2last*k21)-A1last*lambda1)*exp_t_lambda1-((A1last*E2+Doserate+A2last*k21)-A1last*lambda2)*exp_t_lambda2)/(lambda2-lambda1);
-	const double A1term2 = Doserate*E2*(1./(lambda1*lambda2)+exp_t_lambda1/(lambda1*(lambda1-lambda2))-exp_t_lambda2/(lambda2*(lambda1-lambda2)));
+	let A1term1 = (((A1last*E2+Doserate+A2last*k21)-A1last*lambda1)*exp_t_lambda1-((A1last*E2+Doserate+A2last*k21)-A1last*lambda2)*exp_t_lambda2)/(lambda2-lambda1);
+	let A1term2 = Doserate*E2*(1./(lambda1*lambda2)+exp_t_lambda1/(lambda1*(lambda1-lambda2))-exp_t_lambda2/(lambda2*(lambda1-lambda2)));
 	A1 = A1term1+A1term2; /* Amount in the central compartment */
 
-	const double A2term1 = (((A2last*E1+A1last*k12)-A2last*lambda1)*exp_t_lambda1-((A2last*E1+A1last*k12)-A2last*lambda2)*exp_t_lambda2)/(lambda2-lambda1);
-	const double A2term2 = Doserate*k12*(1./(lambda1*lambda2)+exp_t_lambda1/(lambda1*(lambda1-lambda2))-exp_t_lambda2/(lambda2*(lambda1-lambda2)));
+	let A2term1 = (((A2last*E1+A1last*k12)-A2last*lambda1)*exp_t_lambda1-((A2last*E1+A1last*k12)-A2last*lambda2)*exp_t_lambda2)/(lambda2-lambda1);
+	let A2term2 = Doserate*k12*(1./(lambda1*lambda2)+exp_t_lambda1/(lambda1*(lambda1-lambda2))-exp_t_lambda2/(lambda2*(lambda1-lambda2)));
 	A2 = A2term1+A2term2; /* Amount in the peripheral compartment */
 #undef A1
 #undef A2

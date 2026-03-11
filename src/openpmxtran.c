@@ -67,7 +67,7 @@ static void string_appendfv(STRING* v, const char* format, va_list args1)
     va_end(args2);
 
 	/* reserve some space including zero terminator and do print at the old end */
-	let oldsize = vector_size(*v);
+	let oldsize = v->size;
     vector_resize(*v, oldsize + nchars + 1);
 	char* oldend = &v->rawptr[oldsize];
     vsnprintf(oldend, nchars + 1, format, args1);
@@ -273,7 +273,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 
 	strip_firstlast_space(buffer);
 
-	assert(vector_size(*fieldnames) == 0);
+	assert(fieldnames->size == 0);
 
 	string_append(data, "typedef struct RECORD {\n");
 	string_append(data, "\tdouble ");
@@ -302,7 +302,7 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 				 * strip_firstlast_space() so we have the correct name */
 				check_reserved_name(s, "datafile");
 
-				if (vector_size(*fieldnames) != 1)
+				if (fieldnames->size != 1)
 					string_append(data, ", ");
 				string_append(data, s);
 			}
@@ -325,12 +325,12 @@ static void load_datafile_write_dataconfig(const char* datafile, STRING* data, S
 				}
 				string_append(data, s);
 				free(s);
-				if (n < vector_size(*fieldnames) - 1)
+				if (n < fieldnames->size - 1)
 					string_append(data, ",");
 				++n;
 			}
-			if (n != vector_size(*fieldnames))
-				fatal("number fields in data line %i does not match header (%i)", n, vector_size(*fieldnames));
+			if (n != fieldnames->size)
+				fatal("number fields in data line %i does not match header (%i)", n, fieldnames->size);
 			string_append(data, "\t},\n");
 		}
 		++nrows;
@@ -439,8 +439,7 @@ static char* match_brackets(char* p, int level)
 /// the data filename.
 static void parse_data_with_filename(PARSERESULT* res, char* p)
 {
-	if (vector_size(res->data) ||
-		vector_size(res->record_field_names))
+	if (res->data.size || res->record_field_names.size)
 		fatal("more than one $DATA \"%s\"", p);
 
 	var endvars = match_brackets(p, 1);
@@ -464,8 +463,7 @@ static void parse_data_with_filename(PARSERESULT* res, char* p)
 /// second argument.
 static void parse_data_without_filename(PARSERESULT* res, char* p, const char* filename)
 {
-	if (vector_size(res->data) ||
-		vector_size(res->record_field_names))
+	if (res->data.size || res->record_field_names.size)
 		fatal("more than one $DATA \"%s\"", p);
 
 	if (!filename || strlen(filename) == 0) 
@@ -483,7 +481,7 @@ static void parse_data_without_filename(PARSERESULT* res, char* p, const char* f
 /// advancer method.
 static void parse_advan_init(PARSERESULT* res, char* p)
 {
-	if (vector_size(res->advan_init))
+	if (res->advan_init.size)
 		fatal("more than one $ADVAN \"%s\"", p);
 
 	var endvars = match_brackets(p, 1);
@@ -557,8 +555,8 @@ static void get_delim_tokens(char* p, STRINGS* namevec)
 /// space.
 static void parse_imodel(PARSERESULT* res, char* p)
 {
-	if (vector_size(res->imodel_field_names) ||
-		vector_size(res->imodel_fields_code))
+	if (res->imodel_field_names.size ||
+		res->imodel_fields_code.size)
 		fatal("more than one $IMODEL \"%s\"", p);
 
 	/* parse field names */
@@ -584,8 +582,8 @@ static void parse_imodel(PARSERESULT* res, char* p)
 /// with comma or space.
 static void parse_predict(PARSERESULT* res, char* p)
 {
-	if (vector_size(res->predict_field_names) ||
-		vector_size(res->predict_fields_code))
+	if (res->predict_field_names.size ||
+		res->predict_fields_code.size)
 		fatal("more than one $PREDICT \"%s\"", p);
 
 	/* parse field names */
@@ -610,7 +608,7 @@ static void parse_predict(PARSERESULT* res, char* p)
 /// compartment differential equation for the ODE solver.
 static void parse_diffeqn(PARSERESULT* res, char* p)
 {
-	if (vector_size(res->imodel_diffeqn_code))
+	if (res->imodel_diffeqn_code.size)
 		fatal("more than one $DIFFEQN \"%s\"", p);
 
 	strip_firstlast_space(p);
@@ -620,7 +618,7 @@ static void parse_diffeqn(PARSERESULT* res, char* p)
 /// In the $THETA() block is a initializer for a THETA struct.
 static void parse_theta(PARSERESULT* res, char* p)
 {
-	if (vector_size(res->theta_init))
+	if (res->theta_init.size)
 		fatal("more than one $THETA \"%s\"", p);
 
 	strip_firstlast_space(p);
@@ -652,7 +650,7 @@ static void parse_omega(PARSERESULT* res, char* p)
 
 	STRINGS s = { 0 };
 	get_delim_tokens(p, &s);
-	let ndim = vector_size(s);
+	let ndim = s.size;
 	string_appendf(&res->omega_init, "\t\t{ OMEGA_DIAG, %i, { ", ndim);
 	forvector(i, s)
 		string_appendf(&res->omega_init, "%s, ", s.ptr[i]);
@@ -680,7 +678,7 @@ static void parse_omegablock(PARSERESULT* res, char* p)
 	/* https://www.wolframalpha.com/input?i2d=true&i=solve+k%5C%2844%29+n%3Dk*Divide%5B%5C%2840%29k%2B1%5C%2841%29%2C2%5D */
 	STRINGS s = { 0 };
 	get_delim_tokens(p, &s);
-	let n = vector_size(s);
+	let n = s.size;
 	let ndim = (int)floor((sqrt(8 * n + 1) - 1) / 2);
 
 	/* TODO: maybe put some error checking on the dimension */
@@ -717,7 +715,7 @@ static void parse_omegasameblock(PARSERESULT* res, char* p)
 /// variances.
 static void parse_sigma(PARSERESULT* res, char* p)
 {
-	if (vector_size(res->sigma_init))
+	if (res->sigma_init.size)
 		fatal("more than one $SIGMA \"%s\"", p);
 
 	char* after = 0;
@@ -744,7 +742,7 @@ static void parse_sigma(PARSERESULT* res, char* p)
 /// The $MAIN block contains the C code for the main analysis.
 static void parse_main(PARSERESULT* res, char* p)
 {
-	if (vector_size(res->analysis_code))
+	if (res->analysis_code.size)
 		fatal("More than one $MAIN \"%s\"", p);
 
 	strip_firstlast_space(p);
@@ -852,7 +850,7 @@ int main(int argc, char* argv[])
 
 	/* if $DATA is wholly missing then it must be passed on the command
 	 * line */
-	if (vector_size(res.record_field_names) == 0) {
+	if (res.record_field_names.size == 0) {
 		if (!datafilename || strlen(datafilename) == 0) 
 			fatal("$DATA identifier missing and no datafile passed");
 		parse_data_without_filename(&res, "", datafilename);
@@ -872,13 +870,13 @@ extern char openpmxtran_template[];
 	if (res.advan_method == 0)
 		fatal("$ADVAN() method missing");
 
-	if (vector_size(res.imodel_fields_code) == 0)
+	if (res.imodel_fields_code.size == 0)
 		fatal("$IMODEL() code missing");
 
-	if (vector_size(res.predict_fields_code) == 0)
+	if (res.predict_fields_code.size == 0)
 		fprintf(stdout, "warning: $PREDICT() code missing\n");
 
-	if (vector_size(res.analysis_code) == 0)
+	if (res.analysis_code.size == 0)
 		fatal("$MAIN code missing");
 
 	const char last_begin = *begin;
@@ -936,7 +934,7 @@ extern char openpmxtran_template[];
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_DATA_PREPROCESS_CODE}\n", &i, false)) {
-			if (vector_size(res.data_preprocess_code))
+			if (res.data_preprocess_code.size)
 				string_appendf(&res.output, "%s\n", res.data_preprocess_code.ptr);
 			else
 				string_appendf(&res.output, "	/* no data preprocess */\n");
@@ -991,7 +989,7 @@ extern char openpmxtran_template[];
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_IMODEL_DIFFEQN_CODE}\n", &i, false)) {
-			if (vector_size(res.imodel_diffeqn_code)) {
+			if (res.imodel_diffeqn_code.size) {
 				if (res.needs_diffeqn == false)
 					fatal("This $ADVAN does not require $DIFFEQN");
 				string_appendf(&res.output, "\t%s\n", res.imodel_diffeqn_code.ptr);
@@ -1002,7 +1000,7 @@ extern char openpmxtran_template[];
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_PREDICT_CODE}\n", &i, false)) {
 			string_append(&res.output, res.predict_state_maybe_unused);
-			if (vector_size(res.predict_fields_code) != 0)
+			if (res.predict_fields_code.size != 0)
 				string_appendf(&res.output, "\t%s\n", res.predict_fields_code.ptr);
 			string_append(&res.output, begin + i);
 
@@ -1033,15 +1031,15 @@ extern char openpmxtran_template[];
 			string_append(&res.output, begin + i);
 
 		} else if (match_recordname(begin, "${OPENPMXTRAN_THETA_INIT}\n", &i, false)) {
-			if (vector_size(res.theta_init)) 
+			if (res.theta_init.size) 
 				string_appendf(&res.output, "\t%s\n", res.theta_init.ptr);
 			string_append(&res.output, begin + i);
 		} else if (match_recordname(begin, "${OPENPMXTRAN_OMEGA_INIT}\n", &i, false)) {
-			if (vector_size(res.omega_init)) 
+			if (res.omega_init.size) 
 				string_appendf(&res.output, "\t%s\n", res.omega_init.ptr);
 			string_append(&res.output, begin + i);
 		} else if (match_recordname(begin, "${OPENPMXTRAN_SIGMA_INIT}\n", &i, false)) {
-			if (vector_size(res.sigma_init)) 
+			if (res.sigma_init.size) 
 				string_appendf(&res.output, "\t%s\n", res.sigma_init.ptr);
 			string_append(&res.output, begin + i);
 		

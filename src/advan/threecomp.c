@@ -178,13 +178,10 @@ static void advancer_threecomp_advance_interval(ADVAN* advan,
 	let lambda2 = advanthreecomp->lambda2;
 	let lambda3 = advanthreecomp->lambda3;
 
-#define A1 (state[0])
-#define A2 (state[1])
-#define A3 (state[2])
 	let t = endtime - time; /* change in time */
-	let A1last = A1;
-	let A2last = A2;
-	let A3last = A3;
+	let A1last = state[0];
+	let A2last = state[1];
+	let A3last = state[2];
 	let Doserate = rates[0];
 
 	let B = A2last*k21+A3last*k31;
@@ -196,67 +193,71 @@ static void advancer_threecomp_advance_interval(ADVAN* advan,
 	let exp_t_lambda1 = exp(-t*lambda1);
 	let exp_t_lambda2 = exp(-t*lambda2);
 	let exp_t_lambda3 = exp(-t*lambda3);
-	let div_lambda2131 = 1./((lambda2-lambda1)*(lambda3-lambda1));
-	let div_lambda1213 = 1./((lambda1-lambda2)*(lambda1-lambda3));
-	let div_lambda1223 = 1./((lambda1-lambda2)*(lambda2-lambda3));
-	let div_lambda1232 = 1./((lambda1-lambda2)*(lambda3-lambda2));
-	let div_lambda1323 = 1./((lambda1-lambda3)*(lambda2-lambda3));
-	let div_lambda1332 = 1./((lambda1-lambda3)*(lambda3-lambda2));
-	let div_lambda12131 = 1./(lambda1*(lambda2-lambda1)*(lambda3-lambda1));
-	let div_lambda21232 = 1./(lambda2*(lambda1-lambda2)*(lambda3-lambda2));
-	let div_lambda31323 = 1./(lambda3*(lambda1-lambda3)*(lambda2-lambda3));
-	let div_lambda123 = 1./(lambda1*lambda2*lambda3);
-	let E1l1 = E1-lambda1;
+	let exp_t_lambda1_div_lambda2131 = exp_t_lambda1/((lambda2-lambda1)*(lambda3-lambda1));
+	let exp_t_lambda2_div_lambda1232 = exp_t_lambda2/((lambda1-lambda2)*(lambda3-lambda2));
+	let exp_t_lambda3_div_lambda1323 = exp_t_lambda3/((lambda1-lambda3)*(lambda2-lambda3));
+	let exp_t_lambda1_div_lambda1213 = exp_t_lambda1/((lambda1-lambda2)*(lambda1-lambda3));
+	let exp_t_lambda2_div_lambda1223 = exp_t_lambda2/((lambda1-lambda2)*(lambda2-lambda3));
+	let exp_t_lambda3_div_lambda1332 = exp_t_lambda3/((lambda1-lambda3)*(lambda3-lambda2));
 	let E2l1 = E2-lambda1;
 	let E3l1 = E3-lambda1;
 	let E2l2 = E2-lambda2;
 	let E2l3 = E2-lambda3;
 	let E3l3 = E3-lambda3;
+	let E1l1 = E1-lambda1;
 	let E3l2 = E3-lambda2;
 
-	let A1term1 = A1last*(exp_t_lambda1*E2l1*E3l1*div_lambda2131
-						  + exp_t_lambda2*E2l2*E3l2*div_lambda1232
-						  + exp_t_lambda3*E2l3*E3l3*div_lambda1323);
-	let A1term2 = exp_t_lambda1*(C-B*lambda1)*div_lambda1213
-				+ exp_t_lambda2*(B*lambda2-C)*div_lambda1223
-				+ exp_t_lambda3*(B*lambda3-C)*div_lambda1332;
-	/* small optimization where large term does not have to be calulated in Doserate is zero */
-	let A1term3 = (Doserate == 0.) ? 0. : Doserate*((E2*E3)*div_lambda123
-													 - exp_t_lambda1*E2l1*E3l1*div_lambda12131
-													 - exp_t_lambda2*E2l2*E3l2*div_lambda21232
-													 - exp_t_lambda3*E2l3*E3l3*div_lambda31323);
-	A1 = A1term1 + A1term2 + A1term3;    /* Amount in the central compartment */
+	/* first compartment, first and second term */
+	var A1 = A1last*(E2l1*E3l1*exp_t_lambda1_div_lambda2131
+					+ E2l2*E3l2*exp_t_lambda2_div_lambda1232
+					+ E2l3*E3l3*exp_t_lambda3_div_lambda1323)
+		+ (C-B*lambda1)*exp_t_lambda1_div_lambda1213
+		+ (B*lambda2-C)*exp_t_lambda2_div_lambda1223
+		+ (B*lambda3-C)*exp_t_lambda3_div_lambda1332;
 
-	let A2term1 = A2last*(exp_t_lambda1*E1l1*E3l1*div_lambda2131
-						  + exp_t_lambda2*(E1-lambda2)*E3l2*div_lambda1232
-						  + exp_t_lambda3*(E1-lambda3)*E3l3*div_lambda1323);
+	/* second compartment, first and second term */
 	let A1last_k12 = A1last*k12;
-	let A2term2 = exp_t_lambda1*(I-A1last_k12*lambda1)*div_lambda1213
-				+ exp_t_lambda2*(A1last_k12*lambda2-I)*div_lambda1223
-				+ exp_t_lambda3*(A1last_k12*lambda3-I)*div_lambda1332;
-	/* small optimization where large term does not have to be calulated in Doserate is zero */
-	let A2term3 = (Doserate == 0.) ? 0. : Doserate*k12*(E3*div_lambda123
-														 - exp_t_lambda1*E3l1*div_lambda12131
-														 - exp_t_lambda2*E3l2*div_lambda21232
-														 - exp_t_lambda3*E3l3*div_lambda31323);
-	A2 = A2term1 + A2term2 + A2term3;    /* Amount in the first-peripheral compartment */
+	var A2 = A2last*(E1l1*E3l1*exp_t_lambda1_div_lambda2131
+					+ (E1-lambda2)*E3l2*exp_t_lambda2_div_lambda1232
+					+ (E1-lambda3)*E3l3*exp_t_lambda3_div_lambda1323)
+		+ (I-A1last_k12*lambda1)*exp_t_lambda1_div_lambda1213
+		+ (A1last_k12*lambda2-I)*exp_t_lambda2_div_lambda1223
+		+ (A1last_k12*lambda3-I)*exp_t_lambda3_div_lambda1332;
 
-	let A3term1 = A3last*(exp_t_lambda1*E1l1*E2l1*div_lambda2131
-						  + exp_t_lambda2*(E1-lambda2)*E2l2*div_lambda1232
-						  + exp_t_lambda3*(E1-lambda3)*E2l3*div_lambda1323);
+	/* third compartment, first and second term */
 	let A1last_k13 = A1last*k13;
-	let A3term2 = exp_t_lambda1*(J-A1last_k13*lambda1)*div_lambda1213
-				+ exp_t_lambda2*(A1last_k13*lambda2-J)*div_lambda1223
-				+ exp_t_lambda3*(A1last_k13*lambda3-J)*div_lambda1332;
-	/* small optimization where large term does not have to be calulated in Doserate is zero */
-	let A3term3 = (Doserate == 0.) ? 0. : Doserate*k13*(E2*div_lambda123
-														- exp_t_lambda1*E2l1*div_lambda12131
-														- exp_t_lambda2*E2l2*div_lambda21232
-														- exp_t_lambda3*E2l3*div_lambda31323);
-	A3 = A3term1 + A3term2 + A3term3;  /* Amount in the second-peripheral compartment */
-#undef A1
-#undef A2
-#undef A3
+	var A3 = A3last*(E1l1*E2l1*exp_t_lambda1_div_lambda2131
+					+ (E1-lambda2)*E2l2*exp_t_lambda2_div_lambda1232
+					+ (E1-lambda3)*E2l3*exp_t_lambda3_div_lambda1323)
+		+ (J-A1last_k13*lambda1)*exp_t_lambda1_div_lambda1213
+		+ (A1last_k13*lambda2-J)*exp_t_lambda2_div_lambda1223
+		+ (A1last_k13*lambda3-J)*exp_t_lambda3_div_lambda1332;
+
+	/* third term only if doserate is not 0 */
+	if (Doserate != 0.) { 
+		let div_lambda123 = 1./(lambda1*lambda2*lambda3);
+		let exp_t_lambda1_div_lambda12131 = exp_t_lambda1/(lambda1*(lambda2-lambda1)*(lambda3-lambda1));
+		let exp_t_lambda2_div_lambda21232 = exp_t_lambda2/(lambda2*(lambda1-lambda2)*(lambda3-lambda2));
+		let exp_t_lambda3_div_lambda31323 = exp_t_lambda3/(lambda3*(lambda1-lambda3)*(lambda2-lambda3));
+
+		A1 += Doserate*((E2*E3)*div_lambda123
+						- E2l1*E3l1*exp_t_lambda1_div_lambda12131
+						- E2l2*E3l2*exp_t_lambda2_div_lambda21232
+						- E2l3*E3l3*exp_t_lambda3_div_lambda31323);
+
+		A2 += Doserate*k12*(E3*div_lambda123
+							- E3l1*exp_t_lambda1_div_lambda12131
+							- E3l2*exp_t_lambda2_div_lambda21232
+							- E3l3*exp_t_lambda3_div_lambda31323);
+
+		A3 += Doserate*k13*(E2*div_lambda123
+							- E2l1*exp_t_lambda1_div_lambda12131
+							- E2l2*exp_t_lambda2_div_lambda21232
+							- E2l3*exp_t_lambda3_div_lambda31323);
+	}
+	state[0] = A1;
+	state[1] = A2;
+	state[2] = A3;
 }
 
 ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig)
