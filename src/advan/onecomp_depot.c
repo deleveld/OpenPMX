@@ -24,6 +24,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 
 #include "advan/advan.h"
 #include "utils/c22.h"

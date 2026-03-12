@@ -457,6 +457,15 @@ static void outfile_header(FILE* f2,
 		info(f2, "resample seed %i\n", options->simulate.seed);
 }
 
+static FILE* estimate_results_fopen(const char* name, const char* ext, const char* mode)
+{
+	let nchars = strlen(name) + strlen(ext) + 1;
+	char fname[nchars];
+	strcpy(fname, name);
+	strcat(fname, ext);
+	return fopen(fname, mode);
+}
+
 static STAGE2_PARAMS stage2_params(const char* filename,
 								   IDATA* const idata,
 								   const ADVANFUNCS* const advanfuncs,
@@ -467,10 +476,10 @@ static STAGE2_PARAMS stage2_params(const char* filename,
 	FILE* outstream = 0;
 	FILE* extstream = 0;
 	if (filename) {
-		outstream = results_fopen(filename, OPENPMX_OUTFILE, "w");
+		outstream = estimate_results_fopen(filename, OPENPMX_OUTFILE, "w");
 		if (!outstream)
 			fatal(0, "%s: could not open file \"%s%s\"\n", __func__, filename, OPENPMX_OUTFILE);
-		extstream = results_fopen(filename, OPENPMX_EXTFILE, "w");
+		extstream = estimate_results_fopen(filename, OPENPMX_EXTFILE, "w");
 		if (!extstream)
 			fatal(outstream, "%s: could not open file %s extension %s\n", __func__, filename, OPENPMX_EXTFILE);
 	}

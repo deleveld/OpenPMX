@@ -22,7 +22,6 @@
 #include <stdio.h>
 
 #include "dataconfig/dataconfig.h"
-#include "utils/vector.h"
 
 #ifdef __cplusplus
 extern "C" {

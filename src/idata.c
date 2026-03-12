@@ -29,7 +29,6 @@
 #include "idata.h"
 #include "defines.h"
 #include "utils/c22.h"
-#include "utils/various.h"
 
 #include <gsl/gsl_math.h>
 
@@ -241,12 +240,21 @@ void idata_reset_eta(IDATA* const idata, const double* eta)
 	memcpy(firstindivid->eta, eta, idata->nindivid * idata->nomega * sizeof(double));
 }
 
+static FILE* idata_results_fopen(const char* name, const char* ext, const char* mode)
+{
+	let nchars = strlen(name) + strlen(ext) + 1;
+	char fname[nchars];
+	strcpy(fname, name);
+	strcat(fname, ext);
+	return fopen(fname, mode);
+}
+
 void table_phi_idata(const char* filename,
 					 const IDATA* const idata,
 					 const bool _offset1)
 {
 	assert(filename);
-	var f = results_fopen(filename, OPENPMX_PHIFILE, "w");
+	var f = idata_results_fopen(filename, OPENPMX_PHIFILE, "w");
 	assert(f);
 
 	let nomega = idata->nomega;
@@ -314,7 +322,7 @@ void table_yhat_idata(const char* filename,
 					  const bool _offset1)
 {
 	assert(filename);
-	var f = results_fopen(filename, OPENPMX_YHATFILE, "w");
+	var f = idata_results_fopen(filename, OPENPMX_YHATFILE, "w");
 	assert(f);
 
 	fprintf(f, OPENPMX_HEADER_FORMAT, "YHAT");
@@ -356,7 +364,7 @@ void table_icov_resample_idata(const char* filename,
 	assert(filename);
 	assert(idata->individ[0].icovweight != 0);
 
-	var f = results_fopen(filename, OPENPMX_ICOVRESAMPLEFILE, "w");
+	var f = idata_results_fopen(filename, OPENPMX_ICOVRESAMPLEFILE, "w");
 	assert(f);
 
 	let nomega = idata->nomega;

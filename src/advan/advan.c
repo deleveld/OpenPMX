@@ -35,7 +35,6 @@
 #include <float.h>
 #include <string.h>
 
-#include "print.h"
 #include "advan/advan.h"
 #include "utils/c22.h"
 
@@ -47,7 +46,7 @@ void advan_base_construct(ADVAN* advan, const ADVANFUNCS* advanfuncs)
 	advan->time = NAN;
 	advan->initcount = 0;
 
-	for (int i=0; i<OPENPMX_STATE_MAX; i++)
+	forcount(i, OPENPMX_STATE_MAX)
 		advan->bioavail[i] = 1.;
 
 	advan->ninfusions = 0;
@@ -73,6 +72,7 @@ static inline void add_infusion(ADVANINFUSION *arr, int *size, const ADVANINFUSI
 {
 	arr[*size] = *newinf;
     (*size)++;
+    assert(*size <= OPENPMX_SIMULINFUSION_MAX);
 }
 
 static inline void remove_infusion(ADVANINFUSION *arr, int *size, int index)

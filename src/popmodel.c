@@ -245,9 +245,59 @@ void extfile_header(FILE * f,
 		}
 	}
 	fprintf(f, OPENPMX_HEADER_FORMAT, "OBJ");
-	fprintf(f, OPENPMX_SFORMAT, "RUNTIME");
+	fprintf(f, OPENPMX_HEADER_FORMAT, "RUNTIME");
 	fprintf(f, OPENPMX_SFORMAT, "INEVAL");
 	fprintf(f, "\n");
+
+	/* NON-STANDARD!!! DIFFERENT THAN NONMEM
+	 * add extra line with theta upper and lower limits */
+
+#define EXTFILE_LOWER_BOUNDS     -2000000001
+#define EXTFILE_UPPER_BOUNDS     -2000000002
+#define EXTFILE_EXTRA_FIXED      -2000000006
+
+	fprintf(f, OPENPMX_IFORMAT, EXTFILE_LOWER_BOUNDS);
+	forcount(i, ntheta)
+		fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->lower[i]);
+	forcount(i, nsigma)
+		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	forcount(i, popmodel->nomega)
+		forcount(j, i+1)
+			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_IFORMAT, 0);
+	fprintf(f, "\n");
+
+	fprintf(f, OPENPMX_IFORMAT, EXTFILE_UPPER_BOUNDS);
+	forcount(i, ntheta)
+		fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->upper[i]);
+	forcount(i, nsigma)
+		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	forcount(i, popmodel->nomega)
+		forcount(j, i+1)
+			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_IFORMAT, 0);
+	fprintf(f, "\n");
+
+	fprintf(f, OPENPMX_IFORMAT, EXTFILE_EXTRA_FIXED);
+	forcount(i, ntheta) {
+		let est = (popmodel->thetaestim[i] == FIXED) ? 1. : 0.;
+		fprintf(f, OPENPMX_TABLE_FORMAT, est);
+	}
+	forcount(i, nsigma)
+		fprintf(f, OPENPMX_TABLE_FORMAT, (double)popmodel->sigmafixed[i]);
+
+	forcount(i, popmodel->nomega)
+		forcount(j, i+1)
+			fprintf(f, OPENPMX_TABLE_FORMAT, (double)popmodel->omegafixed[i][j]);
+	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+	fprintf(f, OPENPMX_IFORMAT, 0);
+	fprintf(f, "\n");
+	
 	fflush(f);
 }
 
@@ -278,8 +328,6 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runti
 {
 #define EXTFILE_FINAL_ESTIMATES  -1000000000
 #define EXTFILE_FIXED_FLAGS      -1000000006
-#define EXTFILE_LOWER_BOUNDS     -2000000001
-#define EXTFILE_UPPER_BOUNDS     -2000000001
 
 	fprintf(f, OPENPMX_IFORMAT, EXTFILE_FINAL_ESTIMATES);
 	let ntheta = popmodel->ntheta;
@@ -312,33 +360,7 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runti
 	fprintf(f, OPENPMX_IFORMAT, 0);
 	fprintf(f, "\n");
 
-	/* NON-STANDARD!!! DIFFERENT THAN NONMEM
-	 * add extra line with theta upper and lower limits */
-	fprintf(f, OPENPMX_IFORMAT, EXTFILE_LOWER_BOUNDS);
-	forcount(i, ntheta)
-		fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->lower[i]);
-	forcount(i, nsigma)
-		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	forcount(i, popmodel->nomega)
-		forcount(j, i+1)
-			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_IFORMAT, 0);
-	fprintf(f, "\n");
 
-	fprintf(f, OPENPMX_IFORMAT, EXTFILE_UPPER_BOUNDS);
-	forcount(i, ntheta)
-		fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->upper[i]);
-	forcount(i, nsigma)
-		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	forcount(i, popmodel->nomega)
-		forcount(j, i+1)
-			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_IFORMAT, 0);
-	fprintf(f, "\n");
 	fflush(f);
 }
 

@@ -15,19 +15,7 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
-#include <string.h>
-#include "utils/c22.h"
 #include "utils/various.h"
-
-FILE* results_fopen(const char* name, const char* ext, const char* mode)
-{
-	let nchars = strlen(name) + strlen(ext) + 1;
-	char fname[nchars];
-	strcpy(fname, name);
-	strcat(fname, ext);
-	return fopen(fname, mode);
-}
 
 double timespec_time_difference(const struct timespec* const begin,
 								const struct timespec* const end)

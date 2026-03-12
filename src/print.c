@@ -22,9 +22,7 @@
 #include <stdarg.h>
 
 #include "print.h"
-#include "defines.h"
 #include "utils/c22.h"
-#include "utils/various.h"
 
 #include "buildflags.h"
 

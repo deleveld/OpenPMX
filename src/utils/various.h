@@ -15,17 +15,14 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <stdio.h>
 #include <time.h>
 
-#ifndef OPENPMX_UTIL_H
-#define OPENPMX_UTIL_H
+#ifndef OPENPMX_VARIOUS_H
+#define OPENPMX_VARIOUS_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-FILE* results_fopen(const char* name, const char* ext, const char* mode);
 
 double timespec_time_difference(const struct timespec* const begin,
 								const struct timespec* const end);

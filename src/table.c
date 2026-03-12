@@ -53,7 +53,6 @@ static void strip_firstlast_space(char* s)
 
 	/* copy data over with classic strcpy
 	 * which allows overlap */
-//	while ((*s++ = *a++)) { }
 	memmove(s, a, strlen(a) + 1);
 }
 
