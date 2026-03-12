@@ -46,25 +46,14 @@ extern "C" {
 #define vector_alloc(_mxvect) 		{  }
 #define vector_free(_mxvect) 		_vector_free(&(_mxvect)._vector);
 
-/* for a fixed buffer that does not realloc or need freeing */
-#define vector_buffer(ptr, capacity)			{	._vector = _vector_buffer_init(0, capacity), .rawptr = ptr, }
-#define vector_buffer_init(ptr, size, capacity)	{	._vector = _vector_buffer_init(size, capacity), .rawptr = ptr,  }
-static inline VECTOR_DATA _vector_buffer_init(const int size, const int capacity)
-{
-	assert(size >= 0);
-	assert(capacity > 0);
-	assert(size <= capacity);
-	return (VECTOR_DATA) {
-		._size = size,
-		._capacity = -capacity,
-	};
-}
-
-#define vector_first(_mxvect)	 	((_mxvect).ptr[0])
-#define vector_last(_mxvect) 		((_mxvect).ptr[(_mxvect).size-1])
-
 #define vector_resize(_mxvect, _n)	_vector_resize(&(_mxvect)._vector, (_n), sizeof((_mxvect).ptr[0]))
 #define vector_reserve(_mxvect, _n)	_vector_reserve(&(_mxvect)._vector, (_n), sizeof((_mxvect).ptr[0]))
+
+#define vector_begin(_mxvect)	 	(&(_mxvect).ptr[0])
+#define vector_end(_mxvect) 		(&(_mxvect).ptr[(_mxvect).size])
+
+#define vector_first(_mxvect) 		((_mxvect).ptr[0])
+#define vector_last(_mxvect) 		((_mxvect).ptr[(_mxvect).size-1])
 
 #define vector_append(_mxvect, ...)                                    \
 	do {                                                               \
@@ -90,12 +79,34 @@ static inline VECTOR_DATA _vector_buffer_init(const int size, const int capacity
 #define vector_remove_first(_mxvect) vector_remove((_mxvect), 0, 1)
 #define vector_remove_last(_mxvect) vector_resize((_mxvect), (_mxvect).size - 1)
 
+#define vector_insert(_mxvect, _ind, ...)                              \
+    do {                                                               \
+        typeof(&(_mxvect)) _mxvectptr = &(_mxvect);                    \
+        const int _mxind = (_ind);                                     \
+        _vector_insert(&_mxvectptr->_vector, _mxind, 1,                \
+                       sizeof(_mxvectptr->ptr[0]));                    \
+        _mxvectptr->rawptr[_mxind] = (__VA_ARGS__);                    \
+    } while (0)
+
+#define vector_insertn(_mxvect, _ind, _dat, _n)                        \
+    do {                                                               \
+        typeof(&(_mxvect)) _mxvectptr = &(_mxvect);                    \
+        typeof(_dat) _datptr = (_dat);                                 \
+        const int _mxind = (_ind);                                     \
+        const int _datn = (int)(_n);                                   \
+        _vector_insert(&_mxvectptr->_vector, _mxind, _datn,            \
+                       sizeof(_mxvectptr->ptr[0]));                    \
+        for (int _i = 0; _i < _datn; _i++)                             \
+            _mxvectptr->rawptr[_mxind + _i] = _datptr[_i];             \
+    } while (0)
+    
 #define forvector(_index, _mxvect) for(int _index=0; _index < (_mxvect).size; _index++)
 
 	void _vector_free(VECTOR_DATA * vect);
 	void _vector_resize(VECTOR_DATA * vect, const int newsize, const size_t sizeofdata);
 	void _vector_reserve(VECTOR_DATA * vect, const int newsize, const size_t sizeofdata);
 	void _vector_remove(VECTOR_DATA * vect, const int dindex, int num, const size_t sizeofdata);
+	void _vector_insert(VECTOR_DATA * vect, const int dindex, const int num, const size_t sizeofdata);
 
 #ifdef __cplusplus
 }

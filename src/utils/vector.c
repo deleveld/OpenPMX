@@ -79,4 +79,23 @@ void _vector_remove(VECTOR_DATA * vect, const int dindex, int num, const size_t 
 	vect->_size -= num;
 }
 
+void _vector_insert(VECTOR_DATA * vect, const int dindex, const int num, const size_t sizeofdata)
+{
+    assert(vect);
+    assert(sizeofdata);
+    assert(dindex >= 0);
+    assert(dindex <= vect->_size);  /* <= allows insert at end, equivalent to append */
+    assert(num > 0);
+
+    const int newsize = vect->_size + num;
+    _vector_resize(vect, newsize, sizeofdata);
+
+    unsigned char *begin = (unsigned char *) vect->_data + dindex * sizeofdata;
+    const int bytes = (newsize - dindex - num) * sizeofdata;
+    if (bytes)
+        memmove(begin + num * sizeofdata, begin, bytes);
+
+    /* caller is responsible for filling the gap at begin */
+}
+
 #endif

@@ -78,7 +78,8 @@ typedef struct ADVAN {
 	double amtlag[OPENPMX_STATE_MAX];
 	double bioavail[OPENPMX_STATE_MAX];
 
-	VECTOR(ADVANINFUSION) infusions;
+	ADVANINFUSION infusions[OPENPMX_SIMULINFUSION_MAX];
+	int ninfusions;
 
 	int initcount;
 

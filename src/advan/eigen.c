@@ -1,35 +1,46 @@
 /*
- * Eigendecomposition ADVAN for OpenPMX
+ * This file is part of OpenPMX (https://github.com/deleveld/openpmx).
+ * Copyright (c) 2024 Douglas Eleveld.
  *
- * This advancer uses eigendecomposition to obtain exact analytical
- * solutions for any linear compartmental model, regardless of the
- * number of compartments or topology.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
  *
- * Instead of hardcoding the analytical solution for a specific model
- * structure (like onecomp.c or threecomp.c), or using numerical ODE
- * integration (like diffeqn_libgsl.c), this advancer:
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
  *
- *   1. User must supply system matrix
- *   2. Eigendecomposes the matrix: A = V * diag(eigvals) * V^-1
- *   3. Advances state analytically in modal coordinates
- *
- * This is equivalent to NONMEM's ADVAN5 (linear general compartmental
- * model). The technique is described in:
- *   - Joachim J, "TCI Eigendecomposition" (2026)
- *   - Minto C, Schnider T, "From Eigenvalues to Plasma Coefficients" (2026)
- *
- * The modal state update for constant input over interval dt:
- *
- *   x_modal(t+dt) = x_modal(t) * exp(eigval*dt)
- *                  + (V^-1 * J) / (-eigval) * (1 - exp(eigval*dt))
- *
- * where eigval < 0 for stable systems, V is the eigenvector matrix,
- * and J is the input vector (infusion rates into each compartment).
- *
- * Uses GSL for eigendecomposition (gsl_eigen_nonsymmv) and matrix
- * inversion (LU decomposition).
- * Link with: -lgsl -lgslcblas
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
+/// This advancer uses eigendecomposition to obtain exact analytical
+/// (no step size error) solutions for any linear compartmental model,
+/// regardless of the number of compartments or topology.
+///
+/// Instead of hardcoding the analytical solution for a specific model
+/// structure or using numerical ODE integration, this advancer:
+///
+///   1. User must supply system matrix
+///   2. Eigendecomposes the matrix: A = V * diag(eigvals) * V^-1
+///   3. Advances state analytically in modal coordinates
+///
+/// This is equivalent to NONMEM's ADVAN5 (linear general compartmental
+/// model). The technique is described in:
+///   - Joachim J, "TCI Eigendecomposition" (2026)
+///   - Minto C, Schnider T, "From Eigenvalues to Plasma Coefficients" (2026)
+///
+/// The modal state update for constant input over interval dt:
+///
+///   x_modal(t+dt) = x_modal(t) * exp(eigval*dt)
+///                  + (V^-1 * J) / (-eigval) * (1 - exp(eigval*dt))
+///
+/// where eigval < 0 for stable systems, V is the eigenvector matrix,
+/// and J is the input vector (infusion rates into each compartment).
+///
+/// Uses libGSL for eigendecomposition (gsl_eigen_nonsymmv) and matrix
+/// inversion (LU decomposition).
 
 #include <assert.h>
 #include <math.h>
@@ -49,6 +60,9 @@
 #include <gsl/gsl_permutation.h>
 #include <gsl/gsl_blas.h>
 
+/// For the eigensystem advancer the system matrix must be provided
+/// in row-major order. The user can write this using
+/// `pmx_advan_eigen_sysmat()` or via openpmxtran as `SYSMAT()`.
 /*------------------------------------------------------------------------
  * sysmat is stored in row-major order (C convention, GSL convention):
  *   sysmat[i * n + j] = element at row i, column j
@@ -57,9 +71,6 @@
  * Infusion rates are handled separately by the advancer.
  *----------------------------------------------------------------------*/
 
-/*------------------------------------------------------------------------
- * Advancer state: extends ADVAN with eigen-specific cached data.
- *----------------------------------------------------------------------*/
 typedef struct {
 	ADVAN advan;
 
@@ -83,9 +94,6 @@ typedef struct {
 	gsl_permutation* perm;    
 } ADVANCER_EIGEN;
 
-/*------------------------------------------------------------------------
- * Info
- *----------------------------------------------------------------------*/
 static void advancer_eigen_info(const struct ADVANFUNCS* const advanfuncs,
                                 FILE* f)
 {
@@ -93,9 +101,6 @@ static void advancer_eigen_info(const struct ADVANFUNCS* const advanfuncs,
     fprintf(f, "advan nstate %i\n", advanfuncs->nstate);
 }
 
-/*------------------------------------------------------------------------
- * Constructor: allocate GSL workspaces
- *----------------------------------------------------------------------*/
 static void advancer_eigen_construct(ADVAN* advan,
                                      const struct ADVANFUNCS* const advanfuncs)
 {
@@ -125,9 +130,6 @@ static void advancer_eigen_construct(ADVAN* advan,
 	advan->eigen_sysmat_data = self->sysmat_data;
 }
 
-/*------------------------------------------------------------------------
- * Destructor: free GSL workspaces
- *----------------------------------------------------------------------*/
 static void advancer_eigen_destruct(ADVAN* advan)
 {
 	var self = container_of(advan, ADVANCER_EIGEN, advan);
@@ -388,14 +390,6 @@ static void advancer_eigen_advance_interval(ADVAN* advan,
 	               &x_modal_new_v.vector, 0.0, &state_v.vector); /* state = V * x_modal_new */
 }
 
-/*------------------------------------------------------------------------
- * Public constructor: pmx_advan_eigen
- *
- * This advancer replaces both the hardcoded analytical ADVANs and the
- * ODE solver for any linear model. It is exact (no step size error)
- * and general (any number of compartments, any topology).
- *----------------------------------------------------------------------*/
-
 typedef struct {
 	ADVANFUNCS advanfuncs;
 } ADVANFUNCS_EIGEN;
@@ -432,7 +426,6 @@ ADVANFUNCS* pmx_advan_eigen(const DATACONFIG* const dataconfig,
 }
 
 /*------------------------------------------------------------------------
- * Public constructor: pmx_advan_eigen_threecomp
  *----------------------------------------------------------------------*/
 
 static void advancer_eigen_threecomp_construct(ADVAN* advan,
@@ -515,6 +508,10 @@ static void advancer_eigen_threecomp_advance_interval(ADVAN* advan,
 	advancer_eigen_advance_interval(advan, imodel, record, state, popparam, endtime, rates);
 }
 
+/// This file also implements a three compartment mammilary model
+/// via the underlying eigensystem solver. It is available as
+/// `pmx_advan_eigen_threecomp()` of via openpmxtran as
+/// `$ADVAN(eigen_threecomp)`.
 ADVANFUNCS* pmx_advan_eigen_threecomp(const DATACONFIG* const dataconfig,
 									  const ADVANCONFIG* const advanconfig)
 {
@@ -560,7 +557,6 @@ ADVANFUNCS* pmx_advan_eigen_threecomp(const DATACONFIG* const dataconfig,
 }
 
 /*------------------------------------------------------------------------
- * Public constructor: pmx_advan_eigen_twocomp
  *----------------------------------------------------------------------*/
 
 static void advancer_eigen_twocomp_construct(ADVAN* advan,
@@ -589,7 +585,7 @@ typedef struct {
 	ADVANFUNCS_EIGEN eigen;
 	int offsetV1;
 	int offsetV2;
-	int offsetCL;
+	int offsetCL; 
 	int offsetQ2;
 } ADVANFUNCS_EIGEN_TWOCOMP;
 
@@ -635,6 +631,10 @@ static void advancer_eigen_twocomp_advance_interval(ADVAN* advan,
  	advancer_eigen_advance_interval(advan, imodel, record, state, popparam, endtime, rates);
 }
 
+/// This file also implements a two compartment mammilary model via the
+/// underlying eigensystem solver. It is available as
+/// `pmx_advan_eigen_twocomp()` of via openpmxtran as
+/// `$ADVAN(eigen_twocomp)`.
 ADVANFUNCS* pmx_advan_eigen_twocomp(const DATACONFIG* const dataconfig,
 									const ADVANCONFIG* const advanconfig)
 {

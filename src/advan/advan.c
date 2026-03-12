@@ -50,15 +50,12 @@ void advan_base_construct(ADVAN* advan, const ADVANFUNCS* advanfuncs)
 	for (int i=0; i<OPENPMX_STATE_MAX; i++)
 		advan->bioavail[i] = 1.;
 
-	/* this allows running without any allocations. TODO: There should be a warning
-	 * if more there an unexpected number of overlapping infusions. Right now vector_reserve()
-	 * would assert() */
-	vector_reserve(advan->infusions, OPENPMX_SIMULINFUSION_MAX);
+	advan->ninfusions = 0;
 }
 
 void advan_base_destruct(ADVAN* advan)
 {
-	vector_free(advan->infusions);
+	(void)advan;
 }
 
 ADVANFUNCS* advanfuncs_alloc(const DATACONFIG* dataconfig, const ADVANCONFIG* const advanconfig)
@@ -70,6 +67,18 @@ ADVANFUNCS* advanfuncs_alloc(const DATACONFIG* dataconfig, const ADVANCONFIG* co
 void advanfuncs_free(ADVANFUNCS* advanfuncs)
 {
 	free(advanfuncs);
+}
+
+static inline void add_infusion(ADVANINFUSION *arr, int *size, const ADVANINFUSION* const newinf)
+{
+	arr[*size] = *newinf;
+    (*size)++;
+}
+
+static inline void remove_infusion(ADVANINFUSION *arr, int *size, int index)
+{
+	arr[index] = arr[*size - 1];
+	(*size)--;
 }
 
 PREDICTSTATE advan_advance(ADVAN* const advan,
@@ -104,7 +113,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			if (nstate)
 				memset(state, 0, nstate * sizeof(double));
 			advan->time = final_time;
-			vector_resize(advan->infusions, 0);
+			advan->ninfusions = 0;
 
 			/* for reset and reset-and-dose we should treat it like a discontinuitiy
 			 * This helps the ODE solver a lot I expect */
@@ -142,13 +151,17 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			let duration = (rate != 0.) ? (amt / rate) : (0.);
 			let end = start + duration;
 
-			vector_append(advan->infusions,
-						  (ADVANINFUSION) {
+			advan_ensure(cmt < nstate, __func__, "CMT value exceeds nstate");
+
+			add_infusion(advan->infusions,
+						&advan->ninfusions,
+						&(ADVANINFUSION) {
 							.cmt = cmt,
 							.amt = amt,
 							.rate = rate,
 							.start = start,
-							.end = end } );
+							.end = end
+						});
 		}
 	}
 	
@@ -158,11 +171,13 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	do {
 		let currenttime = advan->time;
 
-		/* remove infusions that are in the past */
-		forvector(i, advan->infusions) {
-			let v = &advan->infusions.ptr[i];
-			if (v->end <= currenttime && v->rate > 0.) {
-				vector_remove(advan->infusions, i, 1);
+		/* remove doses in the past, or infusions that have just now
+		 * stopped */
+		for (int i=0; i<advan->ninfusions; i++) {
+			let v = &advan->infusions[i];
+			if ((v->end < currenttime) ||	
+				(v->end <= currenttime && v->rate > 0.)) {
+				remove_infusion(advan->infusions, &advan->ninfusions, i);
 				--i;
 			}
 		}
@@ -176,8 +191,8 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 /// openpmxtran
 		/* find the first place we have to stop at going to the next record */
 		double intervalstop = final_time;
-		forvector(i, advan->infusions) {
-			let v = &advan->infusions.ptr[i];
+		for (int i=0; i<advan->ninfusions; i++) {
+			let v = &advan->infusions[i];
 			if (v->end < intervalstop)
 				intervalstop = v->end;
 			if (v->start > currenttime && v->start < intervalstop)
@@ -188,9 +203,10 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		if (intervalstop > currenttime) {
 
 			/* collect the infusion rates between now and the intervalstop */
-			double totalrates[OPENPMX_STATE_MAX] = { };
-			forvector(i, advan->infusions) {
-				let v = &advan->infusions.ptr[i];
+			double totalrates[OPENPMX_STATE_MAX];
+			memset(totalrates, 0, nstate * sizeof(double));
+			for (int i=0; i<advan->ninfusions; i++) {
+				let v = &advan->infusions[i];
 				if (v->start <= currenttime && v->end >= currenttime && v->rate > 0.) {
 					let cmt = v->cmt;
 					let rate = v->rate;
@@ -198,6 +214,8 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 					totalrates[cmt] += rate * bioavail;
 				}
 			}
+			
+			/* process the interval with constant rates */
 			advanfuncs->interval(advan, imodel, record, state, popparam, intervalstop, totalrates);
 			advan->time = intervalstop;	/* force and update to time, although the advancer_object might do this as well */
 		}
@@ -207,8 +225,8 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		/* a fake bolus with cmt == -1 means an extra call to init */
 		bool need_reset_now = false;
 		bool need_init_now = false;
-		forvector(i, advan->infusions) {
-			let v = &advan->infusions.ptr[i];
+		for (int i=0; i<advan->ninfusions; i++) {
+			let v = &advan->infusions[i];
 			if (v->start == currenttime && v->rate == 0.) {
 				assert(v->start == v->end);
 				let record_cmt = v->cmt;
@@ -219,7 +237,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 					var bioavail = advan->bioavail[record_cmt];
 					state[record_cmt] += record_amt * bioavail;
 				}
-				vector_remove(advan->infusions, i, 1);
+				remove_infusion(advan->infusions, &advan->ninfusions, i);
 				--i;
 				need_reset_now = true;
 			}
@@ -307,20 +325,22 @@ bool pmx_advan_inittime(const ADVANSTATE* advanstate, const double t)
 	 * extra inittime if another kind of event occurs at the intended
 	 * time, for example an infusion */
 	bool found_already = false;
-	forvector(i, advan->infusions) {
-		let v = &advan->infusions.ptr[i];
+	for (int i=0; i<advan->ninfusions; i++) {
+		let v = &advan->infusions[i];
 		if (v->start == t)
 			found_already = true;
 	}
 
 	if (!found_already) {
-		vector_append(advan->infusions,
-					  (ADVANINFUSION) {
+		add_infusion(advan->infusions,
+					&advan->ninfusions,
+					&(ADVANINFUSION) {
 						.cmt = -1,
 						.amt = 0.,
 						.rate = 0.,
 						.start = t,
-						.end = t });
+						.end = t
+					});
 	}
 	return !found_already;
 }
