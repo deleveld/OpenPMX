@@ -140,6 +140,7 @@ int main(void)
 #include "encode.c"
 #include "utils/vector.c"
 #include "utils/various.c"
+#include "utils/errctx.c"
 
 RECORD data[132] = {
 	{	1,	4.02,	0.,	.74,	79.6,	},

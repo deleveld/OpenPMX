@@ -1160,6 +1160,7 @@ RECORD OPENPMXTRAN_DATA_NAME[] = {
 #include "encode.c"
 #include "utils/vector.c"
 #include "utils/various.c"
+#include "utils/errctx.c"
 
 typedef struct IMODEL {
 /* begin OPENPMXTRAN_IMODEL_FIELDS_DECLARE */

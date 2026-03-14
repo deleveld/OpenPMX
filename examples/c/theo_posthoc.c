@@ -84,6 +84,7 @@ extern RECORD data[11]; /* forward declaration */
 #include "scatter.c"
 #include "utils/vector.c"
 #include "utils/various.c"
+#include "utils/errctx.c"
 
 int main(void)
 {
@@ -133,7 +134,11 @@ int main(void)
 	};
 
 	let advanfuncs = advanfuncs_alloc(&openpmx.data, &openpmx.advan);
-	let popmodel = popmodel_init(&openpmx);
+	ERRCTX errctx = { 0 };
+	let popmodel = popmodel_init(&openpmx, &errctx);
+	if (errctx.len)
+		fatal(0, "%s", errctx.errmsg);
+	
 	var idata = idata_construct(&advanfuncs->recordinfo,
 								popmodel.ntheta,
 								popmodel.nomega,

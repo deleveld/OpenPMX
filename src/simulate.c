@@ -210,7 +210,11 @@ void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig)
 	pmxstate_ensure(pmx);
 	var pstate = pmx->state;
 
-	var popmodel = popmodel_init(pmx);
+	ERRCTX errctx = { 0 };
+	var popmodel = popmodel_init(pmx, &errctx);
+	if (errctx.len)
+		fatal(0, "%s", errctx.errmsg);
+	
 	var options = options_init(pmx);
 	if (simconfig)
 		options.simulate = simconfig_default(simconfig);

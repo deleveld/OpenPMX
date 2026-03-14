@@ -30,7 +30,10 @@
 static PMXSTATE* pmxstate_alloc(const OPENPMX* const pmx)
 {
 	let advanfuncs = advanfuncs_alloc(&pmx->data, &pmx->advan);
-	let popmodel = popmodel_init(pmx);
+	ERRCTX errctx = { 0 };
+	let popmodel = popmodel_init(pmx, &errctx);
+	if (errctx.len)
+		fatal(0, "%s", errctx.errmsg);
 
 	var temp = (PMXSTATE) {
 		.advanfuncs = advanfuncs,
@@ -77,16 +80,13 @@ OPENPMX pmx_copy(const OPENPMX* const pmx)
 	return ret;
 }
 
-void pmx_copy_popparams(OPENPMX* dest, const OPENPMX* const src)
+void pmx_copy_popparam(OPENPMX* dest, const OPENPMX* const src)
 {
 	memcpy(dest->theta, src->theta, sizeof(dest->theta));
 	memcpy(dest->sigma, src->sigma, sizeof(dest->sigma));
 	memcpy(dest->omega, src->omega, sizeof(dest->omega));
 
-	dest->result = (PMXRESULT) { .objfn = DBL_MAX,
-								 .type = OBJFN_INVALID,
-								 .nparam = 0,
-								 .neval = 0 };
+	dest->result = (PMXRESULT) { 0 };
 }
 
 void pmx_cleanup(OPENPMX* pmx)

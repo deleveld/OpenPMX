@@ -27,6 +27,7 @@
 #include "utils/c22.h"
 #include "utils/various.h"
 #include "pmxstate.h"
+#include "print.h"
 
 /* NOTE: this function must be thread safe on the level of an individual */
 static void idata_predict_yhat_thread(INDIVID* const individ,
@@ -144,7 +145,10 @@ void pmx_predict(OPENPMX* pmx)
 	var pstate = pmx->state;
 
 	var options = options_init(pmx);
-	var popmodel = popmodel_init(pmx);
+	ERRCTX errctx = { 0 };
+	var popmodel = popmodel_init(pmx, &errctx);
+	if (errctx.len)
+		fatal(0, "%s", errctx.errmsg);
 
 	idata_predict_yhat(&pstate->idata,
 					  pstate->advanfuncs,
@@ -158,7 +162,10 @@ void pmx_predict_pred(OPENPMX* pmx)
 	var pstate = pmx->state;
 
 	var options = options_init(pmx);
-	var popmodel = popmodel_init(pmx);
+	ERRCTX errctx = { 0 };
+	var popmodel = popmodel_init(pmx, &errctx);
+	if (errctx.len)
+		fatal(0, "%s", errctx.errmsg);
 
 	idata_predict_pred(&pstate->idata,
 						  pstate->advanfuncs,

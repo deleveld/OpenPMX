@@ -601,7 +601,10 @@ void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 		*estimate = options.estimate;
 	}
 
-	var popmodel = popmodel_init(pmx);
+	ERRCTX errctx = { 0 };
+	var popmodel = popmodel_init(pmx, &errctx);
+	if (errctx.len)
+		fatal(0, "%s", errctx.errmsg);
 
 	estimate_popmodel(pmx->filename,
 					  &pstate->idata,
@@ -626,7 +629,10 @@ void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 	}
 	options.estimate.maxeval = 1;
 
-	var popmodel = popmodel_init(pmx);
+	ERRCTX errctx = { 0 };
+	var popmodel = popmodel_init(pmx, &errctx);
+	if (errctx.len)
+		fatal(0, "%s", errctx.errmsg);
 
 	estimate_popmodel(pmx->filename,
 					  &pstate->idata,
@@ -651,7 +657,10 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	options.estimate.step_refine = 0.1;
 	options.estimate.step_final = 0.01;
 
-	var popmodel = popmodel_init(pmx);
+	ERRCTX errctx = { 0 };
+	var popmodel = popmodel_init(pmx, &errctx);
+	if (errctx.len)
+		fatal(0, "%s", errctx.errmsg);
 
 	estimate_popmodel(pmx->filename,
 					  &pstate->idata,

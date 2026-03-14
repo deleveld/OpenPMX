@@ -36,7 +36,7 @@ extern "C" {
 
 #define OPENPMX_THETA_MAX				64
 #define OPENPMX_OMEGABLOCKSIZE_MAX		64
-#define OPENPMX_OMEGABLOCK_MAX			5
+#define OPENPMX_OMEGABLOCK_MAX			10
 #define OPENPMX_OMEGA_MAX				16
 #define OPENPMX_SIGMA_MAX				8
 
@@ -160,6 +160,7 @@ ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANC
 ADVANFUNCS* pmx_advan_eigen(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_eigen_threecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_eigen_twocomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
+ADVANFUNCS* pmx_advan_eigen_onecomp_absorb(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 
 /* differential equation advan methods */
 ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
@@ -223,7 +224,7 @@ typedef struct {
 void pmx_cleanup(OPENPMX* openpmx);
 
 OPENPMX pmx_copy(const OPENPMX* const openpmx);
-void pmx_copy_popparams(OPENPMX* dest, const OPENPMX* const src);
+void pmx_copy_popparam(OPENPMX* dest, const OPENPMX* const src);
 
 /*---------------------------------------------------------------------*/
 /* prediction */
@@ -286,6 +287,19 @@ typedef struct {
 } TABLECONFIG;
 
 void pmx_table(OPENPMX* pmx, const char* fields, const TABLECONFIG* const tableconfig);
+
+/*---------------------------------------------------------------------*/
+/* reload */
+/*---------------------------------------------------------------------*/
+typedef struct {
+	const char* filename;
+	const bool optional;
+	const bool force;
+	const bool preserve;
+	const bool silent;
+} RELOADCONFIG;
+
+int pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args);
 
 #ifdef __cplusplus
 }

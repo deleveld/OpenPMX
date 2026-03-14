@@ -140,6 +140,7 @@ int main(void)
 #include "predict.c"
 #include "checkout.c"
 #include "encode.c"
+#include "utils/errctx.c"
 #include "utils/vector.c"
 #include "utils/various.c"
 

@@ -675,4 +675,118 @@ ADVANFUNCS* pmx_advan_eigen_twocomp(const DATACONFIG* const dataconfig,
 	return ret;
 }
 
+/*------------------------------------------------------------------------
+ *----------------------------------------------------------------------*/
+
+static void advancer_eigen_onecomp_absorb_construct(ADVAN* advan,
+													const struct ADVANFUNCS* const advanfuncs)
+{
+	advancer_eigen_construct(advan,advanfuncs);
+	
+	/* hide the system matrix pointer that eigensolver exposes, because
+	 * we do it ourselves. Any other use would be an error. */
+	advan->eigen_sysmat_data = 0;
+}
+
+static void advancer_eigen_onecomp_absorb_destruct(ADVAN* advan)
+{
+	advancer_eigen_destruct(advan);
+}
+
+static void advancer_eigen_onecomp_absorb_info(const struct ADVANFUNCS* const advanfuncs,
+											   FILE* f)
+{
+    fprintf(f, "advan model eigensystem (one compartment with absorbtion)\n");
+    fprintf(f, "advan nstate %i\n", advanfuncs->nstate);
+}
+
+typedef struct {
+	ADVANFUNCS_EIGEN eigen;
+	int offsetV;
+	int offsetCL; 
+	int offsetKA;
+} ADVANFUNCS_EIGEN_ONECOMP_ABSORB;
+
+__attribute__ ((hot))
+static void advancer_eigen_onecomp_absorb_advance_interval(ADVAN* advan,
+														   const IMODEL* const imodel,
+														   const RECORD* const record,
+														   double* const state,
+														   const POPPARAM* const popparam,
+														   const double endtime,
+														   const double* rates)
+{
+    var self = container_of(advan, ADVANCER_EIGEN, advan);
+    
+    /* do we need to update the eigensystem matrix? */
+	if (self->last_recalc_initcount != advan->initcount) {
+		var eigen_funcs   = container_of(advan->advanfuncs, ADVANFUNCS_EIGEN, advanfuncs);
+		var imodeloffsets = container_of(eigen_funcs, ADVANFUNCS_EIGEN_ONECOMP_ABSORB, eigen); 
+	 
+		let V = *(const double*)(((char*)imodel) + imodeloffsets->offsetV);
+		let CL = *(const double*)(((char*)imodel) + imodeloffsets->offsetCL);
+		let KA = *(const double*)(((char*)imodel) + imodeloffsets->offsetKA);
+		
+		/* define the eigensystem */
+		let KE = CL / V;
+		double sysmat_data[OPENPMX_STATE_MAX * OPENPMX_STATE_MAX] = { 
+			-KA,	0.,
+			KA,		-KE,
+		};
+		/* update the system matrix for the eigen advance */
+		let n = self->n;
+		assert(n == advan->advanfuncs->nstate);
+		memcpy(self->sysmat_data, sysmat_data, n * n * sizeof(double));
+
+		/* resetting the last_recalc_initcount should be done in the 
+		 * advancer_eigen_advance_interval() function, dont do it here */
+	}
+	
+	/* pass the advance down to the eigensystem advancer */
+ 	advancer_eigen_advance_interval(advan, imodel, record, state, popparam, endtime, rates);
+}
+
+/// This file also implements a one compartment model with absorbtion
+/// via the underlying eigensystem solver. It is available as
+/// `pmx_advan_eigen_onecomp_absorb()` or via openpmxtran as
+/// `$ADVAN(eigen_onecomp_absorb)`.
+ADVANFUNCS* pmx_advan_eigen_onecomp_absorb(const DATACONFIG* const dataconfig,
+										   const ADVANCONFIG* const advanconfig)
+{
+	assert(advanconfig->init);
+	assert(advanconfig->predict);
+	assert(advanconfig->nstate == 0 || advanconfig->nstate == 2);
+
+	let retinit = (ADVANFUNCS_EIGEN_ONECOMP_ABSORB) {
+		.eigen = {
+			.advanfuncs = {
+				.advan_size = sizeof(ADVANCER_EIGEN),
+				.construct = advancer_eigen_onecomp_absorb_construct,
+				.destruct = advancer_eigen_onecomp_absorb_destruct,
+				.info = advancer_eigen_onecomp_absorb_info,
+
+				.reset = 0,
+				.interval = advancer_eigen_onecomp_absorb_advance_interval,
+
+				.advanconfig = advanconfig,
+				.recordinfo = recordinfo_init(dataconfig),
+				.nstate = 2, /* dont allow user to set */
+			},
+		},
+		.offsetV = structinfo_find_offset("V", &advanconfig->imodelfields),
+		.offsetCL = structinfo_find_offset("CL", &advanconfig->imodelfields),
+		.offsetKA = structinfo_find_offset("KA", &advanconfig->imodelfields),
+	};
+	advan_ensure(retinit.offsetV >= 0, __func__, "could not find V");
+	advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
+	advan_ensure(retinit.offsetKA >= 0, __func__, "could not find KA");
+	
+	ADVANFUNCS* ret = malloc(sizeof(ADVANFUNCS_EIGEN_ONECOMP_ABSORB));
+	assert(ret);
+	memcpy(ret, &retinit, sizeof(ADVANFUNCS_EIGEN_ONECOMP_ABSORB));
+
+	return ret;
+}
+
+
 

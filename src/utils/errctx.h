@@ -15,19 +15,22 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef OPENPMX_VARIOUS_H
-#define OPENPMX_VARIOUS_H
+#ifndef OPENPMX_ERRCTX_H
+#define OPENPMX_ERRCTX_H
 
-#include <time.h>
+#include <stdarg.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-double timespec_time_difference(const struct timespec* const begin,
-								const struct timespec* const end);
-void timespec_duration(const struct timespec* const begin, double* eval);
- 
+typedef struct {
+	char errmsg[1024]; 
+	size_t len;
+} ERRCTX;
+
+void add_errctx(ERRCTX * errctx, const char* format, ... );
+
 #ifdef __cplusplus
 }
 #endif

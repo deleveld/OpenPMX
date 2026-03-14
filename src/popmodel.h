@@ -21,6 +21,7 @@
 #include <stdio.h>
 
 #include "openpmx.h"
+#include "utils/errctx.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -50,7 +51,7 @@ typedef struct {
 	PMXRESULT result;
 } POPMODEL;
 
-POPMODEL popmodel_init(const OPENPMX* const pmx);
+POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx);
 
 void extfile_header(FILE * f,
 					const POPMODEL* const popmodel,
@@ -75,8 +76,7 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 void popmodel_information(FILE* f2,
 						  const POPMODEL* const popmodel,
 						  const double timestamp);
-void popmodel_initcode(FILE* f2,
-					   const POPMODEL* const popmodel);
+
 
 #ifdef __cplusplus
 }

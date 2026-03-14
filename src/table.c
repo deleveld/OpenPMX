@@ -394,8 +394,12 @@ void pmx_table(OPENPMX* pmx,
 			   const TABLECONFIG* const tableconfig)
 {
 	pmxstate_ensure(pmx);
-	
-	let popmodel = popmodel_init(pmx);
+
+	ERRCTX errctx = { 0 };
+	let popmodel = popmodel_init(pmx, &errctx);
+	if (errctx.len)
+		fatal(0, "%s", errctx.errmsg);
+
 	TABLE table = table_open(&pmx->state->idata,
 							 pmx->state->advanfuncs,
 							 &popmodel,

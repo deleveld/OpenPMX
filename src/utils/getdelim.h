@@ -15,18 +15,16 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef OPENPMX_VARIOUS_H
-#define OPENPMX_VARIOUS_H
+#ifndef OPENPMX_GETDELIM_H
+#define OPENPMX_GETDELIM_H
 
-#include <time.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-double timespec_time_difference(const struct timespec* const begin,
-								const struct timespec* const end);
-void timespec_duration(const struct timespec* const begin, double* eval);
+ssize_t openpmx_getdelim(char **lineptr, size_t *n, int delim, FILE *stream);
  
 #ifdef __cplusplus
 }

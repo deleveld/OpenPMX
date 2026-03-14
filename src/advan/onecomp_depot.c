@@ -38,7 +38,7 @@ static void advancer_onecomp_depot_info(const struct ADVANFUNCS* const advanfunc
 {
 	(void) advanfuncs;
 
-	fprintf(f, "advan model one compartment with absorbtion\n");
+	fprintf(f, "advan model one compartment with absorbtion (bolus only)\n");
 	fprintf(f, "advan parameters V CL KA\n");
 }
 static void advancer_onecomp_depot_construct(ADVAN* advan, const ADVANFUNCS* const advanfuncs)

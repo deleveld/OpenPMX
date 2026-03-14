@@ -31,6 +31,7 @@
 
 #include "utils/c22.h"
 #include "utils/vector.c"
+#include "utils/getdelim.c"
 
 typedef VECTOR(char*) STRINGS;
 
@@ -153,7 +154,6 @@ static int strip_quotes(char* s)
 
 	/* copy data over with classic strcpy
 	 * which allows overlap */
-//	while ((*s++ = *a++)) { }
 	memmove(s, a, strlen(a) + 1);
 
 	return 0;
@@ -173,43 +173,8 @@ static void strip_comments(char *s, const char* ca, const char* cb, const char r
 		b += bl;
 		if (replace_char != 0)
 			*a++ = replace_char;
-			
-//		while ((*a++ = *b++)) { } 
 		memmove(a, b, strlen(b) + 1);
 	}
-}
-
-static ssize_t _openpmx_getdelim(char **lineptr, size_t *n, int delim, FILE *stream)
-{
-    if (lineptr == NULL || n == NULL || stream == NULL)
-        return -1;
-
-    if (*lineptr == NULL || *n == 0) {
-        *n = 512;  // initial size
-        *lineptr = malloc(*n);
-        if (*lineptr == NULL)
-            return -1;
-    }
-
-    size_t pos = 0;
-    int c;
-    while ((c = fgetc(stream)) != EOF) {
-        if (pos + 1 >= *n) {
-            size_t new_size = *n * 2;
-            char *new_ptr = realloc(*lineptr, new_size);
-            if (!new_ptr)
-                return -1;
-            *lineptr = new_ptr;
-            *n = new_size;
-        }
-        (*lineptr)[pos++] = (char)c;
-        if (c == delim)
-            break;
-    }
-    if (pos == 0 && c == EOF)  // nothing read
-        return -1;
-    (*lineptr)[pos] = '\0';
-    return pos;
 }
 
 static char* read_file(const char* filename)
@@ -221,7 +186,7 @@ static char* read_file(const char* filename)
 	/* https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c */
 	char* buffer = NULL;
 	size_t len;
-	ssize_t bytes_read = _openpmx_getdelim(&buffer, &len, '\0', s);
+	ssize_t bytes_read = openpmx_getdelim(&buffer, &len, '\0', s);
 	assert(bytes_read != -1);
 	fclose(s);
 
@@ -241,7 +206,7 @@ static int match_recordname(const char* p, const char* q, int* i, const bool whi
 	return 0;
 }
 
-static void check_reserved_name(const char* s, const char* source)
+static void check_valid_name(const char* s, const char* source)
 {
 	if (streq(s, "PRED") ||
 		streq(s, "pred") ||
@@ -252,107 +217,140 @@ static void check_reserved_name(const char* s, const char* source)
 		streq(s, "OBJ") ||
 		streq(s, "obj") ||
 		streq(s, "INEVAL") ||
+		streq(s, "NAN") ||
 		streq(s, "ineval"))
 		fatal("reserved name \"%s\" in %s", s, source);
 }
 
+typedef enum {
+	GET_DELIM_COMMA_SEP,	/* force comma separator */
+	GET_DELIM_ANY_SEP,		/* use comma separator if comma exists */
+} GET_DELIM_SEP;
+
+static int get_delim_tokens_comma(char* line, STRINGS* namevec)
+{
+	char *running = line;
+	char *token;
+	while ((token = strsep(&running, ",")) != NULL) {
+		strip_firstlast_space(token);
+		if (strlen(token)) {
+			let s = strdup(token);
+			vector_append(*namevec, s);
+
+		/* missing token */
+		} else
+			return 1;
+	}
+	return 0;
+}
+
+static int get_delim_tokens_whitespace(char* line, STRINGS* namevec)
+{
+	char *saveptr;
+	let delim = " \t\r\n";
+	char *token = strtok_r(line, delim, &saveptr); 
+	while (token != NULL) {
+		let s = strdup(token);
+		vector_append(*namevec, s);
+		token = strtok_r(NULL, delim, &saveptr);
+	}
+	return 0;
+}
+
+static int get_delim_tokens(char* line, STRINGS* namevec, const GET_DELIM_SEP sep)
+{
+	/* comma separated, means a single comma separates */
+	if (sep == GET_DELIM_COMMA_SEP ||
+		((sep == GET_DELIM_ANY_SEP) && (strchr(line, ',') != NULL))) 
+		return get_delim_tokens_comma(line, namevec);
+
+	/* whitespace separated, means multiple whitespace separates */
+	return get_delim_tokens_whitespace(line, namevec);
+}
+
 static void load_datafile_write_dataconfig(const char* datafile, STRING* data, STRINGS* fieldnames, STRING* config)
 {
-//	fprintf(stdout, "data \"%s\"\n", datafile);
-	var stream = fopen(datafile, "r");
-	if (!stream) 
-		fatal("could not read data file \"%s\"", datafile);
-
-	/* https://stackoverflow.com/questions/174531/how-to-read-the-content-of-a-file-to-a-string-in-c */
-	char* buffer = NULL;
-	size_t len = 0;
-	ssize_t bytes_read = _openpmx_getdelim(&buffer, &len, '\0', stream);
-	fclose(stream);
-	if (bytes_read == -1)
-		fatal("could not read from data");
-
-	strip_firstlast_space(buffer);
-
 	assert(fieldnames->size == 0);
 
+	var stream = fopen(datafile, "r");
+	if (!stream) 
+		fatal("could not open data file \"%s\"", datafile);
+
 	string_append(data, "typedef struct RECORD {\n");
-	string_append(data, "\tdouble ");
 
-	/* process the file line by line */
-	var nrows = -1;
-	var line = buffer;
-	var linebreak = strchr(line, '\n');
-	if (linebreak == 0)
-		fatal("no lines in data");
-	*linebreak = 0;
-	while (line) {
-		let delim = " \t,";
+	/* read in header */
+	int linenum = 1;
+	char *line = NULL;
+    size_t capacity = 0;
+    var len = openpmx_getdelim(&line, &capacity, '\n', stream);
+    if (len == -1)
+		goto done;
 
-		/* read tokens in header */
-		if (nrows == -1) {
-			const char* token;
-			char* rest = line;
-			while ((token = strtok_r(rest, delim, &rest))) {
-				/* write tokens to recordfields */
-				let s = strdup(token);
-				strip_firstlast_space(s);
-				vector_append(*fieldnames, s);
+	/* determine the separator */
+	var sep = GET_DELIM_ANY_SEP;
+	if (strchr(line, ',') != NULL)
+		sep = GET_DELIM_COMMA_SEP;
 
-				/* error on reserved names in data, do this after
-				 * strip_firstlast_space() so we have the correct name */
-				check_reserved_name(s, "datafile");
+	/* parse the header */
+	let err = get_delim_tokens(line, fieldnames, sep);
+	if (err) 
+		fatal("parsing \"%s\": empty header token", datafile);
 
-				if (fieldnames->size != 1)
-					string_append(data, ", ");
-				string_append(data, s);
-			}
-			string_append(data, ";\n");
-			string_append(data, "} RECORD;\n");
-			string_append(data, "RECORD OPENPMXTRAN_DATA_NAME[] = {\n");
+	if (fieldnames->size == 0)
+		goto done;
 
-		/* read tokens and write out in a RECORD struct */
-		} else {
-			var n = 0;
-			const char* token;
-			char* rest = line;
-			string_appendf(data, "\t{\t");
-			while ((token = strtok_r(rest, delim, &rest))) {
-				var s = strdup(token);
-				strip_firstlast_space(s);
-				if (strcmp(s, ".") == 0) {
-					free(s);
-					s = strdup("NAN");
-				}
-				string_append(data, s);
-				free(s);
-				if (n < fieldnames->size - 1)
-					string_append(data, ",");
-				++n;
-			}
-			if (n != fieldnames->size)
-				fatal("number fields in data line %i does not match header (%i)", n, fieldnames->size);
-			string_append(data, "\t},\n");
-		}
-		++nrows;
-
-		/* go to the next line, the last one wont have \n because we
-		 * already stripped it */
-		line = linebreak;
-		if (line) {
-			++line;
-			linebreak = strchr(line, '\n');
-			if (linebreak)
-				*linebreak = 0;
-		}
+	/* write header to record field names */
+	forvector(i, *fieldnames) {
+		let s = fieldnames->ptr[i];
+		check_valid_name(s, "datafile");
+		string_appendf(data, "\tdouble %s;\n", s);
 	}
-	free(buffer);
+	string_append(data, "} RECORD;\n");
+	string_append(data, "RECORD OPENPMXTRAN_DATA_NAME[] = {\n");
+
+	/* read tokens and write out in a RECORD struct */
+    while ((len = openpmx_getdelim(&line, &capacity, '\n', stream)) != -1) {
+
+		STRINGS vals = { };
+		let err = get_delim_tokens(line, &vals, sep);
+		if (err) 
+			fatal("datafile \"%s\" line %i, empty value", datafile, linenum);
+		if (vals.size != fieldnames->size)
+			fatal("datafile \"%s\" line %i: number fields (%i) does not match header (%i)", datafile, linenum, vals.size, fieldnames->size);
+		
+		string_appendf(data, "\t{\t");
+		forvector(i, vals) {
+			let s = vals.ptr[i];
+			if (strcmp(s, ".") == 0) 
+				string_append(data, "NAN");
+			else 
+				string_append(data, s);
+			if (i < fieldnames->size - 1)
+				string_append(data, ",");
+		}
+		++linenum;
+		strings_free(&vals);
+
+		string_append(data, "\t},\n");
+	}
 	string_appendf(data, "};\n");
+
+done:
+	if (ferror(stream))
+		fatal("error reading datafile \"%s\" line %i", datafile, linenum);
+	if (linenum == 1)
+		fatal("datafile \"%s\" missing header", datafile);
+	if (linenum <= 2)
+		fatal("datafile \"%s\" missing data rows", datafile);
+
+	free(line);
+	fclose(stream);
 
 	/* Write out as an DATACONFIG initializer */
 	string_append(config, "\t{\n");
 	string_append(config, "\t\t.writeable = OPENPMXTRAN_DATA_NAME,\n");
 	string_append(config, "\t\t.records = OPENPMXTRAN_DATA_NAME,\n");
-	string_appendf(config, "\t\t.nrecords = %i,\n", nrows);
+	string_append(config, "\t\t.nrecords = sizeof(OPENPMXTRAN_DATA_NAME)/sizeof(OPENPMXTRAN_DATA_NAME[0]),\n");
 	string_appendf(config, "\t\t._offset1 = true,\n");
 	string_append(config, "\t\t.recordfields = {\n");
 	string_append(config, "\t\t\t.size = sizeof(RECORD),\n");
@@ -529,25 +527,13 @@ static void parse_advan_init(PARSERESULT* res, char* p)
 		res->advan_method = "pmx_advan_eigen_threecomp";
 	else if (streq(p, "eigen_twocomp"))
 		res->advan_method = "pmx_advan_eigen_twocomp";
+	else if (streq(p, "eigen_onecomp_absorb"))
+		res->advan_method = "pmx_advan_eigen_onecomp_absorb";
 	else
 		fatal("\"%s\" is not an ADVAN() method name", p);
 
 	strip_firstlast_space(endvars + 1);
 	string_append(&res->advan_init, endvars + 1);
-}
-
-static void get_delim_tokens(char* p, STRINGS* namevec)
-{
-	char* token;
-	char* rest = p;
-	let delim = ", \t\n";
-	while ((token = strtok_r(rest, delim, &rest))) {
-		strip_firstlast_space(token);
-		if (strlen(token)) {
-			let s = strdup(token);
-			vector_append(*namevec, s);
-		}
-	}
 }
 
 /// For the $IMODEL() itentifier the names in the brackets are the
@@ -566,9 +552,12 @@ static void parse_imodel(PARSERESULT* res, char* p)
 	*endvars = 0;
 
 	strip_firstlast_space(p);
-	get_delim_tokens(p, &res->imodel_field_names);
+	let err = get_delim_tokens(p, &res->imodel_field_names, GET_DELIM_ANY_SEP);
+	if (err)
+		fatal("parsing \"%s\" has missing IMODEL() parameters");
+
 	forvector(i, res->imodel_field_names)
-		check_reserved_name(res->imodel_field_names.ptr[i], "IMODEL()");
+		check_valid_name(res->imodel_field_names.ptr[i], "IMODEL()");
 
 /// In the $IMODEL() block is code called to initialize each
 /// individual model.
@@ -593,9 +582,12 @@ static void parse_predict(PARSERESULT* res, char* p)
 	*endvars = 0;
 
 	strip_firstlast_space(p);
-	get_delim_tokens(p, &res->predict_field_names);
+	let err = get_delim_tokens(p, &res->predict_field_names, GET_DELIM_ANY_SEP);
+	if (err)
+		fatal("parsing \"%s\" has missing PREDICT() parameters");
+
 	forvector(i, res->predict_field_names)
-		check_reserved_name(res->predict_field_names.ptr[i], "PREDICT()");
+		check_valid_name(res->predict_field_names.ptr[i], "PREDICT()");
 
 /// In the $PREDICT() block is code called to calculate the prediction
 /// variables and the observation prediction Y.
@@ -649,7 +641,10 @@ static void parse_omega(PARSERESULT* res, char* p)
 	strip_firstlast_space(p);
 
 	STRINGS s = { 0 };
-	get_delim_tokens(p, &s);
+	let err = get_delim_tokens(p, &s, GET_DELIM_ANY_SEP);
+	if (err)
+		fatal("parsing \"%s\" has missing OMEGA() values");
+
 	let ndim = s.size;
 	string_appendf(&res->omega_init, "\t\t{ OMEGA_DIAG, %i, { ", ndim);
 	forvector(i, s)
@@ -677,7 +672,10 @@ static void parse_omegablock(PARSERESULT* res, char* p)
 	/* calculate dimensions */
 	/* https://www.wolframalpha.com/input?i2d=true&i=solve+k%5C%2844%29+n%3Dk*Divide%5B%5C%2840%29k%2B1%5C%2841%29%2C2%5D */
 	STRINGS s = { 0 };
-	get_delim_tokens(p, &s);
+	let err = get_delim_tokens(p, &s, GET_DELIM_ANY_SEP);
+	if (err)
+		fatal("parsing \"%s\" has missing OMEGABLOCK() values");
+	
 	let n = s.size;
 	let ndim = (int)floor((sqrt(8 * n + 1) - 1) / 2);
 
@@ -730,7 +728,10 @@ static void parse_sigma(PARSERESULT* res, char* p)
 
 	/* get tokens and print with comma delimiter */
 	STRINGS s = { 0 };
-	get_delim_tokens(p, &s);
+	let err = get_delim_tokens(p, &s, GET_DELIM_ANY_SEP);
+	if (err)
+		fatal("parsing \"%s\" has missing SIGMA() values");
+
 	forvector(i, s)
 		string_appendf(&res->sigma_init, "%s, ", s.ptr[i]);
 	strings_free(&s);
@@ -1346,6 +1347,8 @@ char openpmxtran_template[] =
 "}\n"
 "\n"
 "#define table(f, ...)	pmx_table(&openpmx, (f), &(TABLECONFIG){ __VA_ARGS__ })\n"
+"\n"
+"#define reload(...) pmx_reload_popparam(&openpmx, &(RELOADCONFIG){ __VA_ARGS__ })\n"
 "\n"
 "static void openpmxtran_data_preprocess(void)\n"
 "{\n"

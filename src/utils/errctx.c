@@ -1,4 +1,4 @@
-/*
+/* 
  * This file is part of OpenPMX (https://github.com/deleveld/openpmx).
  * Copyright (c) 2024 Douglas Eleveld.
  *
@@ -15,21 +15,31 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef OPENPMX_VARIOUS_H
-#define OPENPMX_VARIOUS_H
+#include <string.h>
+#include <stdio.h>
 
-#include <time.h>
+#include "errctx.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+static void verrctx(ERRCTX *errctx, const char *format, va_list args)
+{
+	size_t capacity = sizeof(errctx->errmsg);
+	if (errctx->len >= capacity - 1) 
+		return;
 
-double timespec_time_difference(const struct timespec* const begin,
-								const struct timespec* const end);
-void timespec_duration(const struct timespec* const begin, double* eval);
- 
-#ifdef __cplusplus
+	size_t available = capacity - errctx->len;
+	int written = vsnprintf(&errctx->errmsg[errctx->len], available, format, args);
+	if (written > 0) {
+		if ((size_t)written >= available) 
+			errctx->len = capacity - 1; 
+		else 
+			errctx->len += (size_t)written;
+	}
 }
-#endif
 
-#endif
+void add_errctx(ERRCTX *errctx, const char *format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    verrctx(errctx, format, args);
+    va_end(args);
+}
