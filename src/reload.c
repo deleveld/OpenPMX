@@ -459,10 +459,11 @@ int pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
 
 	/* last non-zero sigma is the last one */
 	var nsigma = OPENPMX_SIGMA_MAX;
-	for (int i=OPENPMX_SIGMA_MAX-1; i>=0; i--) {
-		nsigma = i + 1;
-		if (src.sigma[i] != 0.)
+	for (i=OPENPMX_SIGMA_MAX-1; i>=0; i--) {
+		if (src.sigma[i] != 0.) {
+			nsigma = i + 1;
 			break;
+		}
 	}
 	for (i=0; i<nsigma; i++)
 		dest->sigma[i] = src.sigma[i];
@@ -476,14 +477,13 @@ int pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
 
 	/* if we dont preserve old values then overwrite other paramaters */
 	if (!args->preserve) {
-		int i;
-		for (i=ntheta; i<OPENPMX_THETA_MAX; i++)
+		for (int i=ntheta; i<OPENPMX_THETA_MAX; i++)
 			memset(&dest->theta[i], 0, sizeof(dest->theta[i]));
 
-		for (i=nsigma; i<OPENPMX_SIGMA_MAX; i++)
+		for (int i=nsigma; i<OPENPMX_SIGMA_MAX; i++)
 			dest->sigma[i] = 0.;
 
-		for (i=nblock; i<OPENPMX_OMEGABLOCK_MAX; i++)
+		for (int i=nblock; i<OPENPMX_OMEGABLOCK_MAX; i++)
 			memset(&dest->omega[i], 0, sizeof(dest->omega[i]));
 	}
 

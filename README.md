@@ -83,6 +83,9 @@ The same example, but using the eigensystem solver.
 The same example, but using the eigensystem solver specialized to a three compartment model.
 - `../../openpmx schnider_eigen_threecomp.gr`
 
+The basic example, but with a different omega structure that is reloaded before starting estimation.
+- `../../openpmx schnider_reload.gr`
+
 ### Theophylline
 In directory `examples/theo` these are the Theophylline data from the NONMEM distribution.
 - `../../openpmx theo.gr`
