@@ -352,8 +352,8 @@ static OPENPMX popparams_init_from_file(const char* filename, ERRCTX* errctx)
 		 *
 		 *   OMEGA_SAME:  no values needed; popmodel_init() copies from
 		 *                the immediately preceding block.               */
-		int n = 0;
 		if (type == OMEGA_DIAG) {
+			int n = 0;
 			for (int r = 0; r < dim; r++) {
 				double val = omega[d + r][d + r];
 				if (omegafixed[d + r][d + r] == 1)
@@ -362,6 +362,7 @@ static OPENPMX popparams_init_from_file(const char* filename, ERRCTX* errctx)
 			}
 
 		} else if (type == OMEGA_BLOCK) {
+			int n = 0;
 			for (int r = 0; r < dim; r++) {
 				/* off-diagonal entries for this row */
 				for (int c = 0; c < r; c++)
