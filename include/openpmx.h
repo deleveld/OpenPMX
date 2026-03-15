@@ -198,8 +198,8 @@ typedef struct {
 		double lower, value, upper;
 		enum {
 			THETA_INVALID = 0,
-			FIXED = 1,
-			ESTIMATE = 2,
+			FIXED,
+			ESTIMATE,
 		} type;
 	} theta[OPENPMX_THETA_MAX];
 	struct {

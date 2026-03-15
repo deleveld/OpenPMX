@@ -21,9 +21,9 @@
 #include "defines.h"
 #include "popmodel.h"
 #include "utils/c22.h"
-#include "utils/vector.c"
-#include "utils/getdelim.c"
-#include "utils/errctx.c"
+#include "utils/vector.h"
+#include "utils/getdelim.h"
+#include "utils/errctx.h"
 
 typedef VECTOR(const char*) TOKENVEC;
 
@@ -152,58 +152,23 @@ static void get_delim_token_ptrs(char* line, TOKENVEC* namevec)
 	}
 }
 
-static void read_extcols(const char *filename, EXTCOLS* extcols, ERRCTX* errctx)
+static void parse_extcols_line(char *line,
+							   EXTCOLS* extcols,
+							   ERRCTX* errctx,
+							   const char* filename,
+							   const int linenum)
 {
-	var linenum = 0;
-	char *line = NULL;
-	char* header_text = 0;
-	TOKENVEC header_elem = { 0 };
+	/* read in a line of values */
+	TOKENVEC vals = { 0 };
+	get_delim_token_ptrs(line, &vals);
 
-    FILE *stream = fopen(filename, "r");
-    if (!stream) {
-		add_errctx(errctx, "%s: cannot open \"%s\"\n", __func__, filename);
-		goto done;
-	}
+	/* error if number of values detected didnt match */
+	if (vals.size != extcols->size) {
+		add_errctx(errctx, "%s: ext file \"%s\" line %i number fields (%i) does not match header (%i)\n",
+				   __func__, filename, linenum, vals.size, extcols->size);
 
-	/* read in header */
-    size_t capacity = 0;
-    var len = openpmx_getdelim(&line, &capacity, '\n', stream);
-    if (len == -1) {
-		add_errctx(errctx, "%s: ext file \"%s\" cannot read header\n", __func__, filename);
-		goto done;
-	}
-	++linenum;
-
-	/* read and translate header */
-	header_text = strdup(line);
-	get_delim_token_ptrs(header_text, &header_elem);
-	forvector(i, header_elem) {
-		let name = header_elem.ptr[i];
-		let colinfo = parse_col_name(name, errctx);
-		if (errctx->len) {
-			add_errctx(errctx, "%s: ext file \"%s\" parse fail\n", __func__, filename);
-			goto done;
-		}
-		vector_append(*extcols, colinfo);
-	}
-
-	/* read in lines */
-    while ((len = openpmx_getdelim(&line, &capacity, '\n', stream)) != -1) {
-		++linenum;
-
-		/* read in a line of values */
-		char* vals_text = strdup(line);
-		TOKENVEC vals = { 0 };
-		get_delim_token_ptrs(vals_text, &vals);
-
-		/* its an error if size doesn't match */
-		if (vals.size != extcols->size)  {
-			add_errctx(errctx, "%s: ext file \"%s\" line %i number fields (%i) does not match header (%i)\n",
-					   __func__, filename, linenum, vals.size, header_elem.size);
-			vector_free(vals);
-			free(vals_text);
-			goto done;
-		}
+	/* copy over values if no errors */
+	} else {
 
 		/* basic value */
 		let iteration = atol(vals.ptr[0]);
@@ -231,11 +196,53 @@ static void read_extcols(const char *filename, EXTCOLS* extcols, ERRCTX* errctx)
 			forvector(i, vals) 
 				extcols->rawptr[i].blocknum = atoi(vals.ptr[i]);
 		}
-		vector_free(vals);
-		free(vals_text);
+	}
+}
+
+static void read_extcols(const char *filename, EXTCOLS* extcols, ERRCTX* errctx)
+{
+	char *line = NULL;
+	char* header_text = 0;
+	TOKENVEC header_elem = { 0 };
+
+    FILE *stream = fopen(filename, "r");
+    if (!stream) {
+		add_errctx(errctx, "%s: cannot open \"%s\"\n", __func__, filename);
+		goto failed;
 	}
 
-done:
+	/* read in header */
+    size_t capacity = 0;
+    var len = openpmx_getdelim(&line, &capacity, '\n', stream);
+    if (len == -1) {
+		add_errctx(errctx, "%s: ext file \"%s\" cannot read header\n", __func__, filename);
+		goto failed;
+	}
+	var linenum = 1;
+
+	/* read and translate header */
+	header_text = strdup(line);
+	get_delim_token_ptrs(header_text, &header_elem);
+	forvector(i, header_elem) {
+		let name = header_elem.ptr[i];
+		let colinfo = parse_col_name(name, errctx);
+		if (errctx->len) {
+			add_errctx(errctx, "%s: ext file \"%s\" header parse fail\n", __func__, filename);
+			goto failed;
+		}
+		vector_append(*extcols, colinfo);
+	}
+
+	/* read in lines, parse them, check for errors */
+    while ((len = openpmx_getdelim(&line, &capacity, '\n', stream)) != -1) {
+		++linenum;
+		parse_extcols_line(line, extcols, errctx, filename, linenum);
+		if (errctx->len)
+			break;
+	}
+
+failed:
+	/* cleanup stream, line and header */
 	if (stream)
 		fclose(stream);
 	free(line);
@@ -258,10 +265,8 @@ static OPENPMX popparams_init_from_file(const char* filename, ERRCTX* errctx)
 	read_extcols(filename, &extcols, errctx);
 
 	/* fail with any lower level error */
-	if (errctx->len) {
-		vector_free(extcols);
-		return pmx;
-	}
+	if (errctx->len)
+		goto failed;
 
 	double omega[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX] = { 0 };
 	int omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX] = { 0 };
@@ -379,7 +384,8 @@ static OPENPMX popparams_init_from_file(const char* filename, ERRCTX* errctx)
 		d  += dim;
 		bk += 1;
 	}
-
+	
+failed:
     vector_free(extcols);
     return pmx;
 }
@@ -397,7 +403,7 @@ int pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
 			goto failed;
 		}
 		/* construct the default filename, where we expect the ext file
-		 * to actually be */
+		 * would normally be */
 		let len = strlen(dest->filename) + strlen(OPENPMX_EXTFILE);
 		filename_buffer = mallocvar(char, len + 1);
 		strcpy(filename_buffer, dest->filename);
@@ -458,12 +464,10 @@ int pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
 	let ntheta = i;
 
 	/* last non-zero sigma is the last one */
-	var nsigma = OPENPMX_SIGMA_MAX;
-	for (i=OPENPMX_SIGMA_MAX-1; i>=0; i--) {
-		if (src.sigma[i] != 0.) {
+	var nsigma = 0;
+	for (i=0; i<OPENPMX_SIGMA_MAX; i++) {
+		if (src.sigma[i] != 0.)
 			nsigma = i + 1;
-			break;
-		}
 	}
 	for (i=0; i<nsigma; i++)
 		dest->sigma[i] = src.sigma[i];
@@ -505,8 +509,7 @@ int pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
 
 	/* failure path */
 failed:
-	if (filename_buffer)
-		free(filename_buffer);
+	free(filename_buffer);
 
 	if (errctx.len)
 		fprintf(stderr, "%s", errctx.errmsg);

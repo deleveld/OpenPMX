@@ -36,7 +36,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 	let theta = pmx->theta;
 	let omegablocks = pmx->omega;
 	let sigma = pmx->sigma;
-	
+
 	POPMODEL ret = { 0 };
 	ret.ntheta = 0;
 	ret.nblock = 0;
@@ -206,14 +206,12 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 	}
 
 	/* make a copy of the sigma */
-	/* we have to check this backwards because there can be zero values at
-	 * lower indicies, after that we can go forward */
-	for (int i=OPENPMX_SIGMA_MAX-1; i>=0; i--) {
-		ret.nsigma = i + 1;
+	/* last non-zero sigma is the last one */
+	ret.nsigma = 0;
+	forcount(i, OPENPMX_SIGMA_MAX) {
 		let v = sigma[i];
-		/* test for non-zero, or negative zero */
-		if (v != 0.)
-			break;
+		if (!isnan(v) && v != 0.)
+			ret.nsigma = i + 1;
 	}
 	forcount(i, ret.nsigma) {
 		let v = sigma[i];
