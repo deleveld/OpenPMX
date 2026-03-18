@@ -90,6 +90,7 @@ void advan_base_construct(ADVAN* advanbase, const ADVANFUNCS* advanfuncs);
 void advan_base_destruct(ADVAN* advanbase);
 
 /* Used by some ODE methods to send arguments to the user DIFFEQN function */
+typedef typeof(((ADVANCONFIG){0}).diffeqn) ADVAN_DIFFEQN;
 typedef struct ADVANCER_DIFFEQN_CALLBACK_ARGS {
 	ADVAN_DIFFEQN diffeqn;
 	const ADVAN* advan;
@@ -100,7 +101,7 @@ typedef struct ADVANCER_DIFFEQN_CALLBACK_ARGS {
 	int nstate;
 } ADVANCER_DIFFEQN_CALLBACK_ARGS;
 
-/* just utility functions */
+/* utility function */
 void advan_ensure(const int flag, const char* fname, const char* message);
 
 #ifdef __cplusplus

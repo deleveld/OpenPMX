@@ -167,3 +167,13 @@ void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel
 	pmx->result = popmodel->result;
 }
 
+void pmx_set_theta(OPENPMX* dest, 
+				   const int index,
+				   typeof(((OPENPMX){0}).theta[0])* theta)
+{
+	let i = (dest->data._offset1) ? (index-1) : (index);
+	assert(i >= 0);
+	assert(i < OPENPMX_THETA_MAX);
+	dest->theta[i] = *theta;
+}
+

@@ -35,6 +35,8 @@
 
 #include <gsl/gsl_math.h>
 
+typedef typeof(((ADVANCONFIG){0}).predict) IMODEL_PREDICT;
+
 /* NOTE: these functions must be thread safe on the level of an individual */
 
 __attribute__ ((hot))
@@ -112,10 +114,13 @@ static inline double phi(const double x)
 /* alignment should help with access speed, may allow SIMD instructions */
 typedef struct {
 	double errarray[OPENPMX_SIGMA_MAX]				__attribute__((aligned(32)));
+	
 	/* will be cast to PREDICTVARS */
 	double _predictvars[OPENPMX_PREDICTVARS_MAX]	__attribute__((aligned(32)));
+
 	/* will be cast to IMODEL */
 	double _imodel[OPENPMX_IMODEL_MAX]				__attribute__((aligned(32)));
+
 } ADVAN_MODEL_MEMORY;
 
 /* functions for Bae and Yim objective function Term 1 and Term 2 */

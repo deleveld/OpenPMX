@@ -151,8 +151,6 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			let duration = (rate != 0.) ? (amt / rate) : (0.);
 			let end = start + duration;
 
-			advan_ensure(cmt < nstate, __func__, "CMT value exceeds nstate");
-
 			add_infusion(advan->infusions,
 						&advan->ninfusions,
 						&(ADVANINFUSION) {
@@ -361,14 +359,15 @@ void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const dou
 	}
 }
 
-double* pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate)
+void pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate, const double* sysmat)
 {
 	let ret = advanstate->advan->eigen_sysmat_data;
 	if (!ret) {
 		fprintf(stderr, "fatal: advancer does not need eigensystem to be defined\n");
 		exit(EXIT_FAILURE);
 	}
-	return ret;
+	let n = advanstate->current.popparam->nstate;
+	memcpy(ret, sysmat, n * n * sizeof(double));
 }
 
 /*

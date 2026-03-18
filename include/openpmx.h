@@ -96,48 +96,43 @@ typedef struct {
 	const PREDICTSTATE current;
 } ADVANSTATE;
 
-/* must be initialized in IMODEL_INIT */
-typedef struct IMODEL IMODEL;
-typedef void (*IMODEL_INIT)(IMODEL* const imodel, ADVANSTATE* advanstate);
-
 /* changes to advancer within the IMODEL_INIT function */
 void pmx_advan_amtlag(const ADVANSTATE* advanstate, const int cmt, const double t);
 void pmx_advan_bioaval(const ADVANSTATE* advanstate, const int cmt, const double f);
 bool pmx_advan_inittime(const ADVANSTATE* advanstate, const double t);
 void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const double v);
-double* pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate);
-
-/* prediction function */
-typedef struct PREDICTVARS PREDICTVARS;
-typedef	double (*IMODEL_PREDICT)(const IMODEL* const imodel,
-								 const PREDICTSTATE* const predictstate,
-								 const double* const err,
-								 PREDICTVARS* predparams);
+void pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate, const double* sysmat);
 
 /* callback for differential equation solver */
-typedef void (*ADVAN_DIFFEQN)(double DADT[],
-							  const IMODEL* const imodel,
-							  const RECORD* const record,
-							  const double* state,
-							  const POPPARAM* const popparam,
-							  const double T);
-
-/* unified arguments for all advancer functions */
+typedef struct IMODEL IMODEL;
+typedef struct PREDICTVARS PREDICTVARS;
 typedef struct ADVANCONFIG ADVANCONFIG;
 typedef struct ADVANFUNCS ADVANFUNCS;
-typedef	ADVANFUNCS* (*ADVANMETHOD)(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
-
 typedef struct ADVANCONFIG {
-	const IMODEL_INIT init;
-	const IMODEL_PREDICT predict;
+	
+	/* init function */
+	void (*init)(IMODEL* const imodel, 
+				 ADVANSTATE* advanstate);
+	/* predict function */
+	double (*predict)(const IMODEL* const imodel,
+					  const PREDICTSTATE* const predictstate,
+					  const double* const err,
+					  PREDICTVARS* predparams);
 	const int firstonly;
 	const int predictall;
 
 	const STRUCTINFO imodelfields;
 	const STRUCTINFO predictfields;
-	const ADVANMETHOD method;
+	ADVANFUNCS* (*method)(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 	const int nstate;
-	const ADVAN_DIFFEQN diffeqn;
+	
+	/* differential equation callback */
+	void (*diffeqn)(double DADT[],
+					const IMODEL* const imodel,
+					const RECORD* const record,
+					const double* state,
+					const POPPARAM* const popparam,
+					const double T);
 
 	/* extra arguments */
 	union {
@@ -151,12 +146,14 @@ typedef struct ADVANCONFIG {
 	} args;
 } ADVANCONFIG;
 
-/* analytic advan methods */
+/* basic analytic advan methods */
 ADVANFUNCS* pmx_advan_pred(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_onecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_onecomp_depot(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
+
+/* eigensystem analytic advan methods */
 ADVANFUNCS* pmx_advan_eigen(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_eigen_threecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_eigen_twocomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
@@ -293,13 +290,38 @@ void pmx_table(OPENPMX* pmx, const char* fields, const TABLECONFIG* const tablec
 /*---------------------------------------------------------------------*/
 typedef struct {
 	const char* filename;
-	const bool optional;
 	const bool force;
+	const bool optional;
 	const bool preserve;
 	const bool silent;
 } RELOADCONFIG;
 
-int pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args);
+void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args);
+
+/*---------------------------------------------------------------------*/
+/* utility set functions */
+/*---------------------------------------------------------------------*/
+void pmx_set_theta(OPENPMX* dest, 
+				   const int index,
+				   typeof(((OPENPMX){0}).theta[0])* theta);
+				   
+/*---------------------------------------------------------------------*/
+/* specialized model equations */
+/*---------------------------------------------------------------------*/
+typedef struct {
+	/* input */
+	const double age;
+	const double weight;
+	const double height;
+	const bool male;
+	
+	/* output */
+	double LBM;
+	double V1, V2, V3, CL, Q2, Q3, KE0;
+	double k10, k12, k21, k13, k31;
+} SCHNIDER_PROPOFOL_CONFIG;
+
+void pmx_model_schnider_propofol(SCHNIDER_PROPOFOL_CONFIG* schniderconfig);
 
 #ifdef __cplusplus
 }

@@ -83,13 +83,13 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 		ret.theta[i] = theta[i].value;
 		ret.upper[i] = theta[i].upper;
 
-		if (theta[i].value < theta[i].lower ||
-			theta[i].value > theta[i].upper) {
-			add_errctx(errctx, "THETA outside boundary { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
-			goto failed;
-		}
-
 		if (est == ESTIMATE) {
+			if (theta[i].value < theta[i].lower ||
+				theta[i].value > theta[i].upper) {
+				add_errctx(errctx, "THETA outside boundary { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
+				goto failed;
+			}
+
 			if (theta[i].value == theta[i].lower ||
 				theta[i].value == theta[i].upper) {
 				add_errctx(errctx, "THETA at boundary { %g, %g, %g, ESTIMATE }\n", theta[i].lower, theta[i].value, theta[i].upper);
@@ -482,24 +482,32 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 	info(f2, "THETA(%i)\n", ntheta);
 	forcount(i, ntheta) {
 		let v = popmodel->theta[i];
-		info(f2, OPENPMX_FFORMAT "\n", v);
+		let f = popmodel->thetaestim[i];
+		info(f2, OPENPMX_FFORMAT "%s\n", 
+			v, 
+			f == FIXED ? "*" : "");
 	}
 
 	/* info about omega matrix */
 	let nomega = popmodel->nomega;
 	info(f2, "OMEGA(%i)\n", nomega);
 	forcount(i, nomega) {
-		forcount(j, i+1) 
-			info(f2, OPENPMX_FFORMAT " ", popmodel->omega[i][j]);
+		forcount(j, i+1) {
+			let v = popmodel->omega[i][j];
+			let f = popmodel->omegafixed[i][j];
+			info(f2, OPENPMX_FFORMAT "%s", v, f ? "*" : "");
+		}
 		info(f2, "\n");
 	}
 
 	/* info about sigma */
 	let nsigma = popmodel->nsigma;
 	info(f2, "SIGMA(%i)\n", nsigma);
-	forcount(i, nsigma) 
-		info(f2, OPENPMX_FFORMAT " ", popmodel->sigma[i]);
-	info(f2, "\n");
+	forcount(i, nsigma) {
+		let v = popmodel->sigma[i];
+		let f = popmodel->sigmafixed[i];
+		info(f2, OPENPMX_FFORMAT " %s\n", v, f ? "*" : "");
+	}
 }
 
 void popmodel_eval_information(const POPMODEL* const popmodel,

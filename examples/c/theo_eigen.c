@@ -36,7 +36,7 @@ static void imodel_init(IMODEL* const _imodel,
 	/* one compartment model with absorbtion */
 	const double sysmat[] = {	-KA,	0.,
 								KA,		-K };
-	memcpy(pmx_advan_eigen_sysmat(_advanstate), sysmat, sizeof(sysmat));
+	pmx_advan_eigen_sysmat(_advanstate, sysmat);
 			
 	_imodel-> V = V;
 	_imodel-> K = K;

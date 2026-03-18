@@ -177,8 +177,9 @@ void scatter_threads(const IDATA* const idata,
 #if defined(OPENPMX_PARALLEL_SINGLETHREAD)
 	nthread = 1;
 #endif
-	if (nthread > nindivid && scatteroptions->checkout_errors) {
-		info(logstream, "nthread (%i) limited to number of individuals (%i)\n", nthread, idata->nindivid);
+	if (nthread > nindivid) {
+		if (nindivid && scatteroptions->checkout_errors) 
+			info(logstream, "nthread (%i) limited to number of individuals (%i)\n", nthread, idata->nindivid);
 		nthread = nindivid;
 	}
 	int nworker = nthread - 1;

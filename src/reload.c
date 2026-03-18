@@ -20,10 +20,19 @@
 #include "openpmx.h"
 #include "defines.h"
 #include "popmodel.h"
+#include "idata.h"
+#include "print.h"
+#include "pmxstate.h"
+#include "advan/advan.h"
 #include "utils/c22.h"
 #include "utils/vector.h"
 #include "utils/getdelim.h"
 #include "utils/errctx.h"
+
+/// This file implements a function that modifies an OPENPMX object
+/// from information from a .ext file. It is available in openpmxtran
+/// as `reload()`. This loads the population paramaters, setting their
+/// structure to that in the file.
 
 typedef VECTOR(const char*) TOKENVEC;
 
@@ -46,8 +55,6 @@ typedef struct {
     int row, col;   /* OMEGA indices (1-based) */
 	int blocknum;
 } COLINFO;
-
-typedef VECTOR(COLINFO) EXTCOLS;
 
 static COLINFO parse_col_name(const char *name, ERRCTX* errctx)
 {
@@ -141,7 +148,8 @@ static COLINFO parse_col_name(const char *name, ERRCTX* errctx)
 }
 
 /* modifies line and makes a vector of pointers to tokens */
-static void get_delim_token_ptrs(char* line, TOKENVEC* namevec)
+static void get_delim_token_ptrs(char* line,
+								 TOKENVEC* namevec)
 {
 	char *saveptr;
 	let delim = " \t\r\n";
@@ -151,6 +159,8 @@ static void get_delim_token_ptrs(char* line, TOKENVEC* namevec)
 		token = strtok_r(NULL, delim, &saveptr);
 	}
 }
+
+typedef VECTOR(COLINFO) EXTCOLS;
 
 static void parse_extcols_line(char *line,
 							   EXTCOLS* extcols,
@@ -170,6 +180,9 @@ static void parse_extcols_line(char *line,
 	/* copy over values if no errors */
 	} else {
 
+/// Each line of the .ext file is read and saved. This allows
+/// continuation of terminated estimation runs from the population
+/// paramaters from the last full iteration.
 		/* basic value */
 		let iteration = atol(vals.ptr[0]);
 		if (iteration > 0 || iteration == -1000000000) {
@@ -198,7 +211,7 @@ static void parse_extcols_line(char *line,
 		}
 	}
 }
-
+	
 static void read_extcols(const char *filename, EXTCOLS* extcols, ERRCTX* errctx)
 {
 	char *line = NULL;
@@ -250,10 +263,10 @@ failed:
 	free(header_text);
 }
 
-static OPENPMX popparams_init_from_file(const char* filename, ERRCTX* errctx)
+static OPENPMX popparams_init_from_file(const char* filename,
+										ERRCTX* errctx)
 {
-    OPENPMX pmx;
-    memset(&pmx, 0, sizeof(pmx));
+    OPENPMX pmx = { 0 };
     forcount(i, OPENPMX_THETA_MAX) 
 		pmx.theta[i].type = THETA_INVALID;
     forcount(i, OPENPMX_SIGMA_MAX)
@@ -261,10 +274,9 @@ static OPENPMX popparams_init_from_file(const char* filename, ERRCTX* errctx)
     forcount(i, OPENPMX_OMEGABLOCK_MAX)
 		pmx.omega[i].type = OMEGA_INVALID;
 
+	/* read in coloumns and exit if error */
 	EXTCOLS extcols = { 0 };
 	read_extcols(filename, &extcols, errctx);
-
-	/* fail with any lower level error */
 	if (errctx->len)
 		goto failed;
 
@@ -311,14 +323,14 @@ static OPENPMX popparams_init_from_file(const char* filename, ERRCTX* errctx)
 
 	/* Walk the diagonal (0-based) and emit one pmx.omega[] block per
 	 * run of consecutive diagonal entries sharing the same block number. */
-	int bk = 0;   /* index into pmx.omega[]  */
-	int d  = 0;   /* 0-based diagonal offset */
+	var bk = 0;		/* index into pmx.omega[]  */
+	var d = 0;		/* 0-based diagonal offset */
 
 	while (d < nomega && bk < OPENPMX_OMEGABLOCK_MAX) {
-		int bn  = omegablocknum[d][d];
+		var bn = omegablocknum[d][d];
 
 		/* How many consecutive diagonal entries share this block number? */
-		int dim = 0;
+		var dim = 0;
 		while (d + dim < nomega && omegablocknum[d + dim][d + dim] == bn)
 			dim++;
 
@@ -326,8 +338,8 @@ static OPENPMX popparams_init_from_file(const char* filename, ERRCTX* errctx)
 		 *   OMEGA_SAME  – every diagonal element has fixed == 2
 		 *   OMEGA_BLOCK – at least one off-diagonal has a non-zero blocknum
 		 *   OMEGA_DIAG  – otherwise                                       */
-		int all_same    = 1;
-		int has_offdiag = 0;
+		var all_same    = 1;
+		var has_offdiag = 0;
 		for (int r = 0; r < dim; r++) {
 			if (omegafixed[d + r][d + r] != 2)
 				all_same = 0;
@@ -335,13 +347,11 @@ static OPENPMX popparams_init_from_file(const char* filename, ERRCTX* errctx)
 				if (omegablocknum[d + r][d + c] != 0)
 					has_offdiag = 1;
 		}
-		int type;
+		var type = OMEGA_DIAG;
 		if (all_same && dim > 0)
 			type = OMEGA_SAME;
 		else if (has_offdiag)
 			type = OMEGA_BLOCK;
-		else
-			type = OMEGA_DIAG;
 
 		pmx.omega[bk].type = type;
 		pmx.omega[bk].ndim = dim;
@@ -390,11 +400,10 @@ failed:
     return pmx;
 }
 
-int pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
+static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel)
 {
 	ERRCTX errctx = { 0 };
 
-	/* if no filename passed in, make one from the destitation name */
 	const char* filename = args->filename;
 	char* filename_buffer = 0;
 	if (!filename) {
@@ -415,6 +424,14 @@ int pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
 	if (errctx.len)
 		goto failed;
 
+	/// The default is that reloading of the population paramaters fails if: 
+	///
+	/// + Any theta bounds dont match
+	/// + Any theta FIXED/ESTIMATE dont match
+	/// + The structure of any the omega blocks differ
+	/// + The number of sigma values differ
+	/// + Any sigma values fixed or estimated dont match
+	///
 	/* we have to check whether we do the copy in its entirety before
 	 * even starting, so we dont copy over a half initialized object */
 	if (!args->force) {
@@ -437,8 +454,17 @@ int pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
 			}
 		}
 
-		/* sigma cant fail */
-
+		forcount(i, OPENPMX_SIGMA_MAX) {
+			if ((src.sigma[i] != 0) != (dest->sigma[i] != 0)) {
+				add_errctx(&errctx, "%s: sigma non-zero does not match.\n", __func__);
+				goto failed;
+			}
+			if ((src.sigma[i] < 0) != (dest->sigma[i] < 0)) {
+				add_errctx(&errctx, "%s: sigma fixed does not match.\n", __func__);
+				goto failed;
+			}
+		}
+		
 		forcount(i, OPENPMX_OMEGABLOCK_MAX) {
 			if (src.omega[i].type == OMEGA_INVALID)
 				break;
@@ -491,34 +517,86 @@ int pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
 			memset(&dest->omega[i], 0, sizeof(dest->omega[i]));
 	}
 
-	/* test by making a POPMODEL which catches more errors */
-	let popmodel = popmodel_init(dest, &errctx);
+	/* Test by making a POPMODEL which may catch some errors */
+	*popmodel = popmodel_init(dest, &errctx);
 	if (errctx.len)
 		goto failed;
 	if (!args->silent) {
-		fprintf(stdout, "popparam loaded \"%s\"\n", filename);
-		popmodel_information(0, &popmodel, 0);
+		fprintf(stdout, "popparam reload \"%s\"\n", filename);
+		popmodel_information(0, popmodel, 0);
 	}
 
 	/* cleanup */
 	/* return with success */
-	dest->result = (PMXRESULT) { 0 };
 	if (filename_buffer)
 		free(filename_buffer);
 	return 0;
 
-	/* failure path */
 failed:
+	/* failure path */
 	free(filename_buffer);
 
-	if (errctx.len)
-		fprintf(stderr, "%s", errctx.errmsg);
+	if (!args->silent) {
+		if (errctx.len)
+			fprintf(stderr, "%s", errctx.errmsg);
+	}
 
-	/* fail if we are not optional */
-	if (!args->optional)
-		exit(EXIT_FAILURE);
-		
+	/* if it failed but it was optional, then dont pass error */
+	if (!args->optional) 
+		fatal(0, "%s: reload failed but not optional\n", __func__);
+
 	return 1;
 }
 
+/// For the configuration object there are various settings.
+///
+/// - `.filename="...",` The filename is used as an .ext file to
+/// load the population parameters (theta, omega, and sigma values)
+/// and save them in the OPENPMX object. The default behavior is to load
+/// the population paramaters from the filename of the destination
+/// OPENPMX object with a .ext extension added.
+/// - `.force=true,` The loaded population paramaters are copied over
+/// those of the destinantion ignoring any mismatch in structure. The
+/// default is to exit the program if the structures differ.
+/// - `.preserve=true,` If the size of the newly loaded population
+/// paramaters is smaller than the existing population paramaters, then
+/// paramaters at higher indicies are preserved. The default is to set
+/// them to invalid values.
+/// - `.optional=true,` If reloading fails then the destination OPENPMX
+/// object is not modified and the program continues. The default
+/// behavior is to consider this a fatal error and the program exits.
+/// - `.silent=true,` Setting this supresses a message showing the
+/// structure of the newly loaded population paramaters.
+
+void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
+{
+	POPMODEL popmodel;
+	let err = reload_popparam(dest, args, &popmodel);
+
+	if (!err) {
+/// A successful reload invalidates the objective function result.
+		dest->result = (PMXRESULT) { 0 };
+
+/// A successful reload invalidates any existing individual level data
+/// in the destinantion OPENPMX object because the numer of etas could
+/// have been changed. 
+		var state = dest->state;
+		if (state) {
+			/* destruct and reconstruct the individual level data. We have
+			 * to do it locally and then memcpy it over because IDATA has
+			 * const members. */
+			let idata = &state->idata;
+			let advanfuncs = state->advanfuncs;
+			idata_destruct(idata);
+			var newidata = idata_construct(&advanfuncs->recordinfo,
+										   popmodel.ntheta,
+										   popmodel.nomega,
+										   popmodel.nsigma,
+										   advanfuncs->nstate,
+										   advanfuncs->advanconfig->imodelfields.size,
+										   advanfuncs->advanconfig->predictfields.size);
+			memcpy(idata, &newidata, sizeof(newidata));
+		}
+	}
+}
 

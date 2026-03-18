@@ -28,8 +28,9 @@
 ///
 /// This is equivalent to NONMEM's ADVAN5 (linear general compartmental
 /// model). The technique is described in:
-///   - Joachim J, "TCI Eigendecomposition" (2026)
-///   - Minto C, Schnider T, "From Eigenvalues to Plasma Coefficients" (2026)
+///
+/// - Joachim J, "TCI Eigendecomposition" (2026)
+/// - Minto C, Schnider T, "From Eigenvalues to Plasma Coefficients" (2026)
 ///
 /// The modal state update for constant input over interval dt:
 ///

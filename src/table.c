@@ -329,7 +329,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	const int off = _offset1 ? 1 : 0;
 	var i = -1;
 /// Values for theta can be accessed in several ways. For example
-/// THETA(1) is accessible as theta(1), THETA(1), theta[1], or THETA[1].
+/// THETA(1) is accessible as theta(1), THETA(1), theta1, or THETA1.
 	if (sscanf(name, "theta(%i)", &i) == 1 ||
 		sscanf(name, "THETA(%i)", &i) == 1 ||
 		sscanf(name, "theta%i", &i) == 1 ||
@@ -342,7 +342,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 		return NAN;
 	}
 /// Values for eta can be accessed in several ways. For example ETA(1)
-/// is accessible as eta(1), ETA(1), eta[1], or ETA[1].
+/// is accessible as eta(1), ETA(1), eta1, or ETA1.
 	if (sscanf(name, "eta(%i)", &i) == 1 ||
 		sscanf(name, "ETA(%i)", &i) == 1 ||
 		sscanf(name, "eta%i", &i) == 1 ||
@@ -357,8 +357,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	}
 /// Compartment amounts (the internal compartment state) can be accessed
 /// in several ways. For example the first compartment state is
-/// accessible as a(1), A(1), a[1], A[1], state(1), STATE(1), state[1],
-/// or STATE[1].
+/// accessible as a(1), A(1), state(1), STATE(1).
 	if (sscanf(name, "a(%i)", &i) == 1 ||
 		sscanf(name, "A(%i)", &i) == 1 || 
 		sscanf(name, "state(%i)", &i) == 1 ||
@@ -373,8 +372,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	}
 /// The values of ERR in the $PREDICT are accssible for table output.
 /// For estimation, these values will be zero. For simulation, they are
-/// likely to be non-zero. The values are accessible as err(1), ERR(1),
-/// err[1], ERR[1].
+/// likely to be non-zero. The values are accessible as err(1), ERR(1).
 	if ((sscanf(name, "err(%i)", &i) == 1) ||
 		(sscanf(name, "ERR(%i)", &i) == 1)) {
 		i -= off;
