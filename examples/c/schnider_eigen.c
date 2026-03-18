@@ -1258,7 +1258,7 @@ static void imodel_init(IMODEL* const _imodel,
 	const double sysmat_data[] = {	-(k10+k12+k13),	k21,	k31,
 									k12,			-k21,	0.,
 									k13, 			0., 	-k31 };
-	memcpy(pmx_advan_eigen_sysmat(_advanstate), sysmat_data, sizeof(sysmat_data));
+	pmx_advan_eigen_sysmat(_advanstate, sysmat_data);
 
 	/* set IMODEL fields */
 	_imodel->V1 = V1;
