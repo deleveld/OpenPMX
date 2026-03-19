@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "defines.h"
 #include "dataconfig/dataconfig.h"
 
 #ifdef __cplusplus

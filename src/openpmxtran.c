@@ -159,6 +159,8 @@ static int strip_quotes(char* s)
 	return 0;
 }
 
+/// In a control file comments can be placed in the C style, delimited by `/*... */` or '//' to the
+/// end of the line. Comments are stripped when the is read in.
 static void strip_comments(char *s, const char* ca, const char* cb, const char replace_char)
 {
 	let al = strlen(ca);
@@ -244,7 +246,7 @@ static int get_delim_tokens_comma(char* line, STRINGS* namevec)
 	return 0;
 }
 
-static int get_delim_tokens_whitespace(char* line, STRINGS* namevec)
+static void get_delim_tokens_whitespace(char* line, STRINGS* namevec)
 {
 	char *saveptr;
 	let delim = " \t\r\n";
@@ -254,18 +256,18 @@ static int get_delim_tokens_whitespace(char* line, STRINGS* namevec)
 		vector_append(*namevec, s);
 		token = strtok_r(NULL, delim, &saveptr);
 	}
-	return 0;
 }
 
 static int get_delim_tokens(char* line, STRINGS* namevec, const GET_DELIM_SEP sep)
 {
 	/* comma separated, means a single comma separates */
-	if (sep == GET_DELIM_COMMA_SEP ||
+	if ((sep == GET_DELIM_COMMA_SEP) ||
 		((sep == GET_DELIM_ANY_SEP) && (strchr(line, ',') != NULL))) 
 		return get_delim_tokens_comma(line, namevec);
 
 	/* whitespace separated, means multiple whitespace separates */
-	return get_delim_tokens_whitespace(line, namevec);
+	get_delim_tokens_whitespace(line, namevec);
+	return 0;
 }
 
 static void load_datafile_write_dataconfig(const char* datafile, STRING* data, STRINGS* fieldnames, STRING* config)
@@ -457,8 +459,6 @@ static void parse_data_with_filename(PARSERESULT* res, char* p)
 	string_append(&res->data_preprocess_code, endvars + 1);
 }
 
-/// For the $DATA identifier the data filename must be passed as the
-/// second argument.
 static void parse_data_without_filename(PARSERESULT* res, char* p, const char* filename)
 {
 	if (res->data.size || res->record_field_names.size)
@@ -495,38 +495,52 @@ static void parse_advan_init(PARSERESULT* res, char* p)
 	if (streq(p, "pred")) {
 		res->advan_method = "pmx_advan_pred";
 		res->predict_state_maybe_unused = "	(void)_state;\n";
+		
 	/// + `onecomp` calls `pmx_advan_onecomp()` a one-compartment model.
 	} else if (streq(p, "onecomp")) 
 		res->advan_method = "pmx_advan_onecomp";
-	/// + `onecomp_depot` calls `pmx_advan_onecomp_depot()` a
-	/// one-compartment model with a depot compartment.
+		
+	/// + `onecomp_depot` calls `pmx_advan_onecomp_depot()` a one-compartment model with a depot compartment.
 	else if (streq(p, "onecomp_depot"))
 		res->advan_method = "pmx_advan_onecomp_depot";
-	/// + `twocomp` calls `pmx_advan_twocomp()` a
-	/// two-compartment model mammilary model.
+		
+	/// + `twocomp` calls `pmx_advan_twocomp()` a two-compartment model mammilary model.
 	else if (streq(p, "twocomp"))
 		res->advan_method = "pmx_advan_twocomp";
-	/// + `threecomp` calls `pmx_advan_threecomp()` a
-	/// three-compartment model mammilary model.
+		
+	/// + `threecomp` calls `pmx_advan_threecomp()` a three-compartment model mammilary model.
 	else if (streq(p, "threecomp"))
 		res->advan_method = "pmx_advan_threecomp";
+		
 	else if (streq(p, "diffeqn_test")) {
 		res->advan_method = "pmx_advan_diffeqn_test";
 		res->needs_diffeqn = true;
-	/// + `diffeqn` calls `pmx_advan_diffeqn_libgsl()` a
-	/// ODE solver from LibGSL.
+		
+	/// + `diffeqn` calls `pmx_advan_diffeqn_libgsl()` a ODE solver from LibGSL.
 	} else if (streq(p, "diffeqn_libgsl")) {
 		res->advan_method = "pmx_advan_diffeqn_libgsl";
 		res->needs_diffeqn = true;
-	/// + `eigen` calls `pmx_advan_eigen()` a linear eigensystem solver.
-	/// In the $IMODEL() function the eigensystem matrix must be
-	/// specified by SYSMAT(). 
+		
+	/// + `eigen` calls `pmx_advan_eigen()` a linear eigensystem solver. In the $IMODEL() function 
+	/// the eigensystem matrix must be specified by SYSMAT(). 
 	} else if (streq(p, "eigen")) 
 		res->advan_method = "pmx_advan_eigen";
+		
+	/// + `eigen_threecomp` calls `pmx_advan_eigen_threecomp()` a linear eigensystem solver specialized
+	/// to a three compartment model. The eigensystem matrix does not have to be set, it is set 
+	/// automatically.
 	else if (streq(p, "eigen_threecomp"))
 		res->advan_method = "pmx_advan_eigen_threecomp";
+		
+	/// + `eigen_twocomp` calls `pmx_advan_eigen_twocomp()` a linear eigensystem solver specialized
+	/// to a two compartment model. The eigensystem matrix does not have to be set, it is set 
+	/// automatically.
 	else if (streq(p, "eigen_twocomp"))
 		res->advan_method = "pmx_advan_eigen_twocomp";
+		
+	/// + `eigen_twocomp` calls `pmx_advan_eigen_onecomp_absorb()` a linear eigensystem solver specialized
+	/// to a one compartment model with absorbtion. The eigensystem matrix does not have to be set, it is set 
+	/// automatically.
 	else if (streq(p, "eigen_onecomp_absorb"))
 		res->advan_method = "pmx_advan_eigen_onecomp_absorb";
 	else
@@ -536,7 +550,7 @@ static void parse_advan_init(PARSERESULT* res, char* p)
 	string_append(&res->advan_init, endvars + 1);
 }
 
-/// For the $IMODEL() itentifier the names in the brackets are the
+/// For the $IMODEL() identifier the names in the brackets are the
 /// individual model parameters. The list is tokenized with comma or
 /// space.
 static void parse_imodel(PARSERESULT* res, char* p)
@@ -709,7 +723,7 @@ static void parse_omegasameblock(PARSERESULT* res, char* p)
 	check_excess_text(after, "$OMEGASAME()");
 }
 
-/// In the $SIGMA() block is a initializer for an array of residual
+/// The $SIGMA() block is a initializer for a diagonal array of residual
 /// variances.
 static void parse_sigma(PARSERESULT* res, char* p)
 {

@@ -203,8 +203,8 @@
 		lines(x=(d1$x), y=d1$y/max(d1$y), col="black", lw=1)
 		abline(v=med1, lt=2, col="black")
 		abline(v=med2, lt=2, col="darkgrey")
-		text(x=med1+offx, y=1.05+offy, labels=sprintf(" %.1f s", med1), adj=c(0,0))
-		text(x=med2, y=1.05, labels=sprintf(" %.1f s", med2), adj=c(0,0), col="darkgrey")
+		text(x=med1+offx, y=1.05+offy, labels=sprintf(" %.3f s", med1), adj=c(0,0))
+		text(x=med2, y=1.05, labels=sprintf(" %.3f s", med2), adj=c(0,0), col="darkgrey")
 		legend("topright",
 			legend=c(basename, gname),
 			col=c("darkgrey", "black"),

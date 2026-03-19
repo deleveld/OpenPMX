@@ -29,6 +29,7 @@
 
 #include "ievaluate.h"
 #include "print.h"
+#include "defines.h"
 #include "advan/advan.h"
 #include "dataconfig/dataconfig.h"
 #include "utils/c22.h"

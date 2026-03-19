@@ -27,7 +27,7 @@ extern "C" {
 
 /*---------------------------------------------------------------------*/
 /// This defines the version number and the various maximum size of
-/// theta, omega, and sigma. Also the number of fields in a record,
+/// theta, omega, and sigma. Also the maximum number of fields in a record,
 /// the number of state variables etc. If these are too low they can
 /// be adjusted here and the library must be recompiled.
 #define OPENPMX_VERSION_MAJOR			0
@@ -42,11 +42,6 @@ extern "C" {
 
 #define OPENPMX_FIELDS_MAX				64
 #define OPENPMX_FIELDNAME_MAX			64
-
-#define OPENPMX_STATE_MAX				32
-#define OPENPMX_IMODEL_MAX				64
-#define OPENPMX_PREDICTVARS_MAX			64
-#define OPENPMX_SIMULINFUSION_MAX		16
 
 /*---------------------------------------------------------------------*/
 /* dataconfig */
