@@ -324,18 +324,15 @@ void extfile_header(FILE * f,
 	forcount(i, popmodel->nblock) {
 		let ndim = popmodel->blockdim[i];
 		let type = popmodel->blocktype[i];
-		var n = 0;
 		if (type == OMEGA_BLOCK) {
 			forcount(r, ndim) {
 				/* off diagonal */
 				for (var c=0; c<r; c++) {
 					omegablock[d + c][d + r] = i + 1;
 					omegablock[d + r][d + c] = i + 1;
-					++n;
 				}
 				/* on diagonal */
 				omegablock[d + r][d + r] = i + 1;
-				++n;
 			}
 
 		/* get entries from elsewhere set omega elements */
@@ -345,19 +342,15 @@ void extfile_header(FILE * f,
 				for (var c=0; c<r; c++) {
 					omegablock[d + c][d + r] = i + 1;
 					omegablock[d + r][d + c] = i + 1;
-					++n;
 				}
 				/* on diagonal */
 				omegablock[d + r][d + r] = i + 1;
-				++n;
 			}
 
 		/* normal diagonal omega block */
 		} else if (type == OMEGA_DIAG) {
-			forcount(r, ndim) {
+			forcount(r, ndim) 
 				omegablock[d + r][d + r] = i + 1;
-				++n;
-			}
 			
 		} else
 			fatal(0, "invalid OMEGA block type (%i)\n", type);
