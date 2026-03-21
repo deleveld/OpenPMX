@@ -1331,7 +1331,6 @@ static void check_names(const RESULT* const result, const DATAINFO* const datain
 			goto done;
 		}
 	}
-
 done:
     vector_free(allnames);
 }
@@ -1342,18 +1341,18 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "Usage: %s <controlfile> [datafile]\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
-	 
-	const char* grfilename = argv[1];
-	const char* datafilename = 0;
+ 
+	let filename = strrchr("/" __FILE__, '/') + 1;
+	let grfilename = argv[1];
+	var datafilename = (const char*)0;
 	if (argc == 3 && strlen(argv[2]))
 		datafilename = argv[2];
-		
-	ERRCTX errctx = { };
 
 	/* read in control file */
+	ERRCTX errctx = { };
 	var controltext = read_file(grfilename, &errctx);
 	if (errctx.len) {
-		fprintf(stderr, "openpmxtran: %s", errctx.errmsg);
+		fprintf(stderr, "%s: %s", filename, errctx.errmsg);
 		exit(EXIT_FAILURE);
 	}
 	strip_comments_robust(controltext);
@@ -1368,40 +1367,40 @@ int main(int argc, char* argv[])
 	};
 	dispatch_sections(&result, &sections, &errctx);
 	if (errctx.len) {
-		fprintf(stderr, "openpmxtran: %s", errctx.errmsg);
+		fprintf(stderr, "%s: %s", filename, errctx.errmsg);
 		exit(EXIT_FAILURE);
 	}
 
 	/* make sure data file is not given twice */
 	if (result.data.file && datafilename) {
-		fprintf(stderr, "openpmxtran: fatal: $DATA() in control file and also on command line\n");
+		fprintf(stderr, "%s: data file in $DATA() and also on command line\n", filename);
 		exit(EXIT_FAILURE);
 	}
 	var datafile_to_use = datafilename;
 	if (!datafile_to_use)
 		datafile_to_use = result.data.file;
 	if (!datafile_to_use) {
-		fprintf(stderr, "openpmxtran: fatal: no data file\n");
+		fprintf(stderr, "%s: no data file\n", filename);
 		exit(EXIT_FAILURE);
 	}
 
 	/* read in datafile and parse it */
 	var datatext = read_file(datafile_to_use, &errctx);
 	if (errctx.len) {
-		fputs(errctx.errmsg, stderr);
+		fprintf(stderr, "%s: %s", filename, errctx.errmsg);
 		exit(EXIT_FAILURE);
 	}
 	DATAINFO datainfo = { };
 	parse_datafile(datatext, &datainfo, &errctx);
 	if (errctx.len) {
-		fputs(errctx.errmsg, stderr);
+		fprintf(stderr, "%s: %s", filename, errctx.errmsg);
 		exit(EXIT_FAILURE);
 	}
 
 	/* do some error checking before we go further */
 	check_names(&result, &datainfo, &errctx);
 	if (errctx.len) {
-		fputs(errctx.errmsg, stderr);
+		fprintf(stderr, "%s: %s", filename, errctx.errmsg);
 		exit(EXIT_FAILURE);
 	}
 	
@@ -1409,7 +1408,7 @@ int main(int argc, char* argv[])
 	extern char openpmxtran_template[];
 	expand_template(grfilename, openpmxtran_template, &result, &datainfo, &errctx);
 	if (errctx.len) {
-		fputs(errctx.errmsg, stderr);
+		fprintf(stderr, "%s: %s", filename, errctx.errmsg);
 		exit(EXIT_FAILURE);
 	}
 
