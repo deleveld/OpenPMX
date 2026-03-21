@@ -187,27 +187,27 @@ static void parse_extcols_line(char *line,
 		let iteration = atol(vals.ptr[0]);
 		if (iteration > 0 || iteration == -1000000000) {
 			forvector(i, vals) 
-				extcols->rawptr[i].value = atof(vals.ptr[i]);
+				extcols->mutptr[i].value = atof(vals.ptr[i]);
 
 		/* lower limit */
 		} else if (iteration == OPENPMX_EXTFILE_LOWER_BOUNDS) {
 			forvector(i, vals) 
-				extcols->rawptr[i].theta_lower = atof(vals.ptr[i]);
+				extcols->mutptr[i].theta_lower = atof(vals.ptr[i]);
 
 		/* upper limit */
 		} else if (iteration == OPENPMX_EXTFILE_UPPER_BOUNDS) {
 			forvector(i, vals) 
-				extcols->rawptr[i].theta_upper = atof(vals.ptr[i]);
+				extcols->mutptr[i].theta_upper = atof(vals.ptr[i]);
 
 		/* fixed */
 		} else if (iteration == OPENPMX_EXTFILE_EXTRA_FIXED) {
 			forvector(i, vals) 
-				extcols->rawptr[i].fixed = atoi(vals.ptr[i]);
+				extcols->mutptr[i].fixed = atoi(vals.ptr[i]);
 
 		/* blocknum */
 		} else if (iteration == OPENPMX_EXTFILE_OMEGA_BLOCKS) {
 			forvector(i, vals) 
-				extcols->rawptr[i].blocknum = atoi(vals.ptr[i]);
+				extcols->mutptr[i].blocknum = atoi(vals.ptr[i]);
 		}
 	}
 }

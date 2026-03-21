@@ -445,13 +445,13 @@ static void handle_omega(RESULT* result, const int keywordlen, char* section, ER
 	result->omega[n].type = section; /* truncated by extract_section_args()... as intended */
 	let err = get_delim_tokens(text.args, &result->omega[n].args, GET_DELIM_SEP_ANY);
 	if (err) {
-		add_errctx(errctx, "%s: %s: parse error\n", __func__, section);
+		add_errctx(errctx, "%s: parse error \"%s\"\n", __func__, section);
 		return;
 	}
 	result->nomega = n + 1;
 
 	if (strlen(text.content)) {
-		add_errctx(errctx, "%s: %s: parse error\n", __func__, text.content);
+		add_errctx(errctx, "%s: parse error \"%s\"\n", __func__, text.content);
 		return;
 	}
 }
@@ -478,12 +478,12 @@ static void handle_sigma(RESULT* result, const int keywordlen, char* section, ER
 
 	let err = get_delim_tokens(text.args, &result->sigma.args, GET_DELIM_SEP_ANY);
 	if (err) {
-		add_errctx(errctx, "%s: %s: parse error\n", __func__, section);
+		add_errctx(errctx, "%s: parse error \"%s\"\n", __func__, section);
 		return;
 	}
 		
 	if (strlen(text.content)) {
-		add_errctx(errctx, "%s: %s: parse error\n", __func__, text.content);
+		add_errctx(errctx, "%s: parse error \"%s\"\n", __func__, text.content);
 		return;
 	}
 }
@@ -548,7 +548,7 @@ struct {
 static void dispatch_sections(RESULT* result, VECPTR* sections, ERRCTX* errctx)
 {
     forvector(i, *sections) {
-		var section = sections->rawptr[i];
+		var section = sections->mutptr[i];
 
         // Section 0 is the preamble — no $ keyword, use the NULL-name handler
         if (i == 0) {
@@ -563,7 +563,7 @@ static void dispatch_sections(RESULT* result, VECPTR* sections, ERRCTX* errctx)
         int matched = 0;
         for (int h = 1; h < (int)countof(handlers); h++) {
 			let name = handlers[h].name;
-            if (strcmp(keyword, name) == 0) {
+            if (streq(keyword, name)) {
 				let keywordlen = strlen(keyword);
                 handlers[h].handler(result, keywordlen, section, errctx);
                 if (errctx->len) 
@@ -651,7 +651,7 @@ static void parse_datafile(char* datatext, DATAINFO* datainfo, ERRCTX* errctx)
 	var header = &datainfo->header;
 	let err = get_delim_tokens(line, header, sep);
 	if (err) {
-		add_errctx(errctx, "%s: parse header elements failed\n", __func__);
+		add_errctx(errctx, "%s: parse header tokens failed\n", __func__);
 		return;
 	}
 	var linenum = 1;
@@ -676,7 +676,7 @@ static void parse_datafile(char* datatext, DATAINFO* datainfo, ERRCTX* errctx)
 		}
 		
 		/* accept the line, copy over the elements */
-		vector_appendn(datainfo->elems, v.rawptr, v.size);
+		vector_appendn(datainfo->elems, v.mutptr, v.size);
 		vector_free(v);
 		
 		/* get next line */
@@ -687,7 +687,6 @@ static void parse_datafile(char* datatext, DATAINFO* datainfo, ERRCTX* errctx)
 		add_errctx(errctx, "%s: no data rows\n", __func__);
 }
 
-/* extract int catching errors */
 static int checked_atoi(const char* str, ERRCTX* errctx)
 {
 	char *end;
@@ -1069,7 +1068,7 @@ static void template_omega_init(FILE* fp,
 			/* double check that the size is consistant */
 			let nvals = ndim * (ndim + 1) / 2;
 			if (n != nvals) {
-				add_errctx(errctx, "%s: omega block size in consistant (%i,%i,%i)\n", __func__, n, ndim, nvals);
+				add_errctx(errctx, "%s: omega block size inconsistant (%i,%i,%i)\n", __func__, n, ndim, nvals);
 				return;
 			}
 			
@@ -1137,29 +1136,29 @@ struct {
 					const DATAINFO* const datainfo, 
 					ERRCTX* errctx);
 } template_entries[] = {
-	{ "${OPENPMXTRAN_DEFAULT_FILENAME}",		template_filename },
-	{ "${OPENPMXTRAN_DATA_ARRAY}",				template_data_array },
-	{ "${OPENPMXTRAN_IMODEL_FIELDS_DECLARE}",	template_imodel_fields_declare },
-	{ "${OPENPMXTRAN_IMODEL_FIELDS_DECLARE_AND_SET}", template_imodel_fields_declare_set },
-	{ "${OPENPMXTRAN_IMODEL_CODE}",				template_imodel_code },
-	{ "${OPENPMXTRAN_IMODEL_FIELDS_SET}",		template_imodel_fields_set },
-	{ "${OPENPMXTRAN_IMODEL_DIFFEQN_CODE}",		template_diffeqn_code },
-	{ "${OPENPMXTRAN_RECORD_FIELDS_DEFINE}",	template_record_fields_define },
-	{ "${OPENPMXTRAN_IMODEL_FIELDS_DEFINE}",	template_imodel_fields_define },
-	{ "${OPENPMXTRAN_PREDPARAMS_FIELDS_DECLARE}", template_predparams_fields_declare },
-	{ "${OPENPMXTRAN_PREDICT_CODE}", 			template_predict_code },
-	{ "${OPENPMXTRAN_PREDPARAMS_FIELDS_SET}",	template_predparams_fields_set },
-	{ "${OPENPMXTRAN_RECORD_FIELDS_WRITABLE_DEFINE}", template_record_fields_writeable_define },
-	{ "${OPENPMXTRAN_DATA_PREPROCESS_CODE}", 	template_data_preprocess_code },
-	{ "${OPENPMXTRAN_RECORD_FIELDS_WRITEBACK}", template_record_fields_writeback },
-	{ "${OPENPMXTRAN_DATA_CONFIG}", 			template_data_config },
-	{ "${OPENPMXTRAN_IMODEL_FIELDINFO}", 		template_imodel_fieldinfo },
-	{ "${OPENPMXTRAN_PREDPARAMS_FIELDINFO}", 	template_predparams_fieldinfo },
-	{ "${OPENPMXTRAN_ADVAN_INIT}", 				template_advan_init },
-	{ "${OPENPMXTRAN_THETA_INIT}", 				template_theta_init },
-	{ "${OPENPMXTRAN_OMEGA_INIT}", 				template_omega_init },
-	{ "${OPENPMXTRAN_SIGMA_INIT}", 				template_sigma_init },
-	{ "${OPENPMXTRAN_MAIN_CODE}", 				template_main_code },
+	{ "{{OPENPMXTRAN_DEFAULT_FILENAME}}",				template_filename },
+	{ "{{OPENPMXTRAN_DATA_ARRAY}}",						template_data_array },
+	{ "{{OPENPMXTRAN_IMODEL_FIELDS_DECLARE}}",			template_imodel_fields_declare },
+	{ "{{OPENPMXTRAN_IMODEL_FIELDS_DECLARE_AND_SET}}",	template_imodel_fields_declare_set },
+	{ "{{OPENPMXTRAN_IMODEL_CODE}}",					template_imodel_code },
+	{ "{{OPENPMXTRAN_IMODEL_FIELDS_SET}}",				template_imodel_fields_set },
+	{ "{{OPENPMXTRAN_IMODEL_DIFFEQN_CODE}}",			template_diffeqn_code },
+	{ "{{OPENPMXTRAN_RECORD_FIELDS_DEFINE}}",			template_record_fields_define },
+	{ "{{OPENPMXTRAN_IMODEL_FIELDS_DEFINE}}",			template_imodel_fields_define },
+	{ "{{OPENPMXTRAN_PREDPARAMS_FIELDS_DECLARE}}", 		template_predparams_fields_declare },
+	{ "{{OPENPMXTRAN_PREDICT_CODE}}", 					template_predict_code },
+	{ "{{OPENPMXTRAN_PREDPARAMS_FIELDS_SET}}",			template_predparams_fields_set },
+	{ "{{OPENPMXTRAN_RECORD_FIELDS_WRITABLE_DEFINE}}",	template_record_fields_writeable_define },
+	{ "{{OPENPMXTRAN_DATA_PREPROCESS_CODE}}", 			template_data_preprocess_code },
+	{ "{{OPENPMXTRAN_RECORD_FIELDS_WRITEBACK}}", 		template_record_fields_writeback },
+	{ "{{OPENPMXTRAN_DATA_CONFIG}}", 					template_data_config },
+	{ "{{OPENPMXTRAN_IMODEL_FIELDINFO}}", 				template_imodel_fieldinfo },
+	{ "{{OPENPMXTRAN_PREDPARAMS_FIELDINFO}}", 			template_predparams_fieldinfo },
+	{ "{{OPENPMXTRAN_ADVAN_INIT}}", 					template_advan_init },
+	{ "{{OPENPMXTRAN_THETA_INIT}}", 					template_theta_init },
+	{ "{{OPENPMXTRAN_OMEGA_INIT}}", 					template_omega_init },
+	{ "{{OPENPMXTRAN_SIGMA_INIT}}", 					template_sigma_init },
+	{ "{{OPENPMXTRAN_MAIN_CODE}}", 						template_main_code },
 };
 
 static void expand_template(const char* grfilename, 
@@ -1193,7 +1192,7 @@ static void expand_template(const char* grfilename,
 		int matched = 0;
 		for (int h = 0; h < (int)countof(template_entries); h++) {
 			let name = template_entries[h].name;
-			if (strcmp(keyword, name) == 0) {
+			if (streq(keyword, name)) {
 				template_entries[h].handler(fp, result, datainfo, errctx);
 				if (errctx->len)
 					goto done;
@@ -1214,11 +1213,127 @@ done:
 	if (fp)
 		fclose(fp);
 
-	/* if error cleanup the output file */
+	/* if error cleanup the output C file */
 	if (errctx->len)
 		unlink(c_filename);
 		
 	free(c_filename);
+}
+
+static int cmp_str(const void *a, const void *b)
+{
+	const char *sa = *(const char **)a;
+	const char *sb = *(const char **)b;
+	return strcmp(sa, sb);
+}
+
+/* validate variable names */
+int is_valid_identifier(const char *s)
+{
+    if (s == NULL || *s == '\0')
+        return 0;
+
+    // First character: letter or underscore
+    if (!(isalpha((unsigned char)*s) || *s == '_'))
+        return 0;
+
+    s++;
+
+    // Remaining characters: letter, digit, or underscore
+    while (*s) {
+        if (!(isalnum((unsigned char)*s) || *s == '_'))
+            return 0;
+        s++;
+    }
+
+    return 1;
+}
+
+static const char *keywords[] =
+{
+    "auto","break","case","char","const","continue","default","do","double",
+    "else","enum","extern","float","for","goto","if","inline","int","long",
+    "register","restrict","return","short","signed","sizeof","static","struct",
+    "switch","typedef","union","unsigned","void","volatile","while","_Alignas",
+    "_Alignof","_Atomic","_Bool","_Complex","_Generic","_Imaginary","_Noreturn",
+    "_Static_assert","_Thread_local"
+};
+
+static int is_keyword(const char *s)
+{
+    size_t n = sizeof(keywords)/sizeof(keywords[0]);
+    for (size_t i = 0; i < n; i++) {
+        if (strcmp(s, keywords[i]) == 0)
+            return 1;
+    }
+    return 0;
+}
+
+static int is_valid_identifier_strict(const char *s)
+{
+    if (!is_valid_identifier(s))
+        return 0;
+    return !is_keyword(s);
+}
+
+typedef VECTOR(const char*) CONSTVECPTR;
+
+/* check for some invalid names */
+static const char* _check_invalid_names(const CONSTVECPTR* args)
+{
+    forvector(i, *args) {
+		let v = args->ptr[i];
+		let badname = !is_valid_identifier_strict(v);
+		if (badname)
+			return v;
+	}
+	return 0;
+}
+
+static void check_names(const RESULT* const result, const DATAINFO* const datainfo, ERRCTX* errctx)
+{
+	CONSTVECPTR allnames = { 0 };
+
+	/* put all names into a list and sort them */
+	vector_appendn(allnames, datainfo->header.ptr, datainfo->header.size);
+	vector_appendn(allnames, result->imodel.args.ptr, result->imodel.args.size);
+	vector_appendn(allnames, result->predict.args.ptr, result->predict.args.size);
+    qsort(allnames.ptr, allnames.size, sizeof(allnames.ptr[0]), cmp_str);
+
+	/* doubles will be sequential, easy to detect */
+    for (int i = 1; i < allnames.size; i++) {
+		let v1 = allnames.ptr[i - 1];
+		let v2 = allnames.ptr[i];
+		if (strcmp(v1, v2) == 0) {
+			add_errctx(errctx, "%s: name \"%s\" has multiple definitions\n", __func__, v1);
+			goto done;
+		}
+	}
+
+	/* look for invalid names */
+	var badname = _check_invalid_names(&allnames);
+	if (badname) {
+		add_errctx(errctx, "%s: invalid name \"%s\"\n", __func__, badname);
+		goto done;
+	}
+
+	/* look for reserved names everwhere */
+    forvector(i, allnames) {
+		let v = allnames.ptr[i];
+		if ((strcmp(v, "Y") == 0) ||
+			(strcmp(v, "YHAT") == 0) ||
+			(strcmp(v, "YHATVAR") == 0) ||
+			(strcmp(v, "PRED") == 0) ||
+			(strcmp(v, "OBJ") == 0) ||
+			(strcmp(v, "INEVAL") == 0) ||
+			(strcmp(v, "NAN") == 0)) {
+			add_errctx(errctx, "%s: name \"%s\" is reserved\n", __func__, v);
+			goto done;
+		}
+	}
+
+done:
+    vector_free(allnames);
 }
 
 int main(int argc, char* argv[])
@@ -1236,16 +1351,16 @@ int main(int argc, char* argv[])
 	ERRCTX errctx = { };
 
 	/* read in control file */
-	var control = read_file(grfilename, &errctx);
+	var controltext = read_file(grfilename, &errctx);
 	if (errctx.len) {
 		fprintf(stderr, "openpmxtran: %s", errctx.errmsg);
 		exit(EXIT_FAILURE);
 	}
-	strip_comments_robust(control);
+	strip_comments_robust(controltext);
 
 	/* split into sections with $... */
 	VECPTR sections = { };
-	split_sections(control, &sections);
+	split_sections(controltext, &sections);
 	
 	/* handle each section, write into result */
 	RESULT result = { 
@@ -1259,8 +1374,7 @@ int main(int argc, char* argv[])
 
 	/* make sure data file is not given twice */
 	if (result.data.file && datafilename) {
-		fprintf(stderr, "openpmxtran: fatal: $DATA() in control file and also on command line (%p:%s):(%p:%s)\n",
-			result.data.file, result.data.file, datafilename, datafilename);
+		fprintf(stderr, "openpmxtran: fatal: $DATA() in control file and also on command line\n");
 		exit(EXIT_FAILURE);
 	}
 	var datafile_to_use = datafilename;
@@ -1279,6 +1393,13 @@ int main(int argc, char* argv[])
 	}
 	DATAINFO datainfo = { };
 	parse_datafile(datatext, &datainfo, &errctx);
+	if (errctx.len) {
+		fputs(errctx.errmsg, stderr);
+		exit(EXIT_FAILURE);
+	}
+
+	/* do some error checking before we go further */
+	check_names(&result, &datainfo, &errctx);
 	if (errctx.len) {
 		fputs(errctx.errmsg, stderr);
 		exit(EXIT_FAILURE);
@@ -1306,7 +1427,7 @@ int main(int argc, char* argv[])
 	/* cleanup */
 	free(datatext);
 	vector_free(sections);
-	free(control);
+	free(controltext);
 	exit(EXIT_SUCCESS);
 }
 
@@ -1340,12 +1461,12 @@ char openpmxtran_template[] =
 "#include \"openpmx.h\"\n"
 "\n"
 "#define OPENPMXTRAN_DEFAULT_FILENAME \\\n"
-"${OPENPMXTRAN_DEFAULT_FILENAME}\n"
+"{{OPENPMXTRAN_DEFAULT_FILENAME}}\n"
 "\n"
-"${OPENPMXTRAN_DATA_ARRAY}\n"
+"{{OPENPMXTRAN_DATA_ARRAY}}\n"
 "\n"
 "typedef struct IMODEL {\n"
-"${OPENPMXTRAN_IMODEL_FIELDS_DECLARE}\n"
+"{{OPENPMXTRAN_IMODEL_FIELDS_DECLARE}}\n"
 "} IMODEL;\n"
 "\n"
 "static void imodel_init(IMODEL* const _imodel,\n"
@@ -1356,15 +1477,14 @@ char openpmxtran_template[] =
 "	const RECORD* const _record = _advanstate->current.record;\n"
 "\n"
 "	/* allow access to RECORD fields */\n"
-"${OPENPMXTRAN_RECORD_FIELDS_DEFINE}\n"
+"{{OPENPMXTRAN_RECORD_FIELDS_DEFINE}}\n"
 "\n"
 "	/* declare and set IMODEL fields */\n"
-"${OPENPMXTRAN_IMODEL_FIELDS_DECLARE_AND_SET}\n"
+"{{OPENPMXTRAN_IMODEL_FIELDS_DECLARE_AND_SET}}\n"
 "\n"
 "#define THETA(i) 		((const double)_theta[(i)-1])\n"
 "#define ETA(i) 		((const double)_eta[(i)-1])\n"
 "#define A(i) 			((const double)_advanstate->current.state[(i)-1])\n"
-"#define INITCOUNT 		pmx_advan_initcount(_advanstate)\n"
 "#define ALAG(i,t) 		pmx_advan_amtlag(_advanstate, (i)-1, (t))\n"
 "#define BIOAVAIL(i,f)	pmx_advan_bioavail(_advanstate, (i)-1, (f))\n"
 "#define STATETIME 		((const double)_advanstate->current.statetime)\n"
@@ -1372,7 +1492,7 @@ char openpmxtran_template[] =
 "#define A_0(i,v) 		pmx_advan_state_init(_advanstate, (i)-1, (v))\n"
 "#define SYSMAT(...)	pmx_advan_eigen_sysmat(_advanstate, (double[]){ __VA_ARGS__ })\n"
 "\n"
-"${OPENPMXTRAN_IMODEL_CODE}\n"
+"{{OPENPMXTRAN_IMODEL_CODE}}\n"
 "\n"
 "#undef THETA\n"
 "#undef ETA\n"
@@ -1380,17 +1500,16 @@ char openpmxtran_template[] =
 "#undef ALAG\n"
 "#undef BIOAVAIL\n"
 "#undef STATETIME\n"
-"#undef INITCOUNT\n"
 "#undef INITTIME\n"
 "#undef A_0\n"
 "#undef SYSMAT\n"
 "\n"
 "	/* set IMODEL fields */\n"
-"${OPENPMXTRAN_IMODEL_FIELDS_SET}\n"
+"{{OPENPMXTRAN_IMODEL_FIELDS_SET}}\n"
 "}\n"
 "\n"
 "typedef struct PREDICTVARS {\n"
-"${OPENPMXTRAN_PREDPARAMS_FIELDS_DECLARE}\n"
+"{{OPENPMXTRAN_PREDPARAMS_FIELDS_DECLARE}}\n"
 "} PREDICTVARS;\n"
 "\n"
 "static void imodel_diffeqn(double _dadt[],\n"
@@ -1409,10 +1528,10 @@ char openpmxtran_template[] =
 "	(void)T;\n"
 "\n"
 "	/* allow access to RECORD fields */\n"
-"${OPENPMXTRAN_RECORD_FIELDS_DEFINE}\n"
+"{{OPENPMXTRAN_RECORD_FIELDS_DEFINE}}\n"
 "\n"
 "	/* declare IMODEL fields */\n"
-"${OPENPMXTRAN_IMODEL_FIELDS_DEFINE}\n"
+"{{OPENPMXTRAN_IMODEL_FIELDS_DEFINE}}\n"
 "\n"
 "#define THETA(i) 	((const double)_theta[(i)-1])\n"
 "#define ETA(i) 	((const double)_eta[(i)-1])\n"
@@ -1420,7 +1539,7 @@ char openpmxtran_template[] =
 "#define A(i) 		((const double)_state[(i)-1])\n"
 "#define DADT(i) 	(_dadt[(i)-1])\n"
 "\n"
-"${OPENPMXTRAN_IMODEL_DIFFEQN_CODE}\n"
+"{{OPENPMXTRAN_IMODEL_DIFFEQN_CODE}}\n"
 "\n"
 "#undef THETA\n"
 "#undef ETA\n"
@@ -1442,13 +1561,13 @@ char openpmxtran_template[] =
 "	double Y = NAN;\n"
 "\n"
 "	/* allow access to RECORD fields */\n"
-"${OPENPMXTRAN_RECORD_FIELDS_DEFINE}\n"
+"{{OPENPMXTRAN_RECORD_FIELDS_DEFINE}}\n"
 "\n"
 "	/* allow access to IMODEL fields */\n"
-"${OPENPMXTRAN_IMODEL_FIELDS_DEFINE}\n"
+"{{OPENPMXTRAN_IMODEL_FIELDS_DEFINE}}\n"
 "\n"
 "	/* declare PREDICTVARS fields */\n"
-"${OPENPMXTRAN_PREDPARAMS_FIELDS_DECLARE}\n"
+"{{OPENPMXTRAN_PREDPARAMS_FIELDS_DECLARE}}\n"
 "\n"
 "#define THETA(i) 	((const double)_popparam->theta[(i)-1])\n"
 "#define ETA(i) 	((const double)_popparam->eta[(i)-1])\n"
@@ -1456,7 +1575,7 @@ char openpmxtran_template[] =
 "#define EPS(i) 	((const double)_err[(i)-1])\n"
 "#define A(i) 		((const double)_current->state[(i)-1])\n"
 "\n"
-"${OPENPMXTRAN_PREDICT_CODE}\n"
+"{{OPENPMXTRAN_PREDICT_CODE}}\n"
 "\n"
 "#undef THETA\n"
 "#undef ETA\n"
@@ -1465,7 +1584,7 @@ char openpmxtran_template[] =
 "#undef EPS\n"
 "\n"
 "	/* set PREDICTVARS fields */\n"
-"${OPENPMXTRAN_PREDPARAMS_FIELDS_SET}\n"
+"{{OPENPMXTRAN_PREDPARAMS_FIELDS_SET}}\n"
 "\n"
 "	return Y;\n"
 "}\n"
@@ -1473,15 +1592,15 @@ char openpmxtran_template[] =
 "static void openpmxtran_data_preprocess_callback(RECORD* _record)\n"
 "{\n"
 "	/* allow write access to RECORD fields */\n"
-"${OPENPMXTRAN_RECORD_FIELDS_WRITABLE_DEFINE}\n"
+"{{OPENPMXTRAN_RECORD_FIELDS_WRITABLE_DEFINE}}\n"
 "\n"
 "	/* allow user to change data */\n"
 "\tdo {\n"
-"${OPENPMXTRAN_DATA_PREPROCESS_CODE}\n"
+"{{OPENPMXTRAN_DATA_PREPROCESS_CODE}}\n"
 "\t} while (0);\n"
 "\n"
 "	/* write back RECORD fields */\n"
-"${OPENPMXTRAN_RECORD_FIELDS_WRITEBACK}\n"
+"{{OPENPMXTRAN_RECORD_FIELDS_WRITEBACK}}\n"
 "\n"
 "	return;\n"
 "}\n"
@@ -1490,7 +1609,7 @@ char openpmxtran_template[] =
 "	.filename = OPENPMXTRAN_DEFAULT_FILENAME,\n"
 "	.nthread = 0,\n"
 "	.data = { \n"
-"${OPENPMXTRAN_DATA_CONFIG}\n"
+"{{OPENPMXTRAN_DATA_CONFIG}}\n"
 "	},\n"
 "	.advan = {\n"
 "		.init = imodel_init,\n"
@@ -1499,25 +1618,25 @@ char openpmxtran_template[] =
 "		.imodelfields = {\n"
 "			.size = sizeof(IMODEL),\n"
 "			.field = {\n"
-"${OPENPMXTRAN_IMODEL_FIELDINFO}\n"
+"{{OPENPMXTRAN_IMODEL_FIELDINFO}}\n"
 "			},\n"
 "		},\n"
 "		.predictfields = {\n"
 "			.size = sizeof(PREDICTVARS),\n"
 "			.field = {\n"
-"${OPENPMXTRAN_PREDPARAMS_FIELDINFO}\n"
+"{{OPENPMXTRAN_PREDPARAMS_FIELDINFO}}\n"
 "			},\n"
 "		},\n"
-"${OPENPMXTRAN_ADVAN_INIT}\n"
+"{{OPENPMXTRAN_ADVAN_INIT}}\n"
 "	},\n"
 "	.theta = {\n"
-"${OPENPMXTRAN_THETA_INIT}\n"
+"{{OPENPMXTRAN_THETA_INIT}}\n"
 "	},\n"
 "	.omega = {\n"
-"${OPENPMXTRAN_OMEGA_INIT}\n"
+"{{OPENPMXTRAN_OMEGA_INIT}}\n"
 "	},\n"
 "	.sigma = {\n"
-"${OPENPMXTRAN_SIGMA_INIT}\n"
+"{{OPENPMXTRAN_SIGMA_INIT}}\n"
 "	},\n"
 "};\n"
 "\n"
@@ -1584,7 +1703,7 @@ char openpmxtran_template[] =
 "	openpmxtran_data_preprocess();\n"
 "//	feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);\n"
 "\n"
-"${OPENPMXTRAN_MAIN_CODE}\n"
+"{{OPENPMXTRAN_MAIN_CODE}}\n"
 "\n"
 "	pmx_cleanup(&openpmx);\n"
 "	return EXIT_SUCCESS;\n"

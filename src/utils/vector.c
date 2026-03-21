@@ -19,14 +19,12 @@
 #define VECTOR_C
 
 #include <assert.h>
-#include <string.h>
 #include "vector.h"
 
 void _vector_free(VECTOR_DATA * vect)
 {
 	if (vect->_capacity >= 0)
 		free(vect->_data);
-	memset(vect, 0, sizeof(*vect));
 }
 
 void _vector_reserve(VECTOR_DATA * vect, const int newsize, const size_t sizeofdata)

@@ -98,10 +98,13 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
              * Since g = sqrt(sigma), then (2g)^2 = 4 * sigma.
              * The formula simplifies to: (ya1 - ya2)^2 / 4. */
 			let diff = ya1 - ya2;
-			yhatvar += (diff * diff) * 0.25;
+
+/*			yhatvar += (diff * diff) */
+			yhatvar += (diff * diff); /* move multiplication out of loop */
 		}
 	}
-	return yhatvar;
+/*	return yhatvar; */
+	return yhatvar * 0.25; /* move multiplication out of loop */;
 }
 
 /* For how this is used see PAGE poster:
