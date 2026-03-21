@@ -1278,18 +1278,6 @@ static int is_valid_identifier_strict(const char *s)
 
 typedef VECTOR(const char*) CONSTVECPTR;
 
-/* check for some invalid names */
-static const char* _check_invalid_names(const CONSTVECPTR* args)
-{
-    forvector(i, *args) {
-		let v = args->ptr[i];
-		let badname = !is_valid_identifier_strict(v);
-		if (badname)
-			return v;
-	}
-	return 0;
-}
-
 static void check_names(const RESULT* const result, const DATAINFO* const datainfo, ERRCTX* errctx)
 {
 	CONSTVECPTR allnames = { 0 };
@@ -1311,10 +1299,16 @@ static void check_names(const RESULT* const result, const DATAINFO* const datain
 	}
 
 	/* look for invalid names */
-	var badname = _check_invalid_names(&allnames);
-	if (badname) {
-		add_errctx(errctx, "%s: invalid name \"%s\"\n", __func__, badname);
-		goto done;
+	forvector(i, allnames) {
+		let v = allnames.ptr[i];
+		if (!is_valid_identifier(v)) {
+			add_errctx(errctx, "%s: invalid name \"%s\"\n", __func__, v);
+			goto done;
+		}
+		if (is_keyword(v)) {
+			add_errctx(errctx, "%s: \"%s\" clashes with C keyword\n", __func__, v);
+			goto done;
+		}
 	}
 
 	/* look for reserved names everwhere */

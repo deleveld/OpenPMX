@@ -95,7 +95,7 @@ fi
 # general build flags
 CC="${CC:-gcc}"
 LIBNAME="openpmx"
-CFLAGS="-g -Ofast -W -Wall -Wextra -march=native -mtune=native"
+CFLAGS="-g -O2 -W -Wall -Wextra -march=native -mtune=native"
 CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -Wwrite-strings -Isrc"
 LFLAGS=""
 AR="ar rcs lib/lib${LIBNAME}.a"
