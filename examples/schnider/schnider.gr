@@ -28,7 +28,7 @@ $THETA
 	{   0.1,   2,   5,  ESTIMATE     },
 	{   0.1,   1,   5,  ESTIMATE     },
 	{   -.1,   0,   .1,  ESTIMATE     },
-$OMEGA(0.1, 0.1, 0.1, 0.1, 0., 0.)
+$OMEGA(0.1, 0.1, 0.1, 0.1, 0, 0)
 $SIGMA(0.1)
-$MAIN 
+$MAIN
 	estimate();
