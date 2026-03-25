@@ -11,6 +11,15 @@ fi
 
 ./install
 
+
+(cd examples/theo; ../../openpmx theo.gr)
+(cd examples/warfarin; ../../openpmx warfarin.gr)
+
+(cd examples/schnider; ../../openpmx schnider.gr)
+(cd examples/schnider; ../../openpmx schnider_eigen.gr)
+(cd examples/schnider; ../../openpmx schnider_eigen_threecomp.gr)
+(cd examples/schnider; ../../openpmx schnider_reload.gr)
+
 (cd examples/c; gcc -W -Wall -Wextra -O2 theo_eigen.c     -I../../include -I../../src -lgsl -lgslcblas -lm; ./${BINARY}; rm ${BINARY})
 
 (cd examples/c; gcc -W -Wall -Wextra -O2 schnider_threecomp.c -I../../include -I../../src -lgsl -lgslcblas -lm; ./${BINARY}; rm ${BINARY})
@@ -21,12 +30,4 @@ fi
 (cd examples/c; gcc -W -Wall -Wextra -O2 theo_advan.c     -I../../include -I../../src -lgsl -lgslcblas -lm; ./${BINARY}; rm ${BINARY})
 (cd examples/c; gcc -W -Wall -Wextra -O2 theo_posthoc.c   -I../../include -I../../src -lgsl -lgslcblas -lm; ./${BINARY}; rm ${BINARY})
 
-(cd examples/theo; ../../openpmx theo.gr)
-(cd examples/warfarin; ../../openpmx warfarin.gr)
-
-(cd examples/schnider; ../../openpmx schnider.gr)
-(cd examples/schnider; ../../openpmx schnider_eigen.gr)
-(cd examples/schnider; ../../openpmx schnider_eigen_threecomp.gr)
 (cd examples/schnider; ../../openpmx schnider_diffeqn.gr)
-(cd examples/schnider; ../../openpmx schnider_reload.gr)
-

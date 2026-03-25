@@ -187,27 +187,27 @@ static void parse_extcols_line(char *line,
 		let iteration = atol(vals.ptr[0]);
 		if (iteration > 0 || iteration == -1000000000) {
 			forvector(i, vals) 
-				extcols->rawptr[i].value = atof(vals.ptr[i]);
+				extcols->mutptr[i].value = atof(vals.ptr[i]);
 
 		/* lower limit */
 		} else if (iteration == OPENPMX_EXTFILE_LOWER_BOUNDS) {
 			forvector(i, vals) 
-				extcols->rawptr[i].theta_lower = atof(vals.ptr[i]);
+				extcols->mutptr[i].theta_lower = atof(vals.ptr[i]);
 
 		/* upper limit */
 		} else if (iteration == OPENPMX_EXTFILE_UPPER_BOUNDS) {
 			forvector(i, vals) 
-				extcols->rawptr[i].theta_upper = atof(vals.ptr[i]);
+				extcols->mutptr[i].theta_upper = atof(vals.ptr[i]);
 
 		/* fixed */
 		} else if (iteration == OPENPMX_EXTFILE_EXTRA_FIXED) {
 			forvector(i, vals) 
-				extcols->rawptr[i].fixed = atoi(vals.ptr[i]);
+				extcols->mutptr[i].fixed = atoi(vals.ptr[i]);
 
 		/* blocknum */
 		} else if (iteration == OPENPMX_EXTFILE_OMEGA_BLOCKS) {
 			forvector(i, vals) 
-				extcols->rawptr[i].blocknum = atoi(vals.ptr[i]);
+				extcols->mutptr[i].blocknum = atoi(vals.ptr[i]);
 		}
 	}
 }
@@ -236,8 +236,7 @@ static void read_extcols(const char *filename, EXTCOLS* extcols, ERRCTX* errctx)
 	/* read and translate header */
 	header_text = strdup(line);
 	get_delim_token_ptrs(header_text, &header_elem);
-	forvector(i, header_elem) {
-		let name = header_elem.ptr[i];
+	forvector_val(name, header_elem) {
 		let colinfo = parse_col_name(name, errctx);
 		if (errctx->len) {
 			add_errctx(errctx, "%s: ext file \"%s\" header parse fail\n", __func__, filename);
@@ -281,12 +280,10 @@ static OPENPMX popparams_init_from_file(const char* filename,
 		goto failed;
 
 	double omega[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX] = { 0 };
-	int omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX] = { 0 };
+	OMEGAFIXED omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX] = { 0 };
 	int omegablocknum[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX] = { 0 };
 
-	forvector(i, extcols) {
-		let v = &extcols.ptr[i];
-
+	forvector_ptr(v, extcols) {
 		if (v->kind == COL_THETA) {
 			let thetaidx = v->num - 1;
 			pmx.theta[thetaidx].value = v->value;
@@ -305,7 +302,9 @@ static OPENPMX popparams_init_from_file(const char* filename,
 			let rowidx = v->row - 1;
 			let colidx = v->col - 1;
 			omega[rowidx][colidx] = omega[colidx][rowidx] = v->value;
-			omegafixed[rowidx][colidx] = omegafixed[colidx][rowidx] = v->fixed;
+			
+			var fixval = omegafixed_from_ext_fixedval(v->fixed);
+			omegafixed[rowidx][colidx] = omegafixed[colidx][rowidx] = fixval; 
 			omegablocknum[rowidx][colidx] = omegablocknum[colidx][rowidx] = v->blocknum;
 		}
 	}
@@ -313,8 +312,7 @@ static OPENPMX popparams_init_from_file(const char* filename,
 	/* Find nomega: largest row or col index seen in any OMEGA column.
 	 * Indices are 1-based in the ext file.                            */
 	int nomega = 0;
-	forvector(i, extcols) {
-		let v = &extcols.ptr[i];
+	forvector_ptr(v, extcols) {
 		if (v->kind == COL_OMEGA) {
 			if (v->row > nomega) nomega = v->row;
 			if (v->col > nomega) nomega = v->col;
@@ -341,7 +339,7 @@ static OPENPMX popparams_init_from_file(const char* filename,
 		var all_same    = 1;
 		var has_offdiag = 0;
 		for (int r = 0; r < dim; r++) {
-			if (omegafixed[d + r][d + r] != 2)
+			if (omegafixed[d + r][d + r] != OMEGAFIXED_SAME)
 				all_same = 0;
 			for (int c = 0; c < r; c++)
 				if (omegablocknum[d + r][d + c] != 0)
@@ -371,7 +369,7 @@ static OPENPMX popparams_init_from_file(const char* filename,
 			int n = 0;
 			for (int r = 0; r < dim; r++) {
 				double val = omega[d + r][d + r];
-				if (omegafixed[d + r][d + r] == 1)
+				if (omegafixed[d + r][d + r] == OMEGAFIXED_FIXED)
 					val = -fabs(val);
 				pmx.omega[bk].values[n++] = val;
 			}
@@ -384,7 +382,7 @@ static OPENPMX popparams_init_from_file(const char* filename,
 					pmx.omega[bk].values[n++] = omega[d + r][d + c];
 				/* diagonal entry — negative if fixed */
 				double val = omega[d + r][d + r];
-				if (omegafixed[d + r][d + r] == 1)
+				if (omegafixed[d + r][d + r] == OMEGAFIXED_FIXED)
 					val = -fabs(val);
 				pmx.omega[bk].values[n++] = val;
 			}

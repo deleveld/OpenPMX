@@ -32,7 +32,7 @@ extern "C" {
 /// be adjusted here and the library must be recompiled.
 #define OPENPMX_VERSION_MAJOR			0
 #define OPENPMX_VERSION_MINOR			1
-#define OPENPMX_VERSION_RELEASE			2
+#define OPENPMX_VERSION_RELEASE			3
 
 #define OPENPMX_THETA_MAX				64
 #define OPENPMX_OMEGABLOCKSIZE_MAX		64
@@ -301,22 +301,6 @@ void pmx_set_theta(OPENPMX* dest,
 				   typeof(((OPENPMX){0}).theta[0])* theta);
 				   
 /*---------------------------------------------------------------------*/
-/* specialized model equations */
-/*---------------------------------------------------------------------*/
-typedef struct {
-	/* input */
-	const double age;
-	const double weight;
-	const double height;
-	const bool male;
-	
-	/* output */
-	double LBM;
-	double V1, V2, V3, CL, Q2, Q3, KE0;
-	double k10, k12, k21, k13, k31;
-} SCHNIDER_PROPOFOL_CONFIG;
-
-void pmx_model_schnider_propofol(SCHNIDER_PROPOFOL_CONFIG* schniderconfig);
 
 #ifdef __cplusplus
 }

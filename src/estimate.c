@@ -552,6 +552,9 @@ static void estimate_popmodel(const char* filename,
 	if (maxeval > 1)
 		info(params.outstream, "optim %s\n", message);
 
+	/* update results to screen and log */
+	popmodel_information(params.outstream, popmodel, -DBL_MAX);
+
 /// Before estimation a data checkout is done (see checkout.c and 
 /// ievaluate.c) to detect various errors. 
 	idata_ineval(idata, true);

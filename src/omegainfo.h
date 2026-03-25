@@ -19,6 +19,7 @@
 #define OPENPMX_OMEGAINFO_H
 
 #include "nonzero.h"
+#include "omegafixed.h"
 
 #include <gsl/gsl_matrix.h>
 
@@ -37,7 +38,7 @@ typedef struct {
 
 OMEGAINFO omegainfo_init(const int nomega,
 						 const double omega[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX],
-						 const int omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX]);
+						 const OMEGAFIXED omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX]);
 
 void omegainfo_update_inverse_lndet(OMEGAINFO* const omegainfo,
 									const double omega[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX]);

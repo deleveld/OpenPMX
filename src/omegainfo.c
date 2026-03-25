@@ -74,7 +74,7 @@ void omegainfo_update_inverse_lndet(OMEGAINFO* const omegainfo,
 
 OMEGAINFO omegainfo_init(const int nomega,
 						 const double omega[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX],
-						 const int omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX])
+						 const OMEGAFIXED omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX])
 {
 	OMEGAINFO ret = { };
 	ret.omega_nonzero_lndet = 0.;
@@ -108,7 +108,7 @@ OMEGAINFO omegainfo_init(const int nomega,
 			 * to be estimated. the negative variances (FIXED) on the
 			 * diagonal are handeled during decode */
 			let fixed = omegafixed[i][i];
-			if (sum != 0. && fixed != 2) {
+			if (sum != 0. && fixed != OMEGAFIXED_SAME) {
 				ret.nonfixed.rowcol[ret.nonfixed.n] = i;
 				++ret.nonfixed.n;
 			}

@@ -90,7 +90,8 @@ static TABLE table_open(const IDATA* const idata,
 						const char* pmx_filename,
 						int* tablecount,
 						const char* _fields,
-						const TABLECONFIG* const tableconfig)
+						const TABLECONFIG* const tableconfig,
+						ERRCTX* errctx)
 {
 	FILE* stream = 0;
 	
@@ -99,29 +100,41 @@ static TABLE table_open(const IDATA* const idata,
 /// written to that filename.  
 		/* write to user define filename */
 		if (tableconfig->filename) {
-			if (tableconfig->name)
-				fatal(0, "Table has both filename and name.\n");
-			if (tableconfig->stream)
-				fatal(0, "Table has both filename and stream.\n");
+			if (tableconfig->name) {
+				add_errctx(errctx, "%s: table has both filename \"%s\" and name \"%s\"\n",
+						   __func__, tableconfig->filename, tableconfig->name);
+				goto done_file_open;
+			}
+			if (tableconfig->stream) {
+				add_errctx(errctx, "%s: table has both filename \"%s\" and stream\n",
+						   __func__, tableconfig->filename);
+				goto done_file_open;
+			}
 			stream = fopen(tableconfig->filename, "w");
-			if (!stream)
-				fatal(0, "Could not open table file \"%s\"\n", tableconfig->filename);
-
+			if (!stream) {
+				add_errctx(errctx, "%s: open table file failed \"%s\"\n", __func__, tableconfig->filename);
+				goto done_file_open;
+			}
 /// If a .name is defined in the TABLECONFIG then the output is
 /// written to a filename which is the name in the PMX object extended
 /// with the given name.   
 		} else if (tableconfig->name) {
 			char fname[PATH_MAX + NAME_MAX];
-			if (tableconfig->stream)
-				fatal(0, "Table has both name and stream.\n");
+			if (tableconfig->stream) {
+				add_errctx(errctx, "%s: table has both name \"%s\" and stream\n",
+						   __func__, tableconfig->name);
+				goto done_file_open;
+			}
 			snprintf(fname, sizeof(fname), "%s%s%s",
 				pmx_filename ? pmx_filename : "",
 				pmx_filename ? "." : "",
 				tableconfig->name);
 			stream = fopen(fname, "w");
-			if (!stream)
-				fatal(0, "Could not open table file \"%s\".\n", fname);
-
+			if (!stream) {
+				add_errctx(errctx, "%s: table has both name \"%s\" and stream\n",
+						   __func__, tableconfig->name);
+				goto done_file_open;
+			}
 /// if a .stream (FILE*) is provided then table will be output to it.
 /// For example it could be stdout or stderr. If given in this way then
 /// fclose() is not called on the stream when the table is closed.
@@ -140,16 +153,22 @@ static TABLE table_open(const IDATA* const idata,
 				*tablecount,
 				OPENPMX_TABLEFILE);
 			stream = fopen(fname, "w");
-			if (!stream)
-				fatal(0, "Could not open table file \"%s\".\n", fname);
+			if (!stream) {
+				add_errctx(errctx, "%s: open table file failed \"%s\"\n", __func__, fname);
+				goto done_file_open;
+			}
 
 /// If no TABLECONFIG and no PMX filename, then use stdout
 		} else
 			stream = stdout;
 	}
-	if (!stream)
-		fatal(0, "Could not open table stream.\n");
 
+done_file_open:
+	if (!stream) {
+		add_errctx(errctx, "%s: no stream\n", __func__);
+		return (TABLE) { 0 };
+	}
+	
 	var ret = (TABLE) {
 		.idata = idata,
 		.advanfuncs = advanfuncs,
@@ -292,27 +311,20 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	if (predictvarsoffset >= 0)
 		return DATA_FIELD(table->predictvars, predictvarsoffset);
 
-/// The follwing fields are accesible: yhat, YHAT, yhatvar, YHATVAR,
-/// pred, PRED, obj, OBJ, ineval, INEVAL, evid, EVID, MDV, EVID, AMT,
-/// RATE, and CMT.
+/// The follwing fields are accesible: YHAT, YHATVAR, PRED, OBJ, INEVAL,
+/// EVID, MDV, EVID, AMT, RATE, and CMT.
 	/* Table entries for each RECORD */
-	if (strcmp(name, "yhat") == 0 ||
-		strcmp(name, "YHAT") == 0)
+	if (strcmp(name, "YHAT") == 0)
 		return individ->yhat[table->individ_i];
-	if (strcmp(name, "yhatvar") == 0 ||
-		strcmp(name, "YHATVAR") == 0)
+	if (strcmp(name, "YHATVAR") == 0)
 		return individ->yhatvar[table->individ_i];
-	if (strcmp(name, "PRED") == 0 ||
-		strcmp(name, "pred") == 0)
+	if (strcmp(name, "PRED") == 0)
 		return individ->pred[table->individ_i];
-	if (strcmp(name, "obj") == 0 ||
-		strcmp(name, "OBJ") == 0)
+	if (strcmp(name, "OBJ") == 0)
 		return individ->iobjfn;
-	if (strcmp(name, "ineval") == 0 ||
-		strcmp(name, "INEVAL") == 0)
+	if (strcmp(name, "INEVAL") == 0)
 		return individ->ineval; 
-	if (strcmp(name, "evid") == 0 ||
-		strcmp(name, "EVID") == 0) 
+	if (strcmp(name, "EVID") == 0) 
 		return RECORDINFO_EVID(recordinfo, table->record);
 	if (strcmp(name, "MDV") == 0)
 		return RECORDINFO_MDV(recordinfo, table->record);
@@ -328,58 +340,38 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	/* Table entries for THETA, ETA, STATE, or ERR values */
 	const int off = _offset1 ? 1 : 0;
 	var i = -1;
-/// Values for theta can be accessed in several ways. For example
-/// THETA(1) is accessible as theta(1), THETA(1), theta1, or THETA1.
-	if (sscanf(name, "theta(%i)", &i) == 1 ||
-		sscanf(name, "THETA(%i)", &i) == 1 ||
-		sscanf(name, "theta%i", &i) == 1 ||
-		sscanf(name, "THETA%i", &i) == 1) {
+	if (sscanf(name, "THETA(%i)", &i) == 1) {
 		i -= off;
 		if (i >= 0 && i < idata->ntheta)
 			return table->popmodel.theta[i];
 		if (table->individ == 0 && table->individ_i == 0)
-			warning(0, "Accessing (\"%s\") outside ntheta (%i)\n", name, idata->ntheta + off);
+			warning(0, "access \"%s\" outside ntheta (%i)\n", name, idata->ntheta + off);
 		return NAN;
 	}
-/// Values for eta can be accessed in several ways. For example ETA(1)
-/// is accessible as eta(1), ETA(1), eta1, or ETA1.
-	if (sscanf(name, "eta(%i)", &i) == 1 ||
-		sscanf(name, "ETA(%i)", &i) == 1 ||
-		sscanf(name, "eta%i", &i) == 1 ||
-		sscanf(name, "ETA%i", &i) == 1) {
+	if (sscanf(name, "ETA(%i)", &i) == 1) {
 		i -= off;
 		let eta = individ->eta;
 		if (i >= 0 && i < idata->nomega)
 			return eta[i];
 		if (table->individ == 0 && table->individ_i == 0)
-			warning(0, "Accessing (\"%s\") outside nomega (%i)\n", name, idata->nomega + off);
+			warning(0, "access \"%s\" outside nomega (%i)\n", name, idata->nomega + off);
 		return NAN;
 	}
-/// Compartment amounts (the internal compartment state) can be accessed
-/// in several ways. For example the first compartment state is
-/// accessible as a(1), A(1), state(1), STATE(1).
-	if (sscanf(name, "a(%i)", &i) == 1 ||
-		sscanf(name, "A(%i)", &i) == 1 || 
-		sscanf(name, "state(%i)", &i) == 1 ||
-		sscanf(name, "STATE(%i)", &i) == 1) {
+	if (sscanf(name, "A(%i)", &i) == 1) {
 		i -= off;
 		let state = individ->istate + table->individ_i * idata->nstate;
 		if (i >= 0 && i < idata->nstate)
 			return state[i];	
 		if (table->individ == 0 && table->individ_i == 0)
-			warning(0, "Accessing (\"%s\") outside nstate (%i)\n", name, idata->nstate + off);
+			warning(0, "access \"%s\" outside nstate (%i)\n", name, idata->nstate + off);
 		return NAN;
 	}
-/// The values of ERR in the $PREDICT are accssible for table output.
-/// For estimation, these values will be zero. For simulation, they are
-/// likely to be non-zero. The values are accessible as err(1), ERR(1).
-	if ((sscanf(name, "err(%i)", &i) == 1) ||
-		(sscanf(name, "ERR(%i)", &i) == 1)) {
+	if (sscanf(name, "ERR(%i)", &i) == 1) {
 		i -= off;
 		if (i >= 0 && i < idata->nsigma)
 			return table->err[i];
 		if (table->individ == 0 && table->individ_i == 0)
-			warning(0, "Accessing (\"%s\") outside nsigma (%i)\n", name, idata->nsigma + off);
+			warning(0, "access \"%s\" outside nsigma (%i)\n", name, idata->nsigma + off);
 		return NAN;
 	}
 	
@@ -396,7 +388,7 @@ void pmx_table(OPENPMX* pmx,
 	ERRCTX errctx = { 0 };
 	let popmodel = popmodel_init(pmx, &errctx);
 	if (errctx.len)
-		fatal(0, "%s", errctx.errmsg);
+		fatal(0, "%s: %s", __func__, errctx.errmsg);
 
 	TABLE table = table_open(&pmx->state->idata,
 							 pmx->state->advanfuncs,
@@ -404,15 +396,17 @@ void pmx_table(OPENPMX* pmx,
 							 pmx->filename,
 							 &pmx->state->tablecount,
 							 fields,
-							 tableconfig);
+							 tableconfig,
+							 &errctx);
+	if (errctx.len)
+		fatal(0, "%s: %s", __func__, errctx.errmsg);
 
 	FILE* f = table.stream;
 	assert(f);
 
 	/* write out fields */
 	while (table_row(&table)) {
-		forvector(i, table.fieldnames) {
-			let name = table.fieldnames.ptr[i];
+		forvector_val(name, table.fieldnames) {
 			let val = table_value(&table, name, pmx->data._offset1);
 			fprintf(f, OPENPMX_TABLE_FORMAT, val);
 		}

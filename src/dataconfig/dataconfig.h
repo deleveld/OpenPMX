@@ -58,17 +58,23 @@ static inline const RECORD* RECORD_INDEX(const RECORD* p, const int size, const 
 
 static inline double RECORDINFO_ID(const RECORDINFO* const recordinfo, const RECORD* p)
 {
-	return *(const double*)((const char*)p + recordinfo->offsetID);
+	if (recordinfo->offsetID != -1)
+		return *(const double*)((const char*)p + recordinfo->offsetID);
+	return 1.;
 }
 
 static inline double RECORDINFO_TIME(const RECORDINFO* const recordinfo, const RECORD* p)
 {
-	return *(const double*)((const char*)p + recordinfo->offsetTIME);
+	if (recordinfo->offsetTIME != -1)
+		return *(const double*)((const char*)p + recordinfo->offsetTIME);
+	return 0.;
 }
 
 static inline double RECORDINFO_DV(const RECORDINFO* const recordinfo, const RECORD* p)
 {
-	return *(const double*)((const char*)p + recordinfo->offsetDV);
+	if (recordinfo->offsetDV != -1)
+		return *(const double*)((const char*)p + recordinfo->offsetDV);
+	return 1e-16;
 }
 
 static inline double RECORDINFO_AMT(const RECORDINFO* const recordinfo, const RECORD* p)

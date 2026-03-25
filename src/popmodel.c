@@ -57,7 +57,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 	forcount(i, OPENPMX_OMEGA_MAX) {
 		forcount(j, OPENPMX_OMEGA_MAX) {
 			ret.omega[i][j] = NAN;
-			ret.omegafixed[i][j] = 0;
+			ret.omegafixed[i][j] = OMEGAFIXED_ESTIMATE;
 		}
 	}
 	forcount(i, OPENPMX_SIGMA_MAX) {
@@ -157,12 +157,12 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 					ret.omega[d + c][d + r] = value;
 					ret.omega[d + r][d + c] = value;
 
-					ret.omegafixed[d + c][d + r] = 2;
-					ret.omegafixed[d + r][d + c] = 2;
+					ret.omegafixed[d + c][d + r] = OMEGAFIXED_SAME;
+					ret.omegafixed[d + r][d + c] = OMEGAFIXED_SAME;
 				}
 				let value = ret.omega[d + r - ndim][d + r - ndim];
 				ret.omega[d + r][d + r] = value;
-				ret.omegafixed[d + r][d + r] = 2;
+				ret.omegafixed[d + r][d + r] = OMEGAFIXED_SAME;
 			}
 
 		/* normal diagonal omega block */
@@ -195,13 +195,13 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 			let v = ret.omega[i][j];
 			if (i == j && v <= 0.) {
 				ret.omega[i][j] = fabs(v);
-				if (ret.omegafixed[i][j] == 2) {
+				if (ret.omegafixed[i][j] == OMEGAFIXED_SAME) {
 					add_errctx(errctx, "variances on diagonal of a SAME block cannot be fixed\n");
 					goto failed;
 				}
-				ret.omegafixed[i][j] = 1;
+				ret.omegafixed[i][j] = OMEGAFIXED_FIXED;
 			} else if (v == 0.)
-				ret.omegafixed[i][j] = 1;
+				ret.omegafixed[i][j] = OMEGAFIXED_FIXED;
 		}
 	}
 
@@ -305,7 +305,9 @@ void extfile_header(FILE * f,
 
 	forcount(i, popmodel->nomega) {
 		forcount(j, i+1) {
-			fprintf(f, OPENPMX_TABLE_FORMAT, (double)popmodel->omegafixed[i][j]);
+			let fixed = popmodel->omegafixed[i][j];
+			let v = omegafixed_to_ext_fixedval(fixed);
+			fprintf(f, OPENPMX_TABLE_FORMAT, v);
 		}
 	}
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
@@ -324,18 +326,15 @@ void extfile_header(FILE * f,
 	forcount(i, popmodel->nblock) {
 		let ndim = popmodel->blockdim[i];
 		let type = popmodel->blocktype[i];
-		var n = 0;
 		if (type == OMEGA_BLOCK) {
 			forcount(r, ndim) {
 				/* off diagonal */
 				for (var c=0; c<r; c++) {
 					omegablock[d + c][d + r] = i + 1;
 					omegablock[d + r][d + c] = i + 1;
-					++n;
 				}
 				/* on diagonal */
 				omegablock[d + r][d + r] = i + 1;
-				++n;
 			}
 
 		/* get entries from elsewhere set omega elements */
@@ -345,19 +344,15 @@ void extfile_header(FILE * f,
 				for (var c=0; c<r; c++) {
 					omegablock[d + c][d + r] = i + 1;
 					omegablock[d + r][d + c] = i + 1;
-					++n;
 				}
 				/* on diagonal */
 				omegablock[d + r][d + r] = i + 1;
-				++n;
 			}
 
 		/* normal diagonal omega block */
 		} else if (type == OMEGA_DIAG) {
-			forcount(r, ndim) {
+			forcount(r, ndim) 
 				omegablock[d + r][d + r] = i + 1;
-				++n;
-			}
 			
 		} else
 			fatal(0, "invalid OMEGA block type (%i)\n", type);
@@ -429,7 +424,7 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runti
 
 	forcount(i, popmodel->nomega)
 		forcount(j, i+1)
-			fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->omegafixed[i][j] ? 1. : 0.);
+			fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->omegafixed[i][j] != OMEGAFIXED_ESTIMATE ? 1. : 0.);
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 	fprintf(f, OPENPMX_IFORMAT, 0);
@@ -453,19 +448,19 @@ static void info_iteration(FILE* f1,
 
 void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double timestamp)
 {
-	if (popmodel->result.type != OBJFN_INVALID) {
-		const char* message = 0;
-		switch (popmodel->result.type) {
-			case OBJFN_INVALID:		message = "invalid";	break;
-			case OBJFN_CURRENT:		message = "current";	break;
-			case OBJFN_FINAL:		message = "final";		break;
-			case OBJFN_EVALUATE:	message = "evaluate";	break;
-			default:
-				assert(0);
-		}
-		assert(message);
-		info(f2, "popmodel %s\n", message);
+	const char* message = 0;
+	switch (popmodel->result.type) {
+		case OBJFN_INVALID:		message = "invalid";	break;
+		case OBJFN_CURRENT:		message = "current";	break;
+		case OBJFN_FINAL:		message = "final";		break;
+		case OBJFN_EVALUATE:	message = "evaluate";	break;
+		default:
+			assert(0);
+	}
+	assert(message);
+	info(f2, "popmodel %s\n", message);
 
+	if (popmodel->result.type != OBJFN_INVALID && timestamp != -DBL_MAX) {
 		if (popmodel->result.type == OBJFN_EVALUATE ||
 			popmodel->result.type == OBJFN_CURRENT ||
 			popmodel->result.type == OBJFN_FINAL) {
@@ -495,7 +490,7 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 		forcount(j, i+1) {
 			let v = popmodel->omega[i][j];
 			let f = popmodel->omegafixed[i][j];
-			info(f2, OPENPMX_FFORMAT "%s", v, f ? "*" : "");
+			info(f2, OPENPMX_FFORMAT "%s", v, f != OMEGAFIXED_ESTIMATE ? "*" : "");
 		}
 		info(f2, "\n");
 	}

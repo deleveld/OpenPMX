@@ -19,14 +19,12 @@
 #define VECTOR_C
 
 #include <assert.h>
-#include <string.h>
 #include "vector.h"
 
 void _vector_free(VECTOR_DATA * vect)
 {
 	if (vect->_capacity >= 0)
 		free(vect->_data);
-	memset(vect, 0, sizeof(*vect));
 }
 
 void _vector_reserve(VECTOR_DATA * vect, const int newsize, const size_t sizeofdata)
@@ -63,8 +61,8 @@ void _vector_remove(VECTOR_DATA * vect, const int dindex, int num, const size_t 
 {
 	assert(vect);
 	assert(sizeofdata);
-	assert(dindex < vect->_size);
 	assert(num > 0);
+	assert(dindex < vect->_size);
 
 	int bytes;
 	unsigned char *begin = (unsigned char *) vect->_data + dindex * sizeofdata;

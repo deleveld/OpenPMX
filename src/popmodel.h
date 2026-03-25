@@ -21,6 +21,7 @@
 #include <stdio.h>
 
 #include "openpmx.h"
+#include "omegafixed.h"
 #include "utils/errctx.h"
 
 #ifdef __cplusplus
@@ -40,7 +41,7 @@ typedef struct {
 	int nblock;
 
 	double omega[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX];
-	int omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX];
+	OMEGAFIXED omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX];
 	int nomega;
 
 	double sigma[OPENPMX_SIGMA_MAX];

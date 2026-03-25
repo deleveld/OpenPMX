@@ -175,5 +175,7 @@ void pmx_set_theta(OPENPMX* dest,
 	assert(i >= 0);
 	assert(i < OPENPMX_THETA_MAX);
 	dest->theta[i] = *theta;
+	
+	dest->result = (PMXRESULT) { 0 };
 }
 
