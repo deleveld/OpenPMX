@@ -70,7 +70,7 @@ EXITMESSAGE="error: openpmx failed\n"
 cleanup() {
 	printf "${EXITMESSAGE}" 	2>/dev/null || true
 	rm "${OBJFILE}" 			2>/dev/null || true
-	rm "${EXECFILE}" 			2>/dev/null || true
+#	rm "${EXECFILE}" 			2>/dev/null || true
 	rm -f "$QUEUEDIR/$MYTICKET" 2>/dev/null || true
 	if [ -z "$(find "$QUEUEDIR" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
 		rmdir "$QUEUEDIR" 		2>/dev/null || true

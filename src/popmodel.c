@@ -306,7 +306,7 @@ void extfile_header(FILE * f,
 	forcount(i, popmodel->nomega) {
 		forcount(j, i+1) {
 			let fixed = popmodel->omegafixed[i][j];
-			let v = omegafixed_encode(fixed);
+			let v = omegafixed_to_ext_fixedval(fixed);
 			fprintf(f, OPENPMX_TABLE_FORMAT, v);
 		}
 	}

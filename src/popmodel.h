@@ -32,16 +32,15 @@ typedef struct {
 	double lower[OPENPMX_THETA_MAX];
 	double theta[OPENPMX_THETA_MAX];
 	double upper[OPENPMX_THETA_MAX];
-	int thetaestim[OPENPMX_THETA_MAX]; /* int conversion from THETA.type enum */
+	unsigned char thetaestim[OPENPMX_THETA_MAX]; /* openpmx.theta[0].type */
 	int ntheta;
 
-	/* TODO: maybe I can avoid keeping track of blocks if I flag SAME(2) as (1E6+2). But how do I write the FINAL files? */
-	int blocktype[OPENPMX_OMEGABLOCK_MAX]; /* int conversion from OMEGA.type enum */
+	unsigned char blocktype[OPENPMX_OMEGABLOCK_MAX]; /* openpmx.omega[0].type */
 	int blockdim[OPENPMX_OMEGABLOCK_MAX];
 	int nblock;
 
 	double omega[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX];
-	OMEGAFIXED omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX];
+	unsigned char omegafixed[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX];
 	int nomega;
 
 	double sigma[OPENPMX_SIGMA_MAX];

@@ -112,7 +112,7 @@ void pmx_update_from_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel
 		let ndim = popmodel->blockdim[k];
 		let type = popmodel->blocktype[k];
 
-		assert((int)pmx->omega[k].type == type);
+		assert(pmx->omega[k].type == type);
 		assert(pmx->omega[k].ndim == ndim);
 
 		switch (type) {
