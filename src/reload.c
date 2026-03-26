@@ -20,6 +20,7 @@
 #include "openpmx.h"
 #include "defines.h"
 #include "popmodel.h"
+#include "omegafixed.h"
 #include "idata.h"
 #include "print.h"
 #include "pmxstate.h"
@@ -303,7 +304,7 @@ static OPENPMX popparams_init_from_file(const char* filename,
 			let colidx = v->col - 1;
 			omega[rowidx][colidx] = omega[colidx][rowidx] = v->value;
 			
-			var fixval = omegafixed_from_ext_fixedval(v->fixed);
+			var fixval = omegafixed_decode(v->fixed);
 			omegafixed[rowidx][colidx] = omegafixed[colidx][rowidx] = fixval; 
 			omegablocknum[rowidx][colidx] = omegablocknum[colidx][rowidx] = v->blocknum;
 		}

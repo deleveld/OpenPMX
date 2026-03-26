@@ -25,6 +25,7 @@
 #include "popmodel.h"
 #include "defines.h"
 #include "print.h"
+#include "omegafixed.h"
 #include "utils/c22.h"
 #include "utils/various.h"
 #include "utils/errctx.h"
@@ -306,7 +307,7 @@ void extfile_header(FILE * f,
 	forcount(i, popmodel->nomega) {
 		forcount(j, i+1) {
 			let fixed = popmodel->omegafixed[i][j];
-			let v = omegafixed_to_ext_fixedval(fixed);
+			let v = omegafixed_encode(fixed);
 			fprintf(f, OPENPMX_TABLE_FORMAT, v);
 		}
 	}

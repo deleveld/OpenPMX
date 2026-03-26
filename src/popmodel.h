@@ -21,12 +21,13 @@
 #include <stdio.h>
 
 #include "openpmx.h"
-#include "omegafixed.h"
 #include "utils/errctx.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef typeof(((OPENPMX){0}).result) PMXRESULT;
 
 typedef struct {
 	double lower[OPENPMX_THETA_MAX];
@@ -44,7 +45,7 @@ typedef struct {
 	int nomega;
 
 	double sigma[OPENPMX_SIGMA_MAX];
-	int sigmafixed[OPENPMX_SIGMA_MAX];
+	unsigned char sigmafixed[OPENPMX_SIGMA_MAX];
 	int nsigma;
 
 	/* filled in during estimation iterations */

@@ -380,7 +380,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			let cmt = RECORDINFO_CMT_0offset(recordinfo, ptr);
 			if (cmt < 0 || cmt >= advanfuncs->nstate) {
 				let _cmt = RECORDINFO_CMT(recordinfo, ptr);
-				fatal(logstream, "CMT (%i) not within number of states (%i): ID %f time %f record %i\n", _cmt, advanfuncs->nstate, id, time, i + record_offset);
+				fatal(logstream, "CMT (%i, %f) not within number of states (%i): ID %f time %f record %i\n", cmt, _cmt, advanfuncs->nstate, id, time, i + record_offset);
 			}
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);

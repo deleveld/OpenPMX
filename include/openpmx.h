@@ -159,21 +159,6 @@ ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const A
 ADVANFUNCS* pmx_advan_diffeqn_test(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 
 /*---------------------------------------------------------------------*/
-/* basic types */
-/*---------------------------------------------------------------------*/
-typedef struct {
-	double objfn;
-	enum {
-		OBJFN_INVALID = 0,
-		OBJFN_EVALUATE,
-		OBJFN_CURRENT,
-		OBJFN_FINAL,
-	} type;
-	int nparam;
-	int neval;
-} PMXRESULT;
-
-/*---------------------------------------------------------------------*/
 /* OPENPMX */
 /*---------------------------------------------------------------------*/
 typedef struct {
@@ -207,7 +192,17 @@ typedef struct {
 	double sigma[OPENPMX_SIGMA_MAX];
 
 	/* output */
-	PMXRESULT result;
+	struct {
+		double objfn;
+		enum {
+			OBJFN_INVALID = 0,
+			OBJFN_EVALUATE,
+			OBJFN_CURRENT,
+			OBJFN_FINAL,
+		} type;
+		int nparam;
+		int neval;
+	} result;
 
 	/* internal use */
 	struct PMXSTATE* state;
