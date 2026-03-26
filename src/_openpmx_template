@@ -70,7 +70,7 @@ EXITMESSAGE="error: openpmx failed\n"
 cleanup() {
 	printf "${EXITMESSAGE}" 	2>/dev/null || true
 	rm "${OBJFILE}" 			2>/dev/null || true
-#	rm "${EXECFILE}" 			2>/dev/null || true
+	rm "${EXECFILE}" 			2>/dev/null || true
 	rm -f "$QUEUEDIR/$MYTICKET" 2>/dev/null || true
 	if [ -z "$(find "$QUEUEDIR" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
 		rmdir "$QUEUEDIR" 		2>/dev/null || true
@@ -89,7 +89,9 @@ fi
 (${CC} ${CFLAGS} -fdebug-prefix-map=$(pwd)=. -I"${OPENPMXPATH}/include" -c "${FILE}" -o "${OBJFILE}") 2>&1
 
 # we have object files, so link now
-(${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} -lopenpmx -lgsl -lgslcblas -lm) 2>&1
+(${CC} "${OBJFILE}" -o "${EXECFILE}" -L"${OPENPMXPATH}/lib" ${LFLAGS} \
+	-Wl,-Bstatic -lopenpmx \
+	-Wl,-Bdynamic -lgsl -lgslcblas -lm) 2>&1
 
 # execute and clear exit message
 if "./${EXECFILE}" 2>&1; then

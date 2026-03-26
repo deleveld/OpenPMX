@@ -121,12 +121,12 @@ case "${PLATFORM}" in
     linux*|wsl*)
         CFLAGS="${CFLAGS}"
         CLIBFLAGS="${CLIBFLAGS} -fPIC"
-        LFLAGS="${LFLAGS} -static -flto"
+        LFLAGS="${LFLAGS} -flto"
         ;;
     msys2*)
         CFLAGS="${CFLAGS} -I/mingw64/include"
         LFLAGS="${LFLAGS} -L\"${OPENPMXPATH}/lib\" -L/mingw64/lib"
-        LFLAGS="${LFLAGS} -static -flto"
+        LFLAGS="${LFLAGS} -flto"
         ;;
     *)
         printf "error: platform %s not recognized\n" "${PLATFORM}" >&2

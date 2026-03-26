@@ -25,8 +25,8 @@ extern "C" {
 typedef unsigned char OMEGAFIXED;
 enum {
 	OMEGAFIXED_ESTIMATE = 0,
-	OMEGAFIXED_FIXED,
-	OMEGAFIXED_SAME,
+	OMEGAFIXED_FIXED = 1,
+	OMEGAFIXED_SAME = 2,
 };
 
 /* Conversion to the value in the .ext file from OMEGAFIXED. This is 
