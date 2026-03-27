@@ -26,6 +26,11 @@
 
 #include "buildflags.h"
 
+#ifdef OPENPMX_SERVER
+#include "defines.h"
+#include "utils/various.h"
+#endif
+
 /* --------------------------------------------------------------------*/
 /* mutex to synchronize printing from threads */
 static bool mutex_init = false;
