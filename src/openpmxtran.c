@@ -850,7 +850,6 @@ static void template_data_array(FILE* fp,
 								ERRCTX* errctx)
 {
 	(void)result;
-	(void)datainfo;
 	(void)errctx;
 	
 	fprintf(fp, "typedef struct RECORD {\n");
@@ -1196,7 +1195,8 @@ static void transform_pmx_line(FILE *fp, char *line, ERRCTX* errctx)
 		bool is_fixed = (keyword_present(cursor, "FIXED") || keyword_present(cursor, "FIX"));
 
 		for (int i = 0; i < 3; i++) {
-			while (isspace((unsigned char)*cursor)) cursor++;
+			while (isspace((unsigned char)*cursor))
+				cursor++;
 			
 			// Check for illegal characters/comments inside the parens
 			if (*cursor != '-' && *cursor != '.' && !isdigit((unsigned char)*cursor) && 
@@ -1212,9 +1212,16 @@ static void transform_pmx_line(FILE *fp, char *line, ERRCTX* errctx)
 
 			char *token_start = cursor;
 			char *endptr;
+			errno = 0;
 			(void)strtod(cursor, &endptr);
-			if (cursor == endptr)
+			if (cursor == endptr) {
+				errctx_add(errctx, "%s: no digit parsed at \"%s\"\n", __func__, cursor);
 				break;
+			}
+			if (errno == ERANGE) {
+				errctx_add(errctx, "%s: out of double range \"%s\"\n", __func__, cursor);
+				break;
+			}
 
 			val_starts[found] = token_start;
 			val_lens[found] = (int)(endptr - token_start);

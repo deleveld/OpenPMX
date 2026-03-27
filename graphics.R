@@ -109,7 +109,7 @@ pdf(pdffile)
 
 get_config_setting <- function(name_val, sub_val, sub_type, default)
 {
-	if (is.na(config))
+	if (!is.data.frame(config))
 		return (default)
 	
 	d <- config[config[["NAME"]] == name_val & 
@@ -161,6 +161,7 @@ if (is.data.frame(cov) && is.data.frame(phi)) {
 	plot_continuous_covariate <- function(x, y, ylim, cname, ename)
 	{
 		plot(x=x, y=y, type="n", ylim=ylim, xlab=cname, ylab=ename)
+		points(x=x, y=y, col="grey")
 		abline(h=0)
 
 		l1 <- lm(y ~ x)
@@ -179,7 +180,6 @@ if (is.data.frame(cov) && is.data.frame(phi)) {
 				legend=legend,
 				bty="n")
 		}
-		points(x=x, y=y, col="grey")
 		grid()
 	}
 
@@ -245,7 +245,12 @@ if (is.data.frame(cov) && is.data.frame(phi)) {
 
 			if (iseta && !all(y == 0)) {
 
-				val <- get_config_setting(cname, ".", "covariate", "")
+				val <- get_config_setting(cname, ".", "covariate", "missing")
+				if (val == "missing") {
+					if (length(unique(x)) <= 5) {
+						val = "categorical"
+					}
+				}
 				if (val == "categorical") {
 					plot_categorical_covariate(x, y, ylim, cname, ename)
 				} else {
@@ -300,9 +305,10 @@ if (is.data.frame(yhatdata)) {
 				logxy <- "xy"
 			}
 			
-			cat(sprintf("plot yhatdata dvid %i\n", dname))
 			valid <- yhatdata[["YHATVAR"]] != 0 & preddvid == dname
 			if (!all(valid == FALSE)) {
+				cat(sprintf("plot yhatdata dvid %i\n", dname))
+
 				id <- yhatdata[valid, "ID"]
 				dv <- as.numeric(yhatdata[valid, "DV"])
 				yhat <- as.numeric(yhatdata[valid, "YHAT"])
@@ -387,5 +393,5 @@ if (is.data.frame(yhatdata)) {
 		}
 	}
 }
-
 dummy <- dev.off()
+cat("done\n")
