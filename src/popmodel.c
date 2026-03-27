@@ -76,7 +76,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 		if (!gsl_finite(theta[i].lower) ||
 			!gsl_finite(theta[i].value) ||
 			!gsl_finite(theta[i].upper)) {
-			add_errctx(errctx, "THETA invalid { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
+			errctx_add(errctx, "THETA invalid { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
 			goto failed;
 		}
 		
@@ -87,13 +87,13 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 		if (est == ESTIMATE) {
 			if (theta[i].value < theta[i].lower ||
 				theta[i].value > theta[i].upper) {
-				add_errctx(errctx, "THETA outside boundary { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
+				errctx_add(errctx, "THETA outside boundary { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
 				goto failed;
 			}
 
 			if (theta[i].value == theta[i].lower ||
 				theta[i].value == theta[i].upper) {
-				add_errctx(errctx, "THETA at boundary { %g, %g, %g, ESTIMATE }\n", theta[i].lower, theta[i].value, theta[i].upper);
+				errctx_add(errctx, "THETA at boundary { %g, %g, %g, ESTIMATE }\n", theta[i].lower, theta[i].value, theta[i].upper);
 				goto failed;
 			}
 		}
@@ -104,7 +104,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 			theta[i].value != 0. ||
 			theta[i].upper != 0. ||
 			theta[i].type != THETA_INVALID) {
-			add_errctx(errctx, "THETA not fully initialized { %g, %g, %g, ??? }\n", theta[i].lower, theta[i].value, theta[i].upper);
+			errctx_add(errctx, "THETA not fully initialized { %g, %g, %g, ??? }\n", theta[i].lower, theta[i].value, theta[i].upper);
 			goto failed;
 		}
 	}
@@ -122,7 +122,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 		ret.nblock += 1;
 	}
 	if (ret.nomega > OPENPMX_OMEGA_MAX) {
-		add_errctx(errctx, "Omega size (%i) is too large, max is %i\n", ret.nomega, OPENPMX_OMEGA_MAX);
+		errctx_add(errctx, "Omega size (%i) is too large, max is %i\n", ret.nomega, OPENPMX_OMEGA_MAX);
 		goto failed;
 	}
 
@@ -174,14 +174,14 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 			}
 
 		} else {
-			add_errctx(errctx, "invalid OMEGA block type (%i)\n", type);
+			errctx_add(errctx, "invalid OMEGA block type (%i)\n", type);
 			goto failed;
 		}
 
 		/* make sure there are no extra values in list we are ignoring */
 		for (int i=n; i<OPENPMX_OMEGABLOCKSIZE_MAX; i++) {
 			if (v[i] != 0.) {
-				add_errctx(errctx, "excess value (%f) in omega block\n", v[i]);
+				errctx_add(errctx, "excess value (%f) in omega block\n", v[i]);
 				goto failed;
 			}
 		}
@@ -197,7 +197,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 			if (i == j && v <= 0.) {
 				ret.omega[i][j] = fabs(v);
 				if (ret.omegafixed[i][j] == OMEGAFIXED_SAME) {
-					add_errctx(errctx, "variances on diagonal of a SAME block cannot be fixed\n");
+					errctx_add(errctx, "variances on diagonal of a SAME block cannot be fixed\n");
 					goto failed;
 				}
 				ret.omegafixed[i][j] = OMEGAFIXED_FIXED;
@@ -218,7 +218,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 		let v = sigma[i];
 
 		if (!gsl_finite(v)) {
-			add_errctx(errctx, "invalid sigma[%i] %g\n", i, v);
+			errctx_add(errctx, "invalid sigma[%i] %g\n", i, v);
 			goto failed;
 		}
 		

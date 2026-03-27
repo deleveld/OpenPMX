@@ -67,15 +67,15 @@ static COLINFO parse_col_name(const char *name, ERRCTX* errctx)
 		char *end;
 		long num = strtol(p, &end, 10);
 		if (end == p || *end != '\0') {
-			add_errctx(errctx, "%s: cannot parse theta index in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: cannot parse theta index in \"%s\"", __func__, name);
 			return ci;
 		}
 		if (num <= 0) {
-			add_errctx(errctx, "%s: theta index must be >= 1 in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: theta index must be >= 1 in \"%s\"", __func__, name);
 			return ci;
 		}
 		if (num >= OPENPMX_THETA_MAX) {
-			add_errctx(errctx, "%s: theta index %ld exceeds max (%d) in \"%s\"", __func__, num, OPENPMX_THETA_MAX, name);
+			errctx_add(errctx, "%s: theta index %ld exceeds max (%d) in \"%s\"", __func__, num, OPENPMX_THETA_MAX, name);
 			return ci;
 		}
 		ci.num = (int)num;
@@ -86,25 +86,25 @@ static COLINFO parse_col_name(const char *name, ERRCTX* errctx)
 		char *end;
 		long row = strtol(p, &end, 10);
 		if (end == p || *end != ',') {
-			add_errctx(errctx, "%s: cannot parse sigma indices in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: cannot parse sigma indices in \"%s\"", __func__, name);
 			return ci;
 		}
 		p = end + 1;
 		long col = strtol(p, &end, 10);
 		if (end == p || (*end != ')' && *end != '\0')) {
-			add_errctx(errctx, "%s: cannot parse sigma col index in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: cannot parse sigma col index in \"%s\"", __func__, name);
 			return ci;
 		}
 		if (row <= 0 || col <= 0) {
-			add_errctx(errctx, "%s: sigma indices must be >= 1 in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: sigma indices must be >= 1 in \"%s\"", __func__, name);
 			return ci;
 		}
 		if (row >= OPENPMX_SIGMA_MAX || col >= OPENPMX_SIGMA_MAX) {
-			add_errctx(errctx, "%s: sigma index exceeds max (%d) in \"%s\"", __func__, OPENPMX_SIGMA_MAX, name);
+			errctx_add(errctx, "%s: sigma index exceeds max (%d) in \"%s\"", __func__, OPENPMX_SIGMA_MAX, name);
 			return ci;
 		}
 		if (row != col) {
-			add_errctx(errctx, "%s: sigma not on diagonal in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: sigma not on diagonal in \"%s\"", __func__, name);
 			return ci;
 		}
 		ci.row = (int)row;
@@ -117,29 +117,29 @@ static COLINFO parse_col_name(const char *name, ERRCTX* errctx)
 		char *end;
 		long row = strtol(p, &end, 10);
 		if (end == p || *end != ',') {
-			add_errctx(errctx, "%s: cannot parse omega indices in \"%s\"\n", __func__, name);
+			errctx_add(errctx, "%s: cannot parse omega indices in \"%s\"\n", __func__, name);
 			return ci;
 		}
 		p = end + 1;
 		long col = strtol(p, &end, 10);
 		if (end == p || (*end != ')' && *end != '\0')) {
-			add_errctx(errctx, "%s: cannot parse omega col index in \"%s\"\n", __func__, name);
+			errctx_add(errctx, "%s: cannot parse omega col index in \"%s\"\n", __func__, name);
 			return ci;
 		}
 		if (row <= 0 || col <= 0) {
-			add_errctx(errctx, "%s: omega indices must be >= 1 in \"%s\"\n", __func__, name);
+			errctx_add(errctx, "%s: omega indices must be >= 1 in \"%s\"\n", __func__, name);
 			return ci;
 		}
 		if (row >= OPENPMX_OMEGA_MAX) {
-			add_errctx(errctx, "%s: omega row %ld exceeds max (%d) in \"%s\"\n", __func__, row, OPENPMX_OMEGA_MAX, name);
+			errctx_add(errctx, "%s: omega row %ld exceeds max (%d) in \"%s\"\n", __func__, row, OPENPMX_OMEGA_MAX, name);
 			return ci;
 		}
 		if (col >= OPENPMX_OMEGA_MAX) {
-			add_errctx(errctx, "%s: omega col %ld exceeds max (%d) in \"%s\"\n", __func__, col, OPENPMX_OMEGA_MAX, name);
+			errctx_add(errctx, "%s: omega col %ld exceeds max (%d) in \"%s\"\n", __func__, col, OPENPMX_OMEGA_MAX, name);
 			return ci;
 		}
 		if (col > row) {
-			add_errctx(errctx, "%s: omega not lower triangular in \"%s\"\n", __func__, name);
+			errctx_add(errctx, "%s: omega not lower triangular in \"%s\"\n", __func__, name);
 			return ci;
 		}
 		ci.row = (int)row;
@@ -175,7 +175,7 @@ static void parse_extcols_line(char *line,
 
 	/* error if number of values detected didnt match */
 	if (vals.size != extcols->size) {
-		add_errctx(errctx, "%s: ext file \"%s\" line %i number fields (%i) does not match header (%i)\n",
+		errctx_add(errctx, "%s: ext file \"%s\" line %i number fields (%i) does not match header (%i)\n",
 				   __func__, filename, linenum, vals.size, extcols->size);
 
 	/* copy over values if no errors */
@@ -221,7 +221,7 @@ static void read_extcols(const char *filename, EXTCOLS* extcols, ERRCTX* errctx)
 
     FILE *stream = fopen(filename, "r");
     if (!stream) {
-		add_errctx(errctx, "%s: cannot open \"%s\"\n", __func__, filename);
+		errctx_add(errctx, "%s: cannot open \"%s\"\n", __func__, filename);
 		goto failed;
 	}
 
@@ -229,7 +229,7 @@ static void read_extcols(const char *filename, EXTCOLS* extcols, ERRCTX* errctx)
     size_t capacity = 0;
     var len = openpmx_getdelim(&line, &capacity, '\n', stream);
     if (len == -1) {
-		add_errctx(errctx, "%s: ext file \"%s\" cannot read header\n", __func__, filename);
+		errctx_add(errctx, "%s: ext file \"%s\" cannot read header\n", __func__, filename);
 		goto failed;
 	}
 	var linenum = 1;
@@ -240,7 +240,7 @@ static void read_extcols(const char *filename, EXTCOLS* extcols, ERRCTX* errctx)
 	forvector_val(name, header_elem) {
 		let colinfo = parse_col_name(name, errctx);
 		if (errctx->len) {
-			add_errctx(errctx, "%s: ext file \"%s\" header parse fail\n", __func__, filename);
+			errctx_add(errctx, "%s: ext file \"%s\" header parse fail\n", __func__, filename);
 			goto failed;
 		}
 		vector_append(*extcols, colinfo);
@@ -407,7 +407,7 @@ static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel
 	char* filename_buffer = 0;
 	if (!filename) {
 		if (!dest->filename) {
-			add_errctx(&errctx, "%s: no default ext filename\n", __func__);
+			errctx_add(&errctx, "%s: no default ext filename\n", __func__);
 			goto failed;
 		}
 		/* construct the default filename, where we expect the ext file
@@ -439,27 +439,27 @@ static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel
 				break;
 			if (dest->theta[i].lower != src.theta[i].lower ||
 				dest->theta[i].upper != src.theta[i].upper) {
-				add_errctx(&errctx, "%s: theta bounds mismatch\n", __func__);
+				errctx_add(&errctx, "%s: theta bounds mismatch\n", __func__);
 				goto failed;
 			}
 			if (dest->theta[i].type != src.theta[i].type) {
-				add_errctx(&errctx, "%s: theta type mismatch\n", __func__);
+				errctx_add(&errctx, "%s: theta type mismatch\n", __func__);
 				goto failed;
 			}
 			if (src.theta[i].value <= dest->theta[i].lower ||
 				src.theta[i].value >= dest->theta[i].upper) {
-				add_errctx(&errctx, "%s: theta value outside range\n", __func__);
+				errctx_add(&errctx, "%s: theta value outside range\n", __func__);
 				goto failed;
 			}
 		}
 
 		forcount(i, OPENPMX_SIGMA_MAX) {
 			if ((src.sigma[i] != 0) != (dest->sigma[i] != 0)) {
-				add_errctx(&errctx, "%s: sigma non-zero does not match.\n", __func__);
+				errctx_add(&errctx, "%s: sigma non-zero does not match.\n", __func__);
 				goto failed;
 			}
 			if ((src.sigma[i] < 0) != (dest->sigma[i] < 0)) {
-				add_errctx(&errctx, "%s: sigma fixed does not match.\n", __func__);
+				errctx_add(&errctx, "%s: sigma fixed does not match.\n", __func__);
 				goto failed;
 			}
 		}
@@ -468,11 +468,11 @@ static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel
 			if (src.omega[i].type == OMEGA_INVALID)
 				break;
 			if (dest->omega[i].type != src.omega[i].type) {
-				add_errctx(&errctx, "%s: omega block type mismatch\n", __func__);
+				errctx_add(&errctx, "%s: omega block type mismatch\n", __func__);
 				goto failed;
 			}
 			if (dest->omega[i].ndim != src.omega[i].ndim) {
-				add_errctx(&errctx, "%s: omega block ndim mismatch\n", __func__);
+				errctx_add(&errctx, "%s: omega block ndim mismatch\n", __func__);
 				goto failed;
 			}
 		}

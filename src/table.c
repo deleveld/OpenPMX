@@ -101,18 +101,18 @@ static TABLE table_open(const IDATA* const idata,
 		/* write to user define filename */
 		if (tableconfig->filename) {
 			if (tableconfig->name) {
-				add_errctx(errctx, "%s: table has both filename \"%s\" and name \"%s\"\n",
+				errctx_add(errctx, "%s: table has both filename \"%s\" and name \"%s\"\n",
 						   __func__, tableconfig->filename, tableconfig->name);
 				goto done_file_open;
 			}
 			if (tableconfig->stream) {
-				add_errctx(errctx, "%s: table has both filename \"%s\" and stream\n",
+				errctx_add(errctx, "%s: table has both filename \"%s\" and stream\n",
 						   __func__, tableconfig->filename);
 				goto done_file_open;
 			}
 			stream = fopen(tableconfig->filename, "w");
 			if (!stream) {
-				add_errctx(errctx, "%s: open table file failed \"%s\"\n", __func__, tableconfig->filename);
+				errctx_add(errctx, "%s: open table file failed \"%s\"\n", __func__, tableconfig->filename);
 				goto done_file_open;
 			}
 /// If a .name is defined in the TABLECONFIG then the output is
@@ -121,7 +121,7 @@ static TABLE table_open(const IDATA* const idata,
 		} else if (tableconfig->name) {
 			char fname[PATH_MAX + NAME_MAX];
 			if (tableconfig->stream) {
-				add_errctx(errctx, "%s: table has both name \"%s\" and stream\n",
+				errctx_add(errctx, "%s: table has both name \"%s\" and stream\n",
 						   __func__, tableconfig->name);
 				goto done_file_open;
 			}
@@ -131,7 +131,7 @@ static TABLE table_open(const IDATA* const idata,
 				tableconfig->name);
 			stream = fopen(fname, "w");
 			if (!stream) {
-				add_errctx(errctx, "%s: table has both name \"%s\" and stream\n",
+				errctx_add(errctx, "%s: table has both name \"%s\" and stream\n",
 						   __func__, tableconfig->name);
 				goto done_file_open;
 			}
@@ -154,7 +154,7 @@ static TABLE table_open(const IDATA* const idata,
 				OPENPMX_TABLEFILE);
 			stream = fopen(fname, "w");
 			if (!stream) {
-				add_errctx(errctx, "%s: open table file failed \"%s\"\n", __func__, fname);
+				errctx_add(errctx, "%s: open table file failed \"%s\"\n", __func__, fname);
 				goto done_file_open;
 			}
 
@@ -165,7 +165,7 @@ static TABLE table_open(const IDATA* const idata,
 
 done_file_open:
 	if (!stream) {
-		add_errctx(errctx, "%s: no stream\n", __func__);
+		errctx_add(errctx, "%s: no stream\n", __func__);
 		return (TABLE) { 0 };
 	}
 	

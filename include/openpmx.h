@@ -44,8 +44,12 @@ extern "C" {
 #define OPENPMX_FIELDNAME_MAX			64
 
 /*---------------------------------------------------------------------*/
-/* dataconfig */
+/* data structres and information about user code */
 /*---------------------------------------------------------------------*/
+typedef struct RECORD RECORD;
+typedef struct IMODEL IMODEL;
+typedef struct PREDICTVARS PREDICTVARS;
+
 typedef	struct {
 	int size;
 	struct {
@@ -54,7 +58,9 @@ typedef	struct {
 	} field[OPENPMX_FIELDS_MAX];
 } STRUCTINFO;
 
-typedef struct RECORD RECORD;
+/*---------------------------------------------------------------------*/
+/* information about the dataset */
+/*---------------------------------------------------------------------*/
 typedef struct {
 	RECORD* writeable;
 	const RECORD* records;
@@ -98,11 +104,8 @@ bool pmx_advan_inittime(const ADVANSTATE* advanstate, const double t);
 void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const double v);
 void pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate, const double* sysmat);
 
-/* callback for differential equation solver */
-typedef struct IMODEL IMODEL;
-typedef struct PREDICTVARS PREDICTVARS;
-typedef struct ADVANCONFIG ADVANCONFIG;
 typedef struct ADVANFUNCS ADVANFUNCS;
+typedef struct ADVANCONFIG ADVANCONFIG;
 typedef struct ADVANCONFIG {
 	
 	/* init function */
@@ -209,9 +212,6 @@ typedef struct {
 } OPENPMX;
 
 void pmx_cleanup(OPENPMX* openpmx);
-
-OPENPMX pmx_copy(const OPENPMX* const openpmx);
-void pmx_copy_popparam(OPENPMX* dest, const OPENPMX* const src);
 
 /*---------------------------------------------------------------------*/
 /* prediction */
