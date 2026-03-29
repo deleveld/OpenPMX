@@ -186,7 +186,7 @@ printf "compile openpmxtran\n"
 SOURCEFILES="pmxstate.c options.c ievaluate.c predict.c stage1.c
 			 checkout.c popmodel.c encode.c nonzero.c omegainfo.c
 			 linalg.c print.c idata.c table.c scatter.c estimate.c
-			 simulate.c reload.c 
+			 simulate.c reload.c server_queue.c 
 			 dataconfig/dataconfig.c
 			 advan/advan.c advan/pred.c advan/onecomp.c
 			 advan/onecomp_depot.c advan/twocomp.c advan/threecomp.c
@@ -220,7 +220,6 @@ printf "write openpmx script\n"
     printf "LFLAGS=\"%s\"\n" "${LFLAGS}"
     printf "OPENPMXPATH=\"%s\"\n" "${OPENPMXPATH}"
     printf "PLATFORM=\"%s\"\n" "${PLATFORM}"
-    printf "QUEUEDIR=\"%s\"\n" "${QUEUEDIR}"
     cat "${OPENPMXPATH}/src/_openpmx_template"
 } > "${OPENPMXPATH}/openpmx"
 

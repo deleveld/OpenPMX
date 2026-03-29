@@ -26,43 +26,6 @@ if [[ "$PLATFORM" == "msys2" ]]; then
 	EXECFILE="${FILE}.exe"
 fi
 
-# setup the queue
-MYPID=$$
-MYTICKET=$(date +%s%N)-$MYPID
-mkdir -p "$QUEUEDIR"
-touch "$QUEUEDIR/$MYTICKET"
-LAST_REPORTED_RANK=-1
-while true; do
-    ALL_TICKETS=$(find "$QUEUEDIR" -maxdepth 1 -mindepth 1 -printf '%f\n' | sort)
-    OLDEST_TICKET=$(echo "$ALL_TICKETS" | head -n 1)
-
-    # remove stale leader and retry
-    LEADER_PID=${OLDEST_TICKET##*-}
-    if ! kill -0 "$LEADER_PID" 2>/dev/null; then
-        rm -f "$QUEUEDIR/$OLDEST_TICKET"
-        continue
-    fi
-
-    # if rank gets lost, remake ticket and retry
-    MY_RANK=$(echo "$ALL_TICKETS" | grep -n "^${MYTICKET}$" | cut -d: -f1)
-    if [ -z "$MY_RANK" ]; then
-        touch "$QUEUEDIR/$MYTICKET"
-        continue
-    fi
-
-    # report rank if changed
-    if [ "$MY_RANK" -gt 1 ] && [ "$MY_RANK" -ne "$LAST_REPORTED_RANK" ]; then
-        printf "queue: waiting for %i other run(s)" $((MY_RANK - 1))
-        LAST_REPORTED_RANK=$MY_RANK
-    fi
-
-    # break if it's our turn, otherwise wait
-    if [ "$OLDEST_TICKET" = "$MYTICKET" ]; then
-        break
-    fi
-    sleep 2
-done
-
 # cleanup when done, the object and excutable files are removed
 # but the .c file remains for debugging purposes. Also the last process
 # cleans up the queue.
@@ -71,10 +34,6 @@ cleanup() {
 	printf "${EXITMESSAGE}" 	2>/dev/null || true
 	rm "${OBJFILE}" 			2>/dev/null || true
 	rm "${EXECFILE}" 			2>/dev/null || true
-	rm -f "$QUEUEDIR/$MYTICKET" 2>/dev/null || true
-	if [ -z "$(find "$QUEUEDIR" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
-		rmdir "$QUEUEDIR" 		2>/dev/null || true
-	fi
 }
 trap cleanup EXIT
 

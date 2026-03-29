@@ -366,7 +366,7 @@ static void handle_preamble(RESULT* result, char* payload, ERRCTX* errctx)
 static void handle_data(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	if (result->data.file) {
-		errctx_add(errctx, "%s: %s: second $DATA()\n", __func__);
+		errctx_add(errctx, "%s: second $DATA()\n", __func__);
 		return;
 	}
 
@@ -382,7 +382,7 @@ static void handle_data(RESULT* result, char* payload, ERRCTX* errctx)
 static void handle_advan(RESULT* result, char* payload, ERRCTX* errctx) 
 {
 	if (result->advan.method) {
-		errctx_add(errctx, "%s: %s: second $ADVAN()\n", __func__);
+		errctx_add(errctx, "%s: second $ADVAN()\n", __func__);
 		return;
 	}
 	
@@ -467,6 +467,10 @@ static void _handle_omega_helper(RESULT* result,
 								 ERRCTX* errctx) 
 {
 	let n = result->nomega;
+	if (n >= OPENPMX_OMEGABLOCK_MAX) {
+		errctx_add(errctx, "%s: too many omega blocks\n", __func__);
+		return;
+	}
 
 	/* allow the direct C initialization of an omega block */
 	if (payload[0] != '(') {
@@ -480,11 +484,6 @@ static void _handle_omega_helper(RESULT* result,
 	let text = extract_args_content(payload, errctx);
 	if (errctx->len)
 		return;
-
-	if (n >= OPENPMX_OMEGABLOCK_MAX) {
-		errctx_add(errctx, "%s: too many omega blocks\n", __func__);
-		return;
-	}
 
 	result->omega[n].type = omega_type;
 	let err = get_delim_tokens(text.args, &result->omega[n].args, GET_DELIM_SEP_ANY);
@@ -532,7 +531,7 @@ static void handle_omegasame(RESULT* result, char* payload, ERRCTX* errctx)
 
 static void handle_sigma(RESULT* result, char* payload, ERRCTX* errctx) 
 {
-	char* input = payload;
+	char* input;
 
 	/* allow the direct C initialization of an omega block */
 	if (payload[0] != '(') {
@@ -674,7 +673,7 @@ static file_content read_file(const char* filename, ERRCTX* errctx)
 		goto failed;
 	}
 
-    let filesize = ftell(fp);
+    long filesize = ftell(fp);
 	if (filesize == -1L) {
 		errctx_add(errctx, "%s: ftell failed\n", __func__);
 		goto failed;
@@ -733,79 +732,98 @@ static void datainfo_destroy(DATAINFO* datainfo)
 	vector_free(datainfo->elems);
 }
 
+static double checked_atof(const char* str, ERRCTX* errctx)
+{
+	char *end;
+	errno = 0;
+	let val = strtod(str, &end);
+	if (errno != 0 || end == str || *end != '\0') {
+		errctx_add(errctx, "%s: invalid data \"%s\"\n", __func__, str);
+		return 0;
+	}
+	return val;
+}
+
 static DATAINFO datainfo_create(file_content* dataptr, ERRCTX* errctx)
 {
-    DATAINFO ret = { 0 };
-    char* line = dataptr->mutptr;
+	DATAINFO ret = { 0 };
+	char* line = dataptr->mutptr;
+	VECPTR v = { 0 };
 
-    /* sanity check */
-    if (!line || !*line) {
-        errctx_add(errctx, "%s: data file is empty\n", __func__);
-        return ret;
-    }
+	/* sanity check */
+	if (!line || !*line) {
+		errctx_add(errctx, "%s: data file is empty\n", __func__);
+		return ret;
+	}
 
-    /* get first line, terminate it so we can read tokens */
-    char* next_newline = strchr(line, '\n');
-    if (next_newline) 
-        *next_newline = '\0';
+	/* get first line, terminate it so we can read tokens */
+	char* next_newline = strchr(line, '\n');
+	if (next_newline) 
+		*next_newline = '\0';
 
-    /* determine separator based on header line */
-    var sep = GET_DELIM_SEP_WHITESPACE;
-    if (strchr(line, ','))
-        sep = GET_DELIM_SEP_COMMA;
+	/* determine separator based on header line */
+	var sep = GET_DELIM_SEP_WHITESPACE;
+	if (strchr(line, ','))
+		sep = GET_DELIM_SEP_COMMA;
 
-    /* parse the header */
-    strip_firstlast_space(line);
-    let err = get_delim_tokens(line, &ret.header, sep);
-    if (err || ret.header.size == 0) {
-        errctx_add(errctx, "%s: parse error or empty data header\n", __func__);
-        goto failed;
-    }
+	/* parse the header */
+	strip_firstlast_space(line);
+	let err = get_delim_tokens(line, &ret.header, sep);
+	if (err || ret.header.size == 0) {
+		errctx_add(errctx, "%s: parse error or empty data header\n", __func__);
+		goto failed;
+	}
 
-    /* data row loop */
-    int linenum = 1;
-    line = next_newline ? next_newline + 1 : NULL;
+	/* data row loop */
+	int linenum = 1;
+	line = next_newline ? next_newline + 1 : NULL;
 
-    while (line && *line) {
-        linenum++;
-        next_newline = strchr(line, '\n');
-        if (next_newline) 
-            *next_newline = '\0';
+	vector_reserve(v, ret.header.size);
+	while (line && *line) {
+		linenum++;
+		next_newline = strchr(line, '\n');
+		if (next_newline) 
+			*next_newline = '\0';
 
-        /* prepare temporary vector for the row */
-        VECPTR v = { 0 };
-        vector_reserve(v, ret.header.size);
-        
-        strip_firstlast_space(line);
-        get_delim_tokens(line, &v, sep);
+		vector_resize(v, 0);
+		strip_firstlast_space(line);
+		get_delim_tokens(line, &v, sep);
 
-        /* strict size check - fails on blank lines or count mismatch */
-        if (v.size != ret.header.size) {
-            errctx_add(errctx, "%s: data row %i has %i elements, header has %i\n",
-                       __func__, linenum, v.size, ret.header.size);
-            vector_free(v);
-            goto failed;
-        }
-        
-        vector_appendn(ret.elems, v.mutptr, v.size);
-        vector_free(v);
+		/* strict size check - fails on blank lines or count mismatch */
+		if (v.size != ret.header.size) {
+			errctx_add(errctx, "%s: data row %i has %i elements, header has %i\n",
+					   __func__, linenum, v.size, ret.header.size);
+			goto failed;
+		}
 
-        /* advance to start of next line or stop if buffer ends */
-        line = next_newline ? next_newline + 1 : NULL;
-    }
+		/* check for valid values */
+		forvector_val(value, v) {
+			if (!streq(value, ".")) {
+				(void)checked_atof(value, errctx);
+				if (errctx->len) 
+					goto failed;
+			}
+		}
+		
+		vector_appendn(ret.elems, v.mutptr, v.size);
 
-    /* final check - ensure at least one row of data exists */
-    if (linenum < 2) {
-        errctx_add(errctx, "%s: no data rows after header\n", __func__);
-        goto failed;
-    }
+		/* advance to start of next line or stop if buffer ends */
+		line = next_newline ? next_newline + 1 : NULL;
+	}
 
-    return ret;
+	/* final check - ensure at least one row of data exists */
+	if (linenum < 2) {
+		errctx_add(errctx, "%s: no data rows after header\n", __func__);
+		goto failed;
+	}
+	vector_free(v);
+	return ret;
 
 failed:
-    vector_free(ret.header);
-    vector_free(ret.elems);
-    return (DATAINFO) { 0 };
+	vector_free(v);
+	vector_free(ret.header);
+	vector_free(ret.elems);
+	return (DATAINFO) { 0 };
 }
 
 static int checked_atoi(const char* str, ERRCTX* errctx)
@@ -864,9 +882,17 @@ static void template_data_array(FILE* fp,
 	forvector_val(v, *elems) {
 		if (ncols == 0)
 			fprintf(fp, "\t{ ");
-		
-		if (streq(v, "."))
+
+/// An "." as a data entry is replaced by NAN.
+		if (streq(v, ".")) {
 			v = "NAN";
+
+		} else {
+			(void)checked_atof(v, errctx);
+			if (errctx->len)
+				return;
+		}
+
 		fprintf(fp, "%s, ", v);
 		
 		++ncols;
@@ -1234,6 +1260,10 @@ static void transform_pmx_line(FILE *fp, char *line, ERRCTX* errctx)
 				cursor++;
 			else if (*cursor == ')' || isalpha((unsigned char)*cursor))
 				break;
+		}
+		if (found == 0) {
+			errctx_add(errctx, "%s: no values found\n", __func__);
+			return;
 		}
 
 		// Output logic...
@@ -1907,11 +1937,18 @@ char openpmxtran_template[] =
 "	}\n"
 "}\n"
 "\n"
+"extern void server_queue(void);\n"
+"\n"
 "int main(void)\n"
 "{\n"
+"	/* enabling exceptions can sometimes help debugging */\n"
+"	/* feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW); */\n"
+"\n"
 "	/* do any preprocessing defined in the $DATA code */\n"
 "	openpmxtran_data_preprocess();\n"
-"//	feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);\n"
+"\n"
+"	/* wait in the server queue if necessary */\n"
+"	server_queue();\n"
 "\n"
 "{{MAIN_CODE}}\n"
 "\n"

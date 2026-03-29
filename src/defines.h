@@ -49,6 +49,7 @@ extern "C" {
 #define OPENPMX_EXTFILE_OMEGA_BLOCKS	-2000000007
 
 #define OPENPMX_SERVER_FLUSH_PERIOD_MS	5000
+#define OPENPMX_SERVER_TIMEOUT_S		(15*60)
 
 #ifdef __cplusplus
 }
