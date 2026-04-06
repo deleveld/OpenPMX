@@ -67,15 +67,15 @@ static COLINFO parse_col_name(const char *name, ERRCTX* errctx)
 		char *end;
 		long num = strtol(p, &end, 10);
 		if (end == p || *end != '\0') {
-			errctx_add(errctx, "%s: cannot parse theta index in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: cannot parse theta index in \"%s\"\n", __func__, name);
 			return ci;
 		}
 		if (num <= 0) {
-			errctx_add(errctx, "%s: theta index must be >= 1 in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: theta index must be >= 1 in \"%s\"\n", __func__, name);
 			return ci;
 		}
-		if (num >= OPENPMX_THETA_MAX) {
-			errctx_add(errctx, "%s: theta index %ld exceeds max (%d) in \"%s\"", __func__, num, OPENPMX_THETA_MAX, name);
+		if (num >= OPENPMX_THETA_MAX) { /* num is 1-based, conversion to 0-based occurs later */
+			errctx_add(errctx, "%s: theta index %ld exceeds max (%d) in \"%s\"\n", __func__, num, OPENPMX_THETA_MAX, name);
 			return ci;
 		}
 		ci.num = (int)num;
@@ -86,25 +86,25 @@ static COLINFO parse_col_name(const char *name, ERRCTX* errctx)
 		char *end;
 		long row = strtol(p, &end, 10);
 		if (end == p || *end != ',') {
-			errctx_add(errctx, "%s: cannot parse sigma indices in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: cannot parse sigma indices in \"%s\"\n", __func__, name);
 			return ci;
 		}
 		p = end + 1;
 		long col = strtol(p, &end, 10);
 		if (end == p || (*end != ')' && *end != '\0')) {
-			errctx_add(errctx, "%s: cannot parse sigma col index in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: cannot parse sigma col index in \"%s\"\n", __func__, name);
 			return ci;
 		}
 		if (row <= 0 || col <= 0) {
-			errctx_add(errctx, "%s: sigma indices must be >= 1 in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: sigma indices must be >= 1 in \"%s\"\n", __func__, name);
 			return ci;
 		}
-		if (row >= OPENPMX_SIGMA_MAX || col >= OPENPMX_SIGMA_MAX) {
-			errctx_add(errctx, "%s: sigma index exceeds max (%d) in \"%s\"", __func__, OPENPMX_SIGMA_MAX, name);
+		if (row >= OPENPMX_SIGMA_MAX || col >= OPENPMX_SIGMA_MAX) { /* num is 1-based, conversion to 0-based occurs later */
+			errctx_add(errctx, "%s: sigma index exceeds max (%d) in \"%s\"\n", __func__, OPENPMX_SIGMA_MAX, name);
 			return ci;
 		}
 		if (row != col) {
-			errctx_add(errctx, "%s: sigma not on diagonal in \"%s\"", __func__, name);
+			errctx_add(errctx, "%s: sigma not on diagonal in \"%s\"\n", __func__, name);
 			return ci;
 		}
 		ci.row = (int)row;
@@ -130,11 +130,11 @@ static COLINFO parse_col_name(const char *name, ERRCTX* errctx)
 			errctx_add(errctx, "%s: omega indices must be >= 1 in \"%s\"\n", __func__, name);
 			return ci;
 		}
-		if (row >= OPENPMX_OMEGA_MAX) {
+		if (row >= OPENPMX_OMEGA_MAX) { /* num is 1-based, conversion to 0-based occurs later */
 			errctx_add(errctx, "%s: omega row %ld exceeds max (%d) in \"%s\"\n", __func__, row, OPENPMX_OMEGA_MAX, name);
 			return ci;
 		}
-		if (col >= OPENPMX_OMEGA_MAX) {
+		if (col >= OPENPMX_OMEGA_MAX) { /* num is 1-based, conversion to 0-based occurs later */
 			errctx_add(errctx, "%s: omega col %ld exceeds max (%d) in \"%s\"\n", __func__, col, OPENPMX_OMEGA_MAX, name);
 			return ci;
 		}
@@ -211,6 +211,7 @@ static void parse_extcols_line(char *line,
 				extcols->mutptr[i].blocknum = atoi(vals.ptr[i]);
 		}
 	}
+	vector_free(vals);
 }
 	
 static void read_extcols(const char *filename, EXTCOLS* extcols, ERRCTX* errctx)
@@ -263,16 +264,22 @@ failed:
 	free(header_text);
 }
 
-static OPENPMX popparams_init_from_file(const char* filename,
-										ERRCTX* errctx)
+typedef struct {
+	typeof(((OPENPMX){0}).theta) theta;
+	typeof(((OPENPMX){0}).omega) omega;
+	typeof(((OPENPMX){0}).sigma) sigma;
+} RELOADPARAM;
+
+static RELOADPARAM params_init_from_file(const char* filename,
+										 ERRCTX* errctx)
 {
-    OPENPMX pmx = { 0 };
+    RELOADPARAM p = { 0 };
     forcount(i, OPENPMX_THETA_MAX) 
-		pmx.theta[i].type = THETA_INVALID;
+		p.theta[i].type = THETA_INVALID;
     forcount(i, OPENPMX_SIGMA_MAX)
-		pmx.sigma[i] = 0;
+		p.sigma[i] = 0;
     forcount(i, OPENPMX_OMEGABLOCK_MAX)
-		pmx.omega[i].type = OMEGA_INVALID;
+		p.omega[i].type = OMEGA_INVALID;
 
 	/* read in coloumns and exit if error */
 	EXTCOLS extcols = { 0 };
@@ -287,17 +294,17 @@ static OPENPMX popparams_init_from_file(const char* filename,
 	forvector_ptr(v, extcols) {
 		if (v->kind == COL_THETA) {
 			let thetaidx = v->num - 1;
-			pmx.theta[thetaidx].value = v->value;
-			pmx.theta[thetaidx].lower = v->theta_lower;
-			pmx.theta[thetaidx].upper = v->theta_upper;
-			pmx.theta[thetaidx].type = v->fixed ? FIXED : ESTIMATE;
+			p.theta[thetaidx].value = v->value;
+			p.theta[thetaidx].lower = v->theta_lower;
+			p.theta[thetaidx].upper = v->theta_upper;
+			p.theta[thetaidx].type = v->fixed ? FIXED : ESTIMATE;
 
 		} else if (v->kind == COL_SIGMA) {
 			let sigmaidx = v->num - 1;
 			var value = v->value;
 			if (v->fixed)
 				value = -fabs(value);
-			pmx.sigma[sigmaidx] = value;
+			p.sigma[sigmaidx] = value;
 
 		} else if (v->kind == COL_OMEGA) {
 			let rowidx = v->row - 1;
@@ -320,9 +327,9 @@ static OPENPMX popparams_init_from_file(const char* filename,
 		}
 	}
 
-	/* Walk the diagonal (0-based) and emit one pmx.omega[] block per
+	/* Walk the diagonal (0-based) and emit one p.omega[] block per
 	 * run of consecutive diagonal entries sharing the same block number. */
-	var bk = 0;		/* index into pmx.omega[]  */
+	var bk = 0;		/* index into p.omega[]  */
 	var d = 0;		/* 0-based diagonal offset */
 
 	while (d < nomega && bk < OPENPMX_OMEGABLOCK_MAX) {
@@ -346,14 +353,21 @@ static OPENPMX popparams_init_from_file(const char* filename,
 				if (omegablocknum[d + r][d + c] != 0)
 					has_offdiag = 1;
 		}
+		/* 0-dim block is error */
+		if (dim == 0) {
+			errctx_add(errctx, "%s: omega block size 0\n", __func__);
+			goto failed;
+		}
+		
+		
 		var type = OMEGA_DIAG;
 		if (all_same && dim > 0)
 			type = OMEGA_SAME;
 		else if (has_offdiag)
 			type = OMEGA_BLOCK;
 
-		pmx.omega[bk].type = type;
-		pmx.omega[bk].ndim = dim;
+		p.omega[bk].type = type;
+		p.omega[bk].ndim = dim;
 
 		/* Pack values[] the way popmodel_init() expects to read them:
 		 *
@@ -372,7 +386,7 @@ static OPENPMX popparams_init_from_file(const char* filename,
 				double val = omega[d + r][d + r];
 				if (omegafixed[d + r][d + r] == OMEGAFIXED_FIXED)
 					val = -fabs(val);
-				pmx.omega[bk].values[n++] = val;
+				p.omega[bk].values[n++] = val;
 			}
 
 		} else if (type == OMEGA_BLOCK) {
@@ -380,12 +394,12 @@ static OPENPMX popparams_init_from_file(const char* filename,
 			for (int r = 0; r < dim; r++) {
 				/* off-diagonal entries for this row */
 				for (int c = 0; c < r; c++)
-					pmx.omega[bk].values[n++] = omega[d + r][d + c];
+					p.omega[bk].values[n++] = omega[d + r][d + c];
 				/* diagonal entry — negative if fixed */
 				double val = omega[d + r][d + r];
 				if (omegafixed[d + r][d + r] == OMEGAFIXED_FIXED)
 					val = -fabs(val);
-				pmx.omega[bk].values[n++] = val;
+				p.omega[bk].values[n++] = val;
 			}
 
 		} /* OMEGA_SAME: leave values[] zeroed, popmodel_init copies */
@@ -396,7 +410,7 @@ static OPENPMX popparams_init_from_file(const char* filename,
 	
 failed:
     vector_free(extcols);
-    return pmx;
+    return p;
 }
 
 static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel)
@@ -419,7 +433,7 @@ static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel
 		filename = filename_buffer;
 	}
 	/* read in the source from the ext file */
-    var src = popparams_init_from_file(filename, &errctx);
+    var src = params_init_from_file(filename, &errctx);
 	if (errctx.len)
 		goto failed;
 
@@ -428,96 +442,108 @@ static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel
 	/// + Any theta bounds dont match
 	/// + Any theta FIXED/ESTIMATE dont match
 	/// + The structure of any the omega blocks differ
+	/// + Any omega values fixed or estimated dont match
 	/// + The number of sigma values differ
 	/// + Any sigma values fixed or estimated dont match
 	///
 	/* we have to check whether we do the copy in its entirety before
 	 * even starting, so we dont copy over a half initialized object */
+	let s = popmodel_init(src.theta, src.omega, src.sigma, &errctx);
+	if (errctx.len)
+		goto failed;
+
+	let d = popmodel_init(dest->theta, dest->omega, dest->sigma, &errctx);
+	if (errctx.len)
+		goto failed;
+
 	if (!args->force) {
-		forcount(i, OPENPMX_THETA_MAX) {
-			if (src.theta[i].type == THETA_INVALID)
-				break;
-			if (dest->theta[i].lower != src.theta[i].lower ||
-				dest->theta[i].upper != src.theta[i].upper) {
+		var ntheta_bad = (s.ntheta != d.ntheta);
+		var nblock_bad = (s.nblock != d.nblock);
+		var nomega_bad = (s.nomega != d.nomega);
+		var nsigma_bad = (s.nsigma != d.nsigma);
+		if (ntheta_bad) {
+			errctx_add(&errctx, "%s: theta count mismatch\n", __func__);
+			goto failed;
+		}
+		if (nblock_bad) {
+			errctx_add(&errctx, "%s: omega block count mismatch\n", __func__);
+			goto failed;
+		}
+		if (nomega_bad) {
+			errctx_add(&errctx, "%s: omega count mismatch\n", __func__);
+			goto failed;
+		}
+		if (nsigma_bad) {
+			errctx_add(&errctx, "%s: sigma count mismatch\n", __func__);
+			goto failed;
+		}
+
+		forcount(i, s.ntheta) {
+			if (d.lower[i] != s.lower[i] ||
+				d.upper[i] != s.upper[i]) {
 				errctx_add(&errctx, "%s: theta bounds mismatch\n", __func__);
 				goto failed;
 			}
-			if (dest->theta[i].type != src.theta[i].type) {
+			if (d.thetaestim[i] != s.thetaestim[i]) {
 				errctx_add(&errctx, "%s: theta type mismatch\n", __func__);
 				goto failed;
 			}
-			if (src.theta[i].value <= dest->theta[i].lower ||
-				src.theta[i].value >= dest->theta[i].upper) {
-				errctx_add(&errctx, "%s: theta value outside range\n", __func__);
-				goto failed;
+
+			if (s.theta[i] <= d.lower[i] ||
+				s.theta[i] >= d.upper[i]) {
+				if (s.thetaestim[i] == ESTIMATE) {
+					errctx_add(&errctx, "%s: estimated theta value outside range\n", __func__);
+					goto failed;
+				}
 			}
 		}
 
-		forcount(i, OPENPMX_SIGMA_MAX) {
-			if ((src.sigma[i] != 0) != (dest->sigma[i] != 0)) {
-				errctx_add(&errctx, "%s: sigma non-zero does not match.\n", __func__);
-				goto failed;
+		forcount(i, s.nomega) {
+			forcount(j, s.nomega) {
+				if (s.omegafixed[i][j] !=  d.omegafixed[i][j]) {
+					errctx_add(&errctx, "%s: omega fixed mismatch \n", __func__);
+					goto failed;
+				}
 			}
-			if ((src.sigma[i] < 0) != (dest->sigma[i] < 0)) {
-				errctx_add(&errctx, "%s: sigma fixed does not match.\n", __func__);
+		}
+
+		forcount(i, s.nsigma) {
+			if (s.sigmafixed[i] != d.sigmafixed[i]) {
+				errctx_add(&errctx, "%s: sigma fixed mismatch\n", __func__);
 				goto failed;
 			}
 		}
 		
-		forcount(i, OPENPMX_OMEGABLOCK_MAX) {
-			if (src.omega[i].type == OMEGA_INVALID)
-				break;
-			if (dest->omega[i].type != src.omega[i].type) {
+		forcount(i, s.nblock) {
+			if (d.blocktype[i] != s.blocktype[i]) {
 				errctx_add(&errctx, "%s: omega block type mismatch\n", __func__);
 				goto failed;
 			}
-			if (dest->omega[i].ndim != src.omega[i].ndim) {
+			if (d.blockdim[i] != s.blockdim[i]) {
 				errctx_add(&errctx, "%s: omega block ndim mismatch\n", __func__);
 				goto failed;
 			}
 		}
 	}
 
-	/* success path */
-	/* actually copy over the population parameters */
-	int i;
-	for (i=0; i<OPENPMX_THETA_MAX; i++) {
-		if (src.theta[i].type == THETA_INVALID)
-			break;
-		dest->theta[i] = src.theta[i];
-	}
-	let ntheta = i;
-
-	/* last non-zero sigma is the last one */
-	var nsigma = 0;
-	for (i=0; i<OPENPMX_SIGMA_MAX; i++) {
-		if (src.sigma[i] != 0.)
-			nsigma = i + 1;
-	}
-	for (i=0; i<nsigma; i++)
-		dest->sigma[i] = src.sigma[i];
+	/* success path */ 
+	/* actually copy over the population parameters, even the limits */
+	memcpy(dest->theta, src.theta, s.ntheta*sizeof(THETATYPE));
+	memcpy(dest->omega, src.omega, s.nblock*sizeof(OMEGABLOCKSTYPE));
+	memcpy(dest->sigma, src.sigma, s.nsigma*sizeof(double));
 	
-	for (i=0; i<OPENPMX_OMEGABLOCK_MAX; i++) {
-		if (src.omega[i].type == OMEGA_INVALID)
-			break;
-		dest->omega[i] = src.omega[i];
-	}
-	let nblock = i;
+	/* overwrite other paramaters */
+	for (int i=s.ntheta; i<OPENPMX_THETA_MAX; i++)
+		memset(&dest->theta[i], 0, sizeof(THETATYPE));
 
-	/* if we dont preserve old values then overwrite other paramaters */
-	if (!args->preserve) {
-		for (int i=ntheta; i<OPENPMX_THETA_MAX; i++)
-			memset(&dest->theta[i], 0, sizeof(dest->theta[i]));
+	for (int i=s.nsigma; i<OPENPMX_SIGMA_MAX; i++)
+		dest->sigma[i] = 0.;
 
-		for (int i=nsigma; i<OPENPMX_SIGMA_MAX; i++)
-			dest->sigma[i] = 0.;
-
-		for (int i=nblock; i<OPENPMX_OMEGABLOCK_MAX; i++)
-			memset(&dest->omega[i], 0, sizeof(dest->omega[i]));
-	}
+	for (int i=s.nblock; i<OPENPMX_OMEGABLOCK_MAX; i++)
+		memset(&dest->omega[i], 0, sizeof(OMEGABLOCKSTYPE));
 
 	/* Test by making a POPMODEL which may catch some errors */
-	*popmodel = popmodel_init(dest, &errctx);
+	*popmodel = popmodel_init(dest->theta, dest->omega, dest->sigma, &errctx);
 	if (errctx.len)
 		goto failed;
 	if (!args->silent) {
@@ -557,10 +583,6 @@ failed:
 /// - `.force=true,` The loaded population paramaters are copied over
 /// those of the destinantion ignoring any mismatch in structure. The
 /// default is to exit the program if the structures differ.
-/// - `.preserve=true,` If the size of the newly loaded population
-/// paramaters is smaller than the existing population paramaters, then
-/// paramaters at higher indicies are preserved. The default is to set
-/// them to invalid values.
 /// - `.optional=true,` If reloading fails then the destination OPENPMX
 /// object is not modified and the program continues. The default
 /// behavior is to consider this a fatal error and the program exits.

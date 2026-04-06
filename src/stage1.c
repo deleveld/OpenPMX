@@ -112,8 +112,8 @@ static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 	double upper[OPENPMX_OMEGA_MAX];
 	let nreta = nonzero->n;
 	forcount(i, nreta) {
-		lower[i] = -DBL_MAX;
-		upper[i] = DBL_MAX;
+		lower[i] = -1e6; // -DBL_MAX;
+		upper[i] = 1e6; // DBL_MAX;
 		if (reta[i] != 0.)
 			all_eta_zero = false;
 	}

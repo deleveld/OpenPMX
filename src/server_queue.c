@@ -20,8 +20,8 @@
 /// It compiles to nothing when not compiling with the install server
 /// option.
 #include "buildflags.h"
-#ifdef OPENPMX_SERVER
 
+#ifdef OPENPMX_SERVER
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

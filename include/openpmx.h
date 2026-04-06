@@ -59,7 +59,7 @@ typedef	struct {
 } STRUCTINFO;
 
 /*---------------------------------------------------------------------*/
-/* information about the dataset */
+/* dataset */
 /*---------------------------------------------------------------------*/
 typedef struct {
 	RECORD* writeable;
@@ -282,14 +282,13 @@ typedef struct {
 	const char* filename;
 	const bool force;
 	const bool optional;
-	const bool preserve;
 	const bool silent;
 } RELOADCONFIG;
 
 void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args);
 
 /*---------------------------------------------------------------------*/
-/* utility set functions */
+/* utility functions */
 /*---------------------------------------------------------------------*/
 void pmx_set_theta(OPENPMX* dest, 
 				   const int index,

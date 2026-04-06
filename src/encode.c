@@ -73,21 +73,22 @@ static int encode_nparam(const POPMODEL* const popmodel,
 
 ENCODE encode_init(const POPMODEL* const popmodel)
 {
-	var temp_popmodel = *popmodel;
-	temp_popmodel.result = (PMXRESULT) { .objfn = DBL_MAX,
-										 .type = OBJFN_INVALID,
-										 .nparam = 0,
-										 .neval = 0 };	
 	var temp_omegainfo = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed);
 	let n = encode_nparam(popmodel, &temp_omegainfo);
 
-	return (ENCODE) {
-		.popmodel = temp_popmodel,
+	var ret = (ENCODE) {
+		.popmodel = *popmodel,
 		.omegainfo = temp_omegainfo,
 		.nparam = n,
 		.offset = { },
 		.has_offsets = false,
 	};
+	ret.popmodel.result.objfn = DBL_MAX;
+	ret.popmodel.result.type = OBJFN_INVALID;
+	ret.popmodel.result.nparam = n;
+	ret.popmodel.result.neval = 0;
+
+	return ret;
 }
 
 #ifdef ENCODE_SPECIAL
@@ -124,7 +125,7 @@ static double theta_transform(const double value, const double lower, const doub
 #ifdef ENCODE_LINEAR
 	if (value < lower)
 		return -1.;
-	if (value > lower)
+	if (value > upper)
 		return 1.;
 	return 2. * (value - lower) / (upper - lower) - 1.;
 #endif
@@ -471,9 +472,7 @@ void encode_update(ENCODE* encode, const double* x)
 	omegainfo_update_inverse_lndet(omegainfo, popmodel->omega);
 
 	/* invalidate the objfn because we dont know it anymore */
-	popmodel->result = (PMXRESULT) { .objfn = DBL_MAX,
-									 .type = OBJFN_INVALID,
-									 .nparam = 0,
-									 .neval = 0 };
+	popmodel->result.objfn = DBL_MAX;
+	popmodel->result.type = OBJFN_INVALID;
 }
 

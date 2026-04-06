@@ -32,12 +32,11 @@
 
 #include <gsl/gsl_math.h>
 
-POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
+POPMODEL popmodel_init(const THETATYPE* const theta,
+					   const OMEGABLOCKSTYPE* const omegablocks,
+					   const double* sigma,
+					   ERRCTX* errctx)
 {
-	let theta = pmx->theta;
-	let omegablocks = pmx->omega;
-	let sigma = pmx->sigma;
-
 	POPMODEL ret = { 0 };
 	ret.ntheta = 0;
 	ret.nblock = 0;
@@ -372,7 +371,11 @@ void extfile_header(FILE * f,
 	fflush(f);
 }
 
-void extfile_append(FILE* f, const POPMODEL* const popmodel, const double runtime_s, const int iter, const int ineval)
+void extfile_append(FILE* f,
+					const POPMODEL* const popmodel,
+					const double runtime_s,
+					const int iter,
+					const int ineval)
 {
 	fprintf(f, OPENPMX_IFORMAT, iter);
 
@@ -451,26 +454,21 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 {
 	const char* message = 0;
 	switch (popmodel->result.type) {
-		case OBJFN_INVALID:		message = "invalid";	break;
+		case OBJFN_INVALID:		break;
 		case OBJFN_CURRENT:		message = "current";	break;
 		case OBJFN_FINAL:		message = "final";		break;
 		case OBJFN_EVALUATE:	message = "evaluate";	break;
 		default:
 			assert(0);
 	}
-	assert(message);
-	info(f2, "popmodel %s\n", message);
-
 	if (popmodel->result.type != OBJFN_INVALID && timestamp != -DBL_MAX) {
-		if (popmodel->result.type == OBJFN_EVALUATE ||
-			popmodel->result.type == OBJFN_CURRENT ||
-			popmodel->result.type == OBJFN_FINAL) {
-			if (timestamp != DBL_MAX)
-				info(f2, "time %.3f ", timestamp);
-			info(f2, "neval %i ", popmodel->result.neval);
-			info(f2, "objfn %.6f ", popmodel->result.objfn);
-			info(f2, "nparam %i\n", popmodel->result.nparam);
-		}
+		info(f2, "popmodel %s\n", message);
+
+		if (timestamp != DBL_MAX)
+			info(f2, "time %.3f ", timestamp);
+		info(f2, "neval %i ", popmodel->result.neval);
+		info(f2, "objfn %.6f ", popmodel->result.objfn);
+		info(f2, "nparam %i\n", popmodel->result.nparam);
 	}
 	
 	/* info about theta */
@@ -508,7 +506,7 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 
 void popmodel_eval_information(const POPMODEL* const popmodel,
 							   const double runtime_s,
-							   const int neval,
+							   const int ineval,
 							   const bool details,
 							   FILE* outstream,
 							   FILE* extstream,
@@ -520,7 +518,7 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 	info_iteration(outstream, runtime_s, popmodel, suffix);
 
 	if (extstream) 
-		extfile_append(extstream, popmodel, runtime_s, popmodel->result.neval, neval);
+		extfile_append(extstream, popmodel, runtime_s, popmodel->result.neval, ineval);
 }
 
 

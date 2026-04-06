@@ -36,23 +36,7 @@
 #include "utils/c22.h"
 #include "utils/vector.c"
 #include "utils/errctx.c"
-
-static void strip_firstlast_space(char* s)
-{
-	/* remove space at begin */
-	char* begin = s;
-	while (*begin && isspace((unsigned char)*begin))
-		++begin;
-
-	/* remove space at end */
-	size_t len = strlen(begin);
-	while (len > 0 && isspace((unsigned char)begin[len - 1]))
-		--len;
-
-	/* copy over, must allow overlap */
-	memmove(s, begin, len);
-	s[len] = '\0';
-}
+#include "utils/getdelim.c"
 
 static int strip_enclosing(char* s, const char terminal_begin, const char terminal_end)
 {
@@ -184,70 +168,6 @@ static void strip_comments_robust(char *s)
     *dst = '\0';
 }
 
-typedef VECTOR(char*) VECPTR;
-
-typedef enum {
-	GET_DELIM_SEP_COMMA,		/* force comma separator */
-	GET_DELIM_SEP_WHITESPACE,	/* force whitespace separator */
-	GET_DELIM_SEP_ANY,			/* use comma separator if comma exists */
-} GET_DELIM_SEP;
-
-static int get_delim_tokens_comma(char* line, VECPTR* namevec)
-{
-	if (line[0] == ',')
-		return 1;
-	
-	char *running = line;
-	char *token;
-	while ((token = strsep(&running, ",")) != NULL) {
-		strip_firstlast_space(token);
-		if (strlen(token)) {
-			vector_append(*namevec, token);
-
-		/* missing token */
-		} else
-			return 1;
-	}
-	return 0;
-}
-
-static void get_delim_tokens_whitespace(char* line, VECPTR* namevec)
-{
-	char *saveptr;
-	let delim = " \t\r\n";
-	char *token = strtok_r(line, delim, &saveptr); 
-	while (token != NULL) {
-		vector_append(*namevec, token);
-		token = strtok_r(NULL, delim, &saveptr);
-	}
-}
-
-static int get_delim_tokens(char* line, VECPTR* namevec, const GET_DELIM_SEP sep)
-{
-	var s = sep;
-	if (sep == GET_DELIM_SEP_ANY) {
-		if (strchr(line, ',')) 
-			s = GET_DELIM_SEP_COMMA;
-		else
-			s = GET_DELIM_SEP_WHITESPACE;
-	}
-	
-	/* comma separated, means a single comma separates */
-	if (s == GET_DELIM_SEP_COMMA) {
-		return get_delim_tokens_comma(line, namevec);
-
-	/* whitespace separated, means multiple whitespace separates */
-	} else if (s == GET_DELIM_SEP_WHITESPACE) {
-		get_delim_tokens_whitespace(line, namevec);
-		
-	/* this should never happen */
-	} else {
-		assert(0);
-	}
-		
-	return 0;
-}
-
 static VECPTR split_sections(char *buf)
 {
     VECPTR sections = { 0 };
@@ -256,7 +176,6 @@ static VECPTR split_sections(char *buf)
         vector_append(sections, 0);    // synthetic empty preamble
 
     vector_append(sections, buf);      // preamble text, or first $ section
-
     for (char *p = buf; *p != '\0'; p++) {
         if (*p == '\n' && *(p + 1) == '$') {
             *p = '\0';
@@ -969,6 +888,7 @@ static void template_diffeqn_code(FILE* fp,
 {
 	(void)errctx;
 	(void)datainfo;
+	
 	write_code(fp, result->diffeqn.code, 
 			   "\t/* no diffeqn code */\n\t(void)_dadt;\n");
 }
@@ -980,6 +900,7 @@ static void template_record_fields_define(FILE* fp,
 {
 	(void)result;
 	(void)errctx;
+	
 	forvector_val(v, datainfo->header) 
 		fprintf(fp, "\tconst double %s = _record->%s; (void)%s;\n", v, v, v);
 }
@@ -991,6 +912,7 @@ static void template_imodel_fields_define(FILE* fp,
 {
 	(void)datainfo;
 	(void)errctx;
+	
 	forvector_val(v, result->imodel.args) 
 		fprintf(fp, "\tconst double %s = _imodel->%s; (void)%s;\n", v, v, v);
 }
@@ -1002,6 +924,7 @@ static void template_predparams_fields_declare(FILE* fp,
 {
 	(void)datainfo;
 	(void)errctx;
+	
 	forvector_val(v, result->predict.args) 
 		fprintf(fp, "\tdouble %s;\n", v);
 }
@@ -1025,6 +948,7 @@ static void template_predparams_fields_set(FILE* fp,
 {
 	(void)datainfo;
 	(void)errctx;
+	
 	write_args(fp, "_predparams->", &result->predict.args, "");
 }
 
@@ -1035,6 +959,7 @@ static void template_record_fields_writeable_define(FILE* fp,
 {
 	(void)result;
 	(void)errctx;
+	
 	write_args(fp, "double ", &datainfo->header, "_record->");
 }
 
@@ -1045,6 +970,7 @@ static void template_data_preprocess_code(FILE* fp,
 {
 	(void)errctx;
 	(void)datainfo;
+	
 	write_code(fp, result->data.code, "\t/* no data preprocess code */\n");
 }
 
@@ -1055,6 +981,7 @@ static void template_record_fields_writeback(FILE* fp,
 {
 	(void)result;
 	(void)errctx;
+	
 	write_args(fp, "_record->", &datainfo->header, "");
 }
 
@@ -1191,10 +1118,10 @@ static bool keyword_present(const char *s, const char *kw)
 }
 
 /**
- * Parses (val) or (val, val, val) and handles the FIXED keyword.
- * Returns false on syntax errors like consecutive commas.
- * Outputs to the provided FILE*. The input line is modified in place
- * (null terminators are inserted to delimit numeric tokens).
+ * Parses NONMEM style (val FIXED) or (val, val, val). Returns false on
+ * syntax errors like consecutive commas. Outputs to the provided FILE*.
+ * The input line is modified in place (null terminators are inserted to
+ *  delimit numeric tokens).
  */
 static void transform_pmx_line(FILE *fp, char *line, ERRCTX* errctx)
 {
@@ -1407,6 +1334,12 @@ static void template_main_code(FILE* fp,
 	(void)datainfo;
 	write_code(fp, result->main.code, "\t/* no main code */\n");
 }
+
+#if defined(__MSYS__) || defined(__MINGW32__)
+#ifndef NAME_MAX
+#define NAME_MAX 255
+#endif
+#endif /* defined(__MSYS__) || defined(__MINGW32__) */
 
 static void expand_template(const char* grfilename, 
 							char* template, 

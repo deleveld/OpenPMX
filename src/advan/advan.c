@@ -323,7 +323,7 @@ bool pmx_advan_inittime(const ADVANSTATE* advanstate, const double t)
 	 * extra inittime if another kind of event occurs at the intended
 	 * time, for example an infusion */
 	bool found_already = false;
-	for (int i=0; i<advan->ninfusions; i++) {
+	forcount(i, advan->ninfusions) {
 		let v = &advan->infusions[i];
 		if (v->start == t)
 			found_already = true;

@@ -50,7 +50,7 @@ typedef struct ADVANFUNCS {
 	const int nstate;
 
 	/* non-zero for the eigensystem solver. Needed for $IMODEL() to be
-	 * able to define the sigensystem. */
+	 * able to define the eigensystem. */
 	double* eigen_sysmat;
 } ADVANFUNCS;
 

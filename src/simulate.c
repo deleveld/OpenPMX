@@ -211,7 +211,7 @@ void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig)
 	var pstate = pmx->state;
 
 	ERRCTX errctx = { 0 };
-	var popmodel = popmodel_init(pmx, &errctx);
+	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
 		fatal(0, "%s", errctx.errmsg);
 	

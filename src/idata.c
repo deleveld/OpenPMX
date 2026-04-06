@@ -233,7 +233,7 @@ int idata_ineval(const IDATA* const idata, const bool reset)
 	return ineval;
 }
 
-void idata_reset_eta(IDATA* const idata, const double* eta)
+void idata_set_eta(IDATA* const idata, const double* eta)
 {
 	assert(eta);
 	var firstindivid = &idata->individ[0];

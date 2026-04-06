@@ -146,7 +146,7 @@ void pmx_predict(OPENPMX* pmx)
 
 	var options = options_init(pmx);
 	ERRCTX errctx = { 0 };
-	var popmodel = popmodel_init(pmx, &errctx);
+	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
 		fatal(0, "%s", errctx.errmsg);
 
@@ -163,7 +163,7 @@ void pmx_predict_pred(OPENPMX* pmx)
 
 	var options = options_init(pmx);
 	ERRCTX errctx = { 0 };
-	var popmodel = popmodel_init(pmx, &errctx);
+	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
 		fatal(0, "%s", errctx.errmsg);
 

@@ -103,7 +103,8 @@ static void advancer_onecomp_depot_advance_interval(ADVAN* advan,
 	let Doserate = rates[0];
 	
 /// This advancer does not yet support infusions. See the GitHub issue. 
-/// The workaround is to code the model as a differential equation.
+/// The workaround is to code the model as a eigensystem or differential
+/// equation.
 	if (Doserate != 0.)
 		fatal(0, "ADVANFUNCS_ONECOMP_DEPOT fails with infusions, see GitHub issue. Use DIFFEQN.");
 

@@ -135,7 +135,7 @@ int main(void)
 
 	let advanfuncs = advanfuncs_alloc(&openpmx.data, &openpmx.advan);
 	ERRCTX errctx = { 0 };
-	let popmodel = popmodel_init(&openpmx, &errctx);
+	let popmodel = popmodel_init(openpmx.theta, openpmx.omega, openpmx.sigma, &errctx);
 	if (errctx.len)
 		fatal(0, "%s", errctx.errmsg);
 	

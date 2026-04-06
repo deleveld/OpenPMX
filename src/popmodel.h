@@ -52,7 +52,13 @@ typedef struct {
 	PMXRESULT result;
 } POPMODEL;
 
-POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx);
+typedef typeof(((OPENPMX){0}).theta[0]) THETATYPE;
+typedef typeof(((OPENPMX){0}).omega[0]) OMEGABLOCKSTYPE;
+
+POPMODEL popmodel_init(const THETATYPE* const theta,
+					   const OMEGABLOCKSTYPE* const omegablocks,
+					   const double* sigma,
+					   ERRCTX* errctx);
 
 void extfile_header(FILE * f,
 					const POPMODEL* const popmodel,
