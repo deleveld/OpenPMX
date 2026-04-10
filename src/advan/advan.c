@@ -95,7 +95,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 /// ### Advancing through an individuals records
 
 /// While advancing the init() function is called (which calls the users
-/// IMODEL() code in openpmxtran) when:
+/// `IMODEL()` code in openpmxtran) when:
 ///
 /// + First record of an individual
 /// + EVID is 3 (reset event) or EVID is 4 (reset-and-dose event)
@@ -185,7 +185,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 /// + The next RECORD time is achieved
 /// + A previous infusion starts or stopped
 /// + A bolus dose is given
-/// + If `pmx_advan_inittime()` has been called, which is INITTIME() in 
+/// + If `pmx_advan_inittime()` has been called, which is `INITTIME()` in 
 /// openpmxtran
 		/* find the first place we have to stop at going to the next record */
 		double intervalstop = final_time;

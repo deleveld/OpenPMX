@@ -18,13 +18,11 @@
 #include <assert.h>
 #include <float.h>
 #include <unistd.h>
+#include <math.h>
+#include <stdlib.h>
 
-#include "openpmx.h"
-#include "print.h"
-#include "scatter.h"
-#include "utils/c22.h"
-#include "advan/advan.h"
 #include "options.h"
+#include "utils/c22.h"
 
 STAGE1CONFIG stage1config_default(const STAGE1CONFIG* const stage1)
 {

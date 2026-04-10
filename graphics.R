@@ -12,11 +12,13 @@ covfile <- paste0(filename, ".covariates")
 yhatfile <- paste0(filename, ".yhat")
 pdffile <- paste0(filename, ".pdf")
 
+cat(sprintf("writing \"%s\"\n", pdffile))
+
 # read in files
 
 config <- NA
 if (file.exists(configfile)) {
-	cat(sprintf("read graphics config %s\n", configfile))
+	cat(sprintf("read config \"%s\"\n", configfile))
 	config <- read.table(configfile, header=TRUE, na.strings = "")
 }
 
@@ -33,7 +35,7 @@ if (!file.exists(datafile)) {
 	}
 }
 if (file.exists(datafile)) {
-	cat(sprintf("read data %s\n", datafile))
+	cat(sprintf("read data \"%s\"\n", datafile))
 	data <- read.table(datafile, header=TRUE, stringsAsFactors=FALSE)
 	if (length(names(data)) == 1) {
 		data <- read.csv(datafile, header=TRUE, stringsAsFactors=FALSE)
@@ -42,19 +44,19 @@ if (file.exists(datafile)) {
 }
 ext <- NA
 if (file.exists(extfile)) {
-	cat(sprintf("read ext %s\n", extfile))
+	cat(sprintf("read ext \"%s\"\n", extfile))
 	ext <- read.table(extfile, header=TRUE, stringsAsFactors=FALSE)
 	names(ext) <- toupper(names(ext))
 }
 phi <- NA
 if (file.exists(phifile)) {
-	cat(sprintf("read phi %s\n", phifile))
+	cat(sprintf("read phi \"%s\"\n", phifile))
 	phi <- read.table(phifile, header=TRUE, stringsAsFactors=FALSE)
 	names(phi) <- toupper(names(phi))
 }
 cov <- NA
 if (file.exists(covfile)) {
-	cat(sprintf("read covariates %s\n", covfile))
+	cat(sprintf("read covariates \"%s\"\n", covfile))
 	cov <- read.table(covfile, header=TRUE, stringsAsFactors=FALSE)
 	names(cov) <- toupper(names(cov))
 	newid <- c(TRUE, diff(cov[["ID"]]) != 0)
@@ -97,7 +99,7 @@ if (file.exists(covfile)) {
 
 yhatdata <- NA
 if (file.exists(yhatfile)) {
-	cat(sprintf("read yhat %s\n", yhatfile))
+	cat(sprintf("read yhat \"%s\"\n", yhatfile))
 	yhatdata <- read.table(yhatfile, header=TRUE, stringsAsFactors=FALSE)
 	names(yhatdata) <- toupper(names(yhatdata))
 	if (is.data.frame(data)) {
@@ -105,6 +107,7 @@ if (file.exists(yhatfile)) {
 		yhatdata <- cbind(data, yhatdata)
 	}
 }
+
 pdf(pdffile)
 
 get_config_setting <- function(name_val, sub_val, sub_type, default)
@@ -192,6 +195,7 @@ if (is.data.frame(cov) && is.data.frame(phi)) {
 			 main = NA, 
 			 xlab = ename, 
 			 col = NA)
+		abline(v=0)
 
 		grp_col <- 2
 		legend_text <- NULL
@@ -395,3 +399,4 @@ if (is.data.frame(yhatdata)) {
 }
 dummy <- dev.off()
 cat("done\n")
+

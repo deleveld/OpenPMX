@@ -59,8 +59,8 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 	/* have to un-reduce the eta values because user code needs the full eta */
 	/* the user code can see the testeta because ievaluate_args->popparam->eta
 	 * points to the same place */
-	unreduce_eta(stage1_params->testeta, reta, stage1_params->nonzero);
 	assert(nreta == stage1_params->nonzero->n);
+	unreduce_eta(stage1_params->testeta, reta, stage1_params->nonzero);
 
 	/* functions for Bae and Yim objective function Term 1 and Term 2 */
 	struct timespec t3;
@@ -475,7 +475,7 @@ void stage1_thread(INDIVID* const individ,
 		memcpy(testeta, ieta, nomega * sizeof(double));
 		
 /// The inner (Stage 1) optimization only optimizes the first, second, 
-/// and third terms in the obvjective function. The fourth term is not
+/// and third terms in the objective function. The fourth term is not
 /// dependant on the individual and the fifth term is calculated at the
 /// minimum of the first three terms.
 
@@ -535,7 +535,6 @@ void stage1_thread(INDIVID* const individ,
 		warning(0, "ID %f lndet is not finite\n", individ->ID);
 		individ->icov_lndet = 100.;
 	}
-//	assert(gsl_finite(individ->icov_lndet) == 1);
 	gsl_linalg_cholesky_invert(reducedicov);
 
 	/* Here we refine the covariance matrix by taking samples at the

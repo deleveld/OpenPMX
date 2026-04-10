@@ -327,9 +327,9 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	assert((int)sizeof(advanmem._imodel) >= advanfuncs->advanconfig->imodelfields.size);
 
 	/* count warnings so we can suppress if there are too many */
-	var obs_yhat_nonfinite_warning_count = 0;
-	var obs_yhatvar_zero_warning_count = 0;
-	var obs_yhatvar_nonfinite_warning_count = 0;
+	var obs_yhat_nonfinite_warning = false;
+	var obs_yhatvar_zero_warning = false;
+	var obs_yhatvar_nonfinite_warning = false;
 
 	/* iterate over individuals data */
 	double lasttime = -DBL_MAX;
@@ -340,7 +340,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	let no_dvlow_present = recordinfo->offsetDVLOW == -1;
 	const RECORD* ptr = record;
 	let id = RECORDINFO_ID(recordinfo, ptr);
-	/// + Non-integer ID is an error.
+	/// + Non-integer ID is probably an error.
 	if (id != floor(id))
 		warning(logstream, "ID (%f) should probably be an integer\n", id);
 	let _offset1 = recordinfo->_offset1;
@@ -389,22 +389,20 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			let cmt = RECORDINFO_CMT_0offset(recordinfo, ptr);
 			if (cmt < 0 || cmt >= advanfuncs->nstate) {
 				let _cmt = RECORDINFO_CMT(recordinfo, ptr);
-				fatal(logstream, "CMT (%i, %f) not within number of states (%i): ID %f time %f record %i\n", cmt, _cmt, advanfuncs->nstate, id, time, i + record_offset);
+				fatal(logstream, "CMT (%i, %f) not within number of states (%i) for dose: ID %f time %f record %i\n", cmt, _cmt, advanfuncs->nstate, id, time, i + record_offset);
 			}
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
 			if (!gsl_finite(amt))
-				fatal(logstream, "AMT not finite (%f): ID %f time %f record %i\n", amt, id, time, i + record_offset);
+				fatal(logstream, "AMT not finite (%f) for dose: ID %f time %f record %i\n", amt, id, time, i + record_offset);
 			if (amt <= 0.)
-				fatal(logstream, "AMT less than or equal to zero (%f): ID %f time %f record %i \n", amt, id, time, i + record_offset);
-			let rate = RECORDINFO_RATE(recordinfo, ptr);
-			if (rate < 0.)
-				fatal(logstream, "RATE less than zero (%f): ID %f record %i\n", rate, id, i + record_offset);
+				fatal(logstream, "AMT less than or equal to zero (%f) for dose: ID %f time %f record %i \n", amt, id, time, i + record_offset);
 
-			if (!gsl_finite(amt)|| amt == 0.)
-				warning(logstream, "AMT missing (%f) assumed 0 for dose: ID %f time %f record %i\n", amt, id, time, i + record_offset);
+			let rate = RECORDINFO_RATE(recordinfo, ptr);
 			if (!gsl_finite(rate))
-				warning(logstream, "RATE missing (%f) assumed 0 for dose: ID %f time %f record %i\n", rate, id, time, i + record_offset);
+				warning(logstream, "RATE not finite (%f) dor dose: ID %f time %f record %i\n", rate, id, time, i + record_offset);
+			if (rate < 0.)
+				fatal(logstream, "RATE less than zero (%f) for dose: ID %f record %i\n", rate, id, i + record_offset);
 
 			if (gsl_finite(dv) == 1 && dv != 0.)
 				warning(logstream, "DV non-zero (%f) for dose: ID %f time %f record %i\n", dv, id, time, i + record_offset);
@@ -453,11 +451,9 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		if (evid == 0 || predictall) {
 			yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 			if (!gsl_finite(yhat)) {
-				if (obs_yhat_nonfinite_warning_count < 1) {
-					warning(logstream, "YHAT non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
-					++obs_yhat_nonfinite_warning_count;
-					if (obs_yhat_nonfinite_warning_count <= 1)
-						warning(logstream, "supressing further YHAT non-finite for ID\n", id);
+				if (!obs_yhat_nonfinite_warning) {
+					warning(logstream, "at least one YHAT non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
+					obs_yhat_nonfinite_warning = true;
 				}
 			}
 		}
@@ -468,20 +464,16 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			/* prediction variance of observations should be finite and positive */
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 			if (!gsl_finite(yhatvar))
-				if (obs_yhatvar_nonfinite_warning_count < 1) {
-					warning(logstream, "YHATVAR non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
-					++obs_yhatvar_nonfinite_warning_count;
-					if (obs_yhatvar_nonfinite_warning_count <= 1)
-						warning(logstream, "supressing further YHATVAR non-finite for ID %f\n", id);
+				if (!obs_yhatvar_nonfinite_warning) {
+					warning(logstream, "at least one YHATVAR non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
+					obs_yhatvar_nonfinite_warning = true;
 			}
 
 			/* predictions with zero error are an error */
 			if (evid == 0 && yhatvar == 0.) {
-				if (obs_yhatvar_zero_warning_count < 1) {
-					warning(logstream, "YHATVAR zero (%f): ID %f time %f record %i\n", yhatvar, id, time, i + record_offset);
-					++obs_yhatvar_zero_warning_count;
-					if (obs_yhatvar_zero_warning_count >= 1) 
-						warning(logstream, "supressing further YHATVAR zero warnings for ID %f\n", id);
+				if (!obs_yhatvar_zero_warning) {
+					warning(logstream, "at least one YHATVAR zero (%f): ID %f time %f record %i\n", yhatvar, id, time, i + record_offset);
+					obs_yhatvar_zero_warning = true;
 				}
 			}
 		}

@@ -18,8 +18,8 @@
 #ifndef OPENPMX_PREDICT_H
 #define OPENPMX_PREDICT_H
 
-#include "openpmx.h"
 #include "popmodel.h"
+#include "idata.h"
 #include "options.h"
 
 #ifdef __cplusplus

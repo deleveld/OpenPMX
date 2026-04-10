@@ -76,15 +76,27 @@ static inline void save_besteta(const STAGE2_PARAMS* const params)
 	memcpy(params->best.eta, firstindivid->eta, idata->nindivid * idata->nomega * sizeof(double));
 }
 
-static void update_best_imodel(const STAGE2_PARAMS* const params,
-							   POPMODEL* const best)
+static void print_model_evaluation(const STAGE2_PARAMS* params)
 {
-	let idata = params->idata;
 	let popmodel = &params->test.popmodel;
 	let options = params->options;
+	popmodel_eval_information(popmodel,
+							  get_timestamp(params),
+							  idata_ineval(params->idata, false),
+							  options->estimate.details || options->estimate.verbose,
+							  params->outstream,
+							  params->extstream,
+							  0);
+}
+
+static void update_best_imodel(const STAGE2_PARAMS* const params)
+{
+	let popmodel = &params->test.popmodel;
+	let options = params->options;
+	var best = params->best.model;
 
 	/* update the best estimation and its objective function and function evaluations so far */
-	const POPMODEL* model_to_print = 0;
+	bool print_model = false;
 	let dobjfn = popmodel->result.objfn - best->result.objfn;
 	if (dobjfn < 0.) { 
 /// Each time the objective function improves during estimation the eta
@@ -92,26 +104,17 @@ static void update_best_imodel(const STAGE2_PARAMS* const params,
 /// optimization.
 		*best = *popmodel;
 		save_besteta(params);
-
-		model_to_print = best;
+		print_model = true;
 	}
 
-	/* even if we didnt improve, update the number of evaluations */
+	/* even if we didnt improve, update the number of evaluations of the best model */
 	best->result.neval = popmodel->result.neval;
 
 	/* update the user */
 	if (options->estimate.verbose)
-		model_to_print = popmodel;
-	if (model_to_print) {
-		let ineval = idata_ineval(idata, false);
-		popmodel_eval_information(model_to_print,
-								  get_timestamp(params),
-								  ineval,
-								  options->estimate.details || options->estimate.verbose,
-								  params->outstream,
-								  params->extstream,
-								  0);
-	}
+		print_model = true;
+	if (print_model)
+		print_model_evaluation(params);
 }
 
 static void encode_evaluate(ENCODE* const test,
@@ -151,7 +154,7 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 	encode_evaluate(&params->test, idata, advanfuncs, options);
 
 	/* update best imodel and inform the user if we improve */
-	update_best_imodel(params, params->best.model);
+	update_best_imodel(params);
 
 	return popmodel->result.objfn;
 }
@@ -165,17 +168,24 @@ static bool bobyqa_error(const int retcode, const char* phase, FILE* stream)
 	if (retcode == BOBYQA_SUCCESS)
 		return false;
 
+	static const struct {
+		int code;
+		const char* msg;
+	} errors[] = {
+		{ BOBYQA_BAD_NPT,              "NPT is not in the required interval"            },
+		{ BOBYQA_TOO_CLOSE,            "insufficient space between the bounds"          },
+		{ BOBYQA_ROUNDING_ERRORS,      "too much cancellation in a denominator"         },
+		{ BOBYQA_TOO_MANY_EVALUATIONS, "maximum number of function evaluations exceeded"},
+		{ BOBYQA_STEP_FAILED,          "a trust region step has failed to reduce Q"     },
+	};
+
 	var errmsg = "unknown";
-	if (retcode == BOBYQA_BAD_NPT) 
-		errmsg = "NPT is not in the required interval";
-	else if (retcode == BOBYQA_TOO_CLOSE) 
-		errmsg = "insufficient space between the bounds";
-	else if (retcode == BOBYQA_ROUNDING_ERRORS) 
-		errmsg = "too much cancellation in a denominator";
-	else if (retcode == BOBYQA_TOO_MANY_EVALUATIONS) 
-		errmsg = "maximum number of function evaluations exceeded";
-	else if (retcode == BOBYQA_STEP_FAILED) 
-		errmsg = "a trust region step has failed to reduce Q";
+	forarray(i, errors) {
+		if (errors[i].code == retcode) {
+			errmsg = errors[i].msg;
+			break;
+		}
+	}
 
 	warning(stream, "%s BOBYQA error %i: %s\n", phase, retcode, errmsg);
 	return true;
@@ -280,24 +290,6 @@ static bool focei(STAGE2_PARAMS* const params)
 	free(initial);
 
 	return converged;
-}
-
-static void print_model_evaluation(STAGE2_PARAMS* params)
-{
-	let idata = params->idata;
-	let popmodel = &params->test.popmodel;
-	let options = params->options;
-	let ineval = idata_ineval(idata, false);
-	var outstream = params->outstream;
-	var extstream = params->extstream;
-	let runtime_s = get_timestamp(params);
-	popmodel_eval_information(popmodel,
-							  runtime_s,
-							  ineval,
-							  options->estimate.details || options->estimate.verbose,
-							  outstream,
-							  extstream,
-							  0);
 }
 
 static bool stabilize_initial_objfn(STAGE2_PARAMS* params)
@@ -473,15 +465,14 @@ static STAGE2_PARAMS stage2_params_init(const char* filename,
 			fatal(outstream, "%s: could not open file %s extension %s\n", __func__, filename, OPENPMX_EXTFILE);
 	}
 
-	let neta = idata->nindivid * idata->nomega;
 	var params = (STAGE2_PARAMS) {
 		.idata = idata,
 		.advanfuncs = advanfuncs,
 		.test = encode_init(popmodel),	/* makes a copy of popmodel to work with */
 		.options = options,
 		.best = {
-			.model = popmodel,			/* best so far is saved at the caller */
-			.eta = 0,
+			.model = popmodel,			/* best so far will be saved at the caller */
+			.eta = callocvar(double, idata->nindivid * idata->nomega),					
 		},
 		.begin = { }, 					/* set after initialization */
 		.outstream = outstream,
@@ -491,10 +482,10 @@ static STAGE2_PARAMS stage2_params_init(const char* filename,
 	if (idata->nindivid <= 0)
 		fatal(outstream, "optim cannot estimate, no individuals\n");
 
-	*params.best.model = params.test.popmodel; /* will set objfn to invalid */
-	params.best.eta = callocvar(double, neta);
+	/* save the current, but with objfn to invalid and nparam as well */
+	*params.best.model = params.test.popmodel;
 
-	/* make sure everything is consistent */
+	/* make sure 0 values reproduce the current model */
 	encode_offset(&params.test, params.best.model);
 
 	return params;
@@ -528,7 +519,6 @@ static void estimate_popmodel(const char* filename,
 
 	/* setup the minimizer */
 	var params = stage2_params_init(filename, idata, advanfuncs, popmodel, options);
-	popmodel->result.nparam = params.test.nparam;
 
 /// At start of estimation the header of the ext file is written.
 	/* do some logging */

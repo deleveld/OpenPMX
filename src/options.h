@@ -18,10 +18,7 @@
 #ifndef OPTIONS_H
 #define OPTIONS_H
 
-#include "popmodel.h"
-#include "idata.h"
-
-#include <gsl/gsl_rng.h>
+#include "openpmx.h"
 
 #ifdef __cplusplus
 extern "C" {

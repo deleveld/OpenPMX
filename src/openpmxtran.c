@@ -38,6 +38,8 @@
 #include "utils/errctx.c"
 #include "utils/getdelim.c"
 
+#define OPENPMX_FILE_RECORDS_MAX	10
+
 static int strip_enclosing(char* s, const char terminal_begin, const char terminal_end)
 {
 	let len = strlen(s);
@@ -264,6 +266,11 @@ typedef struct {
 	struct {
 		const char* code;
 	} main;
+	struct {
+		const char* name;
+		const char* content;
+	} files[OPENPMX_FILE_RECORDS_MAX];
+	int nfiles;
 } RESULT;
 
 static void result_destroy(RESULT* result)
@@ -275,6 +282,8 @@ static void result_destroy(RESULT* result)
 	vector_free(result->sigma.args);
 }
 
+/// Any text preceeding the sections defined by $... is ignored and can
+/// be used for a description of the control file.
 static void handle_preamble(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	(void)result;
@@ -282,6 +291,8 @@ static void handle_preamble(RESULT* result, char* payload, ERRCTX* errctx)
 	(void)errctx; /* nothing to fail */
 }
 
+/// The `$DATA(...)`	 section defines the data filename and any code for
+/// manipulation of the data file before analysis.
 static void handle_data(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	if (result->data.file) {
@@ -298,6 +309,8 @@ static void handle_data(RESULT* result, char* payload, ERRCTX* errctx)
 	result->data.code = text.content;
 }
 
+/// The `$ADVAN(...)` section defines the advancer type and any options
+/// for the advancer.
 static void handle_advan(RESULT* result, char* payload, ERRCTX* errctx) 
 {
 	if (result->advan.method) {
@@ -313,6 +326,8 @@ static void handle_advan(RESULT* result, char* payload, ERRCTX* errctx)
 	result->advan.init = text.content;
 }
 
+/// The `$IMODEL(...)` section defines the model paramaters and the code
+/// to initialize them.
 static void handle_imodel(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	if (result->imodel.code) {
@@ -332,6 +347,9 @@ static void handle_imodel(RESULT* result, char* payload, ERRCTX* errctx)
 	result->imodel.code = text.content;
 }
 
+/// The `$PREDICT(...)` section defines the prediction paramaters and the
+/// code to initialize them. The predition for model fitting is returned
+/// as `Y`.
 static void handle_predict(RESULT* result, char* payload, ERRCTX* errctx) 
 {
 	if (result->predict.code) {
@@ -351,6 +369,8 @@ static void handle_predict(RESULT* result, char* payload, ERRCTX* errctx)
 	result->predict.code = text.content;
 }
 
+/// The `$DIFFEQN` section defines the differential equation for the
+/// advan solvers that require this.
 static void handle_diffeqn(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	if (result->diffeqn.code) {
@@ -362,6 +382,9 @@ static void handle_diffeqn(RESULT* result, char* payload, ERRCTX* errctx)
 	result->diffeqn.code = payload;
 }
 
+/// The `$THETA` section defines the fixed effects. These can be either
+/// given as `{ lower, initial, upper, ESTIMATE },` or in NONMEM style
+/// as `(lower, initial, upper)` or as `(value FIXED)`.
 static void handle_theta(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	if (result->theta.code) {
@@ -418,6 +441,9 @@ block_done:
 	result->nomega = n + 1;
 }
 
+/// The `$OMEGA()` section defines a diagonal omega matrix block of random
+/// effects. The values are separated by `,` or whitespace. Negative
+/// variances are treated as fixed. 
 static void handle_omega(RESULT* result, char* payload, ERRCTX* errctx) 
 {
 	/* if there is a direct C-code initializer, then that C-code is
@@ -426,6 +452,9 @@ static void handle_omega(RESULT* result, char* payload, ERRCTX* errctx)
 	_handle_omega_helper(result, payload, OMEGA_DIAG, errctx); 
 }
 
+/// The `$OMEGABLOCK()` section defines a block omega matrix block of
+/// random effects. The values are separated by `,` or whitespace.
+/// Negative variances along the diagonal are treated as fixed. 
 static void handle_omegablock(RESULT* result, char* payload, ERRCTX* errctx) 
 {
 	if (payload[0] != '(') {
@@ -436,6 +465,10 @@ static void handle_omegablock(RESULT* result, char* payload, ERRCTX* errctx)
 	_handle_omega_helper(result, payload, OMEGA_BLOCK, errctx); 
 }
 
+/// The `$OMEGASAME(...)` section defines a block which copies the values
+/// from lower indicies in the omega matrix. This is used for
+/// inter-occasion variability, i.e. multiple etas with variances and
+/// covariances matching those of lower indicies.
 static void handle_omegasame(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	if (payload[0] != '(') {
@@ -446,6 +479,9 @@ static void handle_omegasame(RESULT* result, char* payload, ERRCTX* errctx)
 	_handle_omega_helper(result, payload, OMEGA_SAME, errctx); 
 }
 
+/// The `$SIGMA()` section defines a diagonal omega matrix block of
+/// residual variability. The values are separated by `,` or whitespace.
+/// Negative variances are treated as fixed. 
 static void handle_sigma(RESULT* result, char* payload, ERRCTX* errctx) 
 {
 	char* input;
@@ -474,7 +510,8 @@ static void handle_sigma(RESULT* result, char* payload, ERRCTX* errctx)
 		return;
 	}
 }
-
+/// The `$MAIN` section defines C code which will run after problem
+/// initialization. 
 static void handle_main(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	if (result->main.code) {
@@ -484,6 +521,23 @@ static void handle_main(RESULT* result, char* payload, ERRCTX* errctx)
 
 	strip_firstlast_space(payload);
 	result->main.code = payload;
+}
+
+/// Sections defined by `$FILE(...)` are written to the control filename
+/// appended by '.' and then the name given. For the `graphics.R` script
+/// this can be used to provide a configuration file for modifying the
+/// graphics produced.
+static void handle_file(RESULT* result, char* payload, ERRCTX* errctx) 
+{ 
+	let text = extract_args_content(payload, errctx);
+	if (errctx->len)
+		return;
+
+	strip_enclosing(text.args, '"', '"');
+	let n = result->nfiles;
+	result->files[n].name = text.args;
+	result->files[n].content = text.content;
+	++result->nfiles;
 }
 
 // ---------------------------------------------------------------------------
@@ -526,6 +580,7 @@ static RESULT result_construct(VECPTR* sections, ERRCTX* errctx)
 		{ "$OMEGASAME",   handle_omegasame },
 		{ "$SIGMA",       handle_sigma    },
 		{ "$MAIN",        handle_main     },
+		{ "$FILE",        handle_file     },
 	};
 
 	RESULT ret = { 0 };
@@ -800,7 +855,7 @@ static void template_data_array(FILE* fp,
 		if (ncols == 0)
 			fprintf(fp, "\t{ ");
 
-/// An "." as a data entry is replaced by NAN.
+/// Within the datafile a `.` as a data entry is replaced by NAN.
 		if (streq(v, ".")) {
 			v = "NAN";
 
@@ -1039,6 +1094,8 @@ static void template_advan_init(FILE* fp,
 								ERRCTX* errctx)
 {
 	(void)datainfo;
+
+/// Within the `$ADVAN(...)` section an advancer must be indicated.
 
 	static const struct {
 		const char* method;
@@ -1526,6 +1583,30 @@ done:
     vector_free(allnames);
 }
 
+static void write_files(const RESULT* result, ERRCTX* errctx)
+{
+#define FILENAME (strrchr(__FILE__, '/') ? strrchr(__FILE__, '/') + 1 : __FILE__)
+	
+	char fname[PATH_MAX];
+	forcount(i, result->nfiles) {
+		snprintf(fname, sizeof(fname), "%s.%s", result->filename, result->files[i].name);
+		printf("%s: write \"%s\"\n", FILENAME, fname);
+		
+		var f = fopen(fname, "w");
+		if (!f) {
+			errctx_add(errctx, "%s: unable to open file \"%s\"\n", __func__, fname);
+			continue;
+		}
+		
+		fputs(result->files[i].content, f);
+		fputc('\n', f);
+		if (ferror(f)) 
+			errctx_add(errctx, "%s: error writing to file \"%s\"\n", __func__, fname);
+
+		fclose(f);
+	}
+}
+
 int main(int argc, char* argv[])
 {
 	if (argc != 2 && argc != 3) {
@@ -1599,6 +1680,13 @@ int main(int argc, char* argv[])
 		exit(EXIT_FAILURE);
 	}
 
+	/* write the files */
+	write_files(&result, &errctx);
+	if (errctx.len) {
+		fprintf(stderr, "%s: %s", filename, errctx.errmsg);
+		exit(EXIT_FAILURE);
+	}
+
 	/* cleanup */
 	datainfo_destroy(&datainfo);
 	result_destroy(&result);
@@ -1608,8 +1696,6 @@ int main(int argc, char* argv[])
 	exit(EXIT_SUCCESS);
 }
 
-/// The variables and code defined in the block is placed into a
-/// template of an OpenPMX analysis.
 char openpmxtran_template[] =
 "/*\n"
 " * Code below this message is generated by OpenPMX (https://github.com/deleveld/openpmx).\n"
