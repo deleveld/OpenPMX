@@ -44,8 +44,12 @@ extern "C" {
 #define OPENPMX_FIELDNAME_MAX			64
 
 /*---------------------------------------------------------------------*/
-/* dataconfig */
+/* data structres and information about user code */
 /*---------------------------------------------------------------------*/
+typedef struct RECORD RECORD;
+typedef struct IMODEL IMODEL;
+typedef struct PREDICTVARS PREDICTVARS;
+
 typedef	struct {
 	int size;
 	struct {
@@ -54,7 +58,9 @@ typedef	struct {
 	} field[OPENPMX_FIELDS_MAX];
 } STRUCTINFO;
 
-typedef struct RECORD RECORD;
+/*---------------------------------------------------------------------*/
+/* dataset */
+/*---------------------------------------------------------------------*/
 typedef struct {
 	RECORD* writeable;
 	const RECORD* records;
@@ -98,11 +104,8 @@ bool pmx_advan_inittime(const ADVANSTATE* advanstate, const double t);
 void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const double v);
 void pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate, const double* sysmat);
 
-/* callback for differential equation solver */
-typedef struct IMODEL IMODEL;
-typedef struct PREDICTVARS PREDICTVARS;
-typedef struct ADVANCONFIG ADVANCONFIG;
 typedef struct ADVANFUNCS ADVANFUNCS;
+typedef struct ADVANCONFIG ADVANCONFIG;
 typedef struct ADVANCONFIG {
 	
 	/* init function */
@@ -159,21 +162,6 @@ ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const A
 ADVANFUNCS* pmx_advan_diffeqn_test(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 
 /*---------------------------------------------------------------------*/
-/* basic types */
-/*---------------------------------------------------------------------*/
-typedef struct {
-	double objfn;
-	enum {
-		OBJFN_INVALID = 0,
-		OBJFN_EVALUATE,
-		OBJFN_CURRENT,
-		OBJFN_FINAL,
-	} type;
-	int nparam;
-	int neval;
-} PMXRESULT;
-
-/*---------------------------------------------------------------------*/
 /* OPENPMX */
 /*---------------------------------------------------------------------*/
 typedef struct {
@@ -207,16 +195,23 @@ typedef struct {
 	double sigma[OPENPMX_SIGMA_MAX];
 
 	/* output */
-	PMXRESULT result;
+	struct {
+		double objfn;
+		enum {
+			OBJFN_INVALID = 0,
+			OBJFN_EVALUATE,
+			OBJFN_CURRENT,
+			OBJFN_FINAL,
+		} type;
+		int nparam;
+		int neval;
+	} result;
 
 	/* internal use */
 	struct PMXSTATE* state;
 } OPENPMX;
 
 void pmx_cleanup(OPENPMX* openpmx);
-
-OPENPMX pmx_copy(const OPENPMX* const openpmx);
-void pmx_copy_popparam(OPENPMX* dest, const OPENPMX* const src);
 
 /*---------------------------------------------------------------------*/
 /* prediction */
@@ -287,14 +282,13 @@ typedef struct {
 	const char* filename;
 	const bool force;
 	const bool optional;
-	const bool preserve;
 	const bool silent;
 } RELOADCONFIG;
 
 void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args);
 
 /*---------------------------------------------------------------------*/
-/* utility set functions */
+/* utility functions */
 /*---------------------------------------------------------------------*/
 void pmx_set_theta(OPENPMX* dest, 
 				   const int index,

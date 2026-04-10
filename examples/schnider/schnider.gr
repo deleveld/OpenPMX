@@ -6,13 +6,13 @@
 //	Data obtained from http://opentci.org/data/propofol/schnider-1998-study (Nov 6 2020)
 //	 - changed CP name to DV
 //
-$DATA("data.csv")
+$DATA(data.csv)
 $ADVAN(threecomp) 
 	.firstonly = true,
 $IMODEL(V1, V2, V3, CL, Q2, Q3)
 	const double SIZE = WT/70.;
 	V1 = THETA(1) * SIZE * exp(ETA(1));
-	V2 = THETA(2) * SIZE * exp(ETA(2) + THETA(7)*(AGE-35));
+	V2 = THETA(2) * SIZE * exp(ETA(2) + THETA(7)*(AGE-35)); /* a comment */
 	V3 = THETA(3) * SIZE * exp(ETA(3));
 	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4));
 	Q2 = THETA(5) * pow(V2/THETA(2), 0.75) * exp(ETA(5));
@@ -28,7 +28,8 @@ $THETA
 	{   0.1,   2,   5,  ESTIMATE     },
 	{   0.1,   1,   5,  ESTIMATE     },
 	{   -.1,   0,   .1,  ESTIMATE     },
-$OMEGA(0.1, 0.1, 0.1, 0.1, 0, 0)
+$OMEGA(0.1, 0.1, 0.1, 0.1, 0., 0.)
 $SIGMA(0.1)
 $MAIN
 	estimate();
+	table("ID TIME DV PRED IPRED", .stream=stdout);

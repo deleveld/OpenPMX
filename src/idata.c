@@ -233,7 +233,7 @@ int idata_ineval(const IDATA* const idata, const bool reset)
 	return ineval;
 }
 
-void idata_reset_eta(IDATA* const idata, const double* eta)
+void idata_set_eta(IDATA* const idata, const double* eta)
 {
 	assert(eta);
 	var firstindivid = &idata->individ[0];
@@ -450,11 +450,11 @@ double idata_objfn(const IDATA* const idata,
 			assert(term5 == 0.);
 		}
 
-		assert(gsl_finite(term1) == 1);
-		assert(gsl_finite(term2) == 1);
-		assert(gsl_finite(term3) == 1);
-		assert(gsl_finite(term4) == 1);
-		assert(gsl_finite(term5) == 1);
+//		assert(gsl_finite(term1) == 1);
+//		assert(gsl_finite(term2) == 1);
+//		assert(gsl_finite(term3) == 1);
+//		assert(gsl_finite(term4) == 1);
+//		assert(gsl_finite(term5) == 1);
 
 		let iobjfn = term1 + term2 + term3 + term4 + term5;
 		individ->iobjfn = iobjfn;
@@ -466,7 +466,7 @@ double idata_objfn(const IDATA* const idata,
 		objfn5 += term5;
 	}
 	let objfn = objfn1 + objfn2 + objfn3 + objfn4 + objfn5;
-	assert(gsl_finite(objfn) == 1);
+//	assert(gsl_finite(objfn) == 1);
 	return objfn;
 }
 

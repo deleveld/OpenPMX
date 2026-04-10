@@ -32,29 +32,7 @@
 #include "advan/advan.h"
 #include "utils/c22.h"
 #include "utils/vector.h"
-
-static void strip_firstlast_space(char* s)
-{
-	let len = strlen(s);
-	if (len == 0)
-		return;
-
-	/* remove space at end */
-	char* a = s + len - 1;
-	while (a != s && *a && isspace((int)*a)) {
-		*a = 0;
-		--a;
-	}
-
-	/* remove space at begin */
-	a = s;
-	while (*a && isspace((int)*a))
-		++a;
-
-	/* copy data over with classic strcpy
-	 * which allows overlap */
-	memmove(s, a, strlen(a) + 1);
-}
+#include "utils/getdelim.h"
 
 typedef struct {
 	const IDATA* idata;
@@ -84,6 +62,23 @@ typedef struct {
 #define NAME_MAX 256
 #endif
 
+static void table_close(TABLE* const table)
+{
+	assert(table);
+	
+	/* close the stream if there is one and if we opened it */
+	if (table->stream &&
+		table->stream != stdout &&
+		table->stream != stderr &&
+		(!table->tableconfig || !table->tableconfig->stream))
+		fclose(table->stream);
+	table->stream = 0;
+
+	/* cleanup */
+	vector_free(table->fieldnames);
+	free(table->fields);
+}
+
 static TABLE table_open(const IDATA* const idata,
 						const ADVANFUNCS* const advanfuncs,
 						const POPMODEL* const popmodel,
@@ -101,18 +96,18 @@ static TABLE table_open(const IDATA* const idata,
 		/* write to user define filename */
 		if (tableconfig->filename) {
 			if (tableconfig->name) {
-				add_errctx(errctx, "%s: table has both filename \"%s\" and name \"%s\"\n",
+				errctx_add(errctx, "%s: table has both filename \"%s\" and name \"%s\"\n",
 						   __func__, tableconfig->filename, tableconfig->name);
 				goto done_file_open;
 			}
 			if (tableconfig->stream) {
-				add_errctx(errctx, "%s: table has both filename \"%s\" and stream\n",
+				errctx_add(errctx, "%s: table has both filename \"%s\" and stream\n",
 						   __func__, tableconfig->filename);
 				goto done_file_open;
 			}
 			stream = fopen(tableconfig->filename, "w");
 			if (!stream) {
-				add_errctx(errctx, "%s: open table file failed \"%s\"\n", __func__, tableconfig->filename);
+				errctx_add(errctx, "%s: open table file failed \"%s\"\n", __func__, tableconfig->filename);
 				goto done_file_open;
 			}
 /// If a .name is defined in the TABLECONFIG then the output is
@@ -121,7 +116,7 @@ static TABLE table_open(const IDATA* const idata,
 		} else if (tableconfig->name) {
 			char fname[PATH_MAX + NAME_MAX];
 			if (tableconfig->stream) {
-				add_errctx(errctx, "%s: table has both name \"%s\" and stream\n",
+				errctx_add(errctx, "%s: table has both name \"%s\" and stream\n",
 						   __func__, tableconfig->name);
 				goto done_file_open;
 			}
@@ -131,8 +126,8 @@ static TABLE table_open(const IDATA* const idata,
 				tableconfig->name);
 			stream = fopen(fname, "w");
 			if (!stream) {
-				add_errctx(errctx, "%s: table has both name \"%s\" and stream\n",
-						   __func__, tableconfig->name);
+				errctx_add(errctx, "%s: table open failed \"%s\"\n",
+						   __func__, fname);
 				goto done_file_open;
 			}
 /// if a .stream (FILE*) is provided then table will be output to it.
@@ -154,7 +149,7 @@ static TABLE table_open(const IDATA* const idata,
 				OPENPMX_TABLEFILE);
 			stream = fopen(fname, "w");
 			if (!stream) {
-				add_errctx(errctx, "%s: open table file failed \"%s\"\n", __func__, fname);
+				errctx_add(errctx, "%s: open table file failed \"%s\"\n", __func__, fname);
 				goto done_file_open;
 			}
 
@@ -165,7 +160,7 @@ static TABLE table_open(const IDATA* const idata,
 
 done_file_open:
 	if (!stream) {
-		add_errctx(errctx, "%s: no stream\n", __func__);
+		errctx_add(errctx, "%s: no stream\n", __func__);
 		return (TABLE) { 0 };
 	}
 	
@@ -191,37 +186,22 @@ done_file_open:
 
 /// The table fields are indicated by a string which will be tokenized
 /// with whitespace or comma.
-	/* parse fields string and write the header */
-	/* we have to tokenize a copy of the fields */
-	char* token;
-	char* rest = ret.fields;
-	let delim = ", \t\n";
-	while ((token = strtok_r(rest, delim, &rest))) {
-		strip_firstlast_space(token);
-		vector_append(ret.fieldnames, token);
-		fprintf(stream, OPENPMX_HEADER_FORMAT, token);
+	VECPTR v = { 0 };
+	let err = get_delim_tokens(ret.fields, &v, GET_DELIM_SEP_ANY);
+	if (err) {
+		errctx_add(errctx, "%s: table names tokens failed\n", __func__);
+		table_close(&ret);
+		return (TABLE) { 0 };
 	}
+	vector_appendn(ret.fieldnames, v.ptr, v.size);
+	vector_free(v);
+
+	/* write the header out */
+	forvector_val(fieldname, ret.fieldnames) 
+		fprintf(stream, OPENPMX_HEADER_FORMAT, fieldname);
 	fputc('\n', stream);
 
 	return ret;
-}
-
-static void table_close(TABLE* const table)
-{
-	assert(table);
-	
-	/* close the stream if there is one and if we opened it */
-	if (table->stream &&
-		table->stream != stdout &&
-		table->stream != stderr &&
-		table->tableconfig &&
-		!table->tableconfig->stream)
-		fclose(table->stream);
-	table->stream = 0;
-
-	/* cleanup */
-	vector_free(table->fieldnames);
-	free(table->fields);
 }
 
 /// Table generation is single threaded because no advancing takes 
@@ -240,7 +220,7 @@ static int table_row(TABLE* const table)
 
 	/* we are already handling a normal row */
 	} else {
-		bool firstonly = false;
+		var firstonly = false;
 		if (table->tableconfig)
 			firstonly = table->tableconfig->firstonly;
 		let nrecord = idata->individ[table->individ].nrecord;
@@ -324,8 +304,6 @@ static double table_value(const TABLE* const table, const char* const name, cons
 		return individ->iobjfn;
 	if (strcmp(name, "INEVAL") == 0)
 		return individ->ineval; 
-	if (strcmp(name, "EVID") == 0) 
-		return RECORDINFO_EVID(recordinfo, table->record);
 	if (strcmp(name, "MDV") == 0)
 		return RECORDINFO_MDV(recordinfo, table->record);
 	if (strcmp(name, "EVID") == 0)
@@ -386,7 +364,7 @@ void pmx_table(OPENPMX* pmx,
 	pmxstate_ensure(pmx);
 
 	ERRCTX errctx = { 0 };
-	let popmodel = popmodel_init(pmx, &errctx);
+	let popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
 		fatal(0, "%s: %s", __func__, errctx.errmsg);
 

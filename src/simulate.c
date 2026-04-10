@@ -97,7 +97,7 @@ static void idata_resample_err(const IDATA* const idata,
 }
 
 /// For simulation random ETA values are chosen according to the omega
-/// matrix
+/// matrix.
 static void idata_resample_eta(IDATA* const idata,
 							   const POPMODEL* const popmodel,
 							   gsl_rng * const rng)
@@ -111,7 +111,7 @@ static void idata_resample_eta(IDATA* const idata,
 	 * (i.e. corrected) one */
 	var omegainfo = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed);
 
-/// Upon simulation the individualized values (ETA and objective
+/// Upon simulation the individualized values (ETA and objective 
 /// function components) are set to zero.
 	let nomega = idata->nomega;
 	forcount(i, idata->nindivid) {
@@ -211,7 +211,7 @@ void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig)
 	var pstate = pmx->state;
 
 	ERRCTX errctx = { 0 };
-	var popmodel = popmodel_init(pmx, &errctx);
+	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
 		fatal(0, "%s", errctx.errmsg);
 	

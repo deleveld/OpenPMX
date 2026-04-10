@@ -11,7 +11,6 @@ fi
 
 ./install
 
-
 (cd examples/theo; ../../openpmx theo.gr)
 (cd examples/warfarin; ../../openpmx warfarin.gr)
 

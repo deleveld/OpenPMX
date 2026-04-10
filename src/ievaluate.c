@@ -200,7 +200,7 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	let record = ievaluate_args->record;
 	let nrecord = ievaluate_args->nrecord;
 	let popparam = &ievaluate_args->popparam;
-
+	
 	char advan_memory[advanfuncs->advan_size];
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
@@ -224,9 +224,12 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	forcount(i, nrecord) {
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
 
+		if (predictvars_saved)
+			memset(predictvars, 0, predictvars_size);
+			
 		let evid = RECORDINFO_EVID(recordinfo, ptr);
 		var yhat = 0.;
-		if (evid == 0 || predictall) 
+		if (evid == 0 || predictall)
 			yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 		if (YHAT)
 			YHAT[i] = yhat;
@@ -236,6 +239,7 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 			let imodelptr = (IMODEL*)((char*)imodel_saved + i * imodel_size);
 			memcpy(imodelptr, imodel, imodel_size);
 
+			assert(predictvars_saved);
 			let predictvarsptr = (PREDICTVARS*)((char*)predictvars_saved + i * predictvars_size);
 			memcpy(predictvarsptr, predictvars, predictvars_size);
 
@@ -322,6 +326,11 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	assert((int)sizeof(advanmem._predictvars) >= advanfuncs->advanconfig->predictfields.size);
 	assert((int)sizeof(advanmem._imodel) >= advanfuncs->advanconfig->imodelfields.size);
 
+	/* count warnings so we can suppress if there are too many */
+	var obs_yhat_nonfinite_warning_count = 0;
+	var obs_yhatvar_zero_warning_count = 0;
+	var obs_yhatvar_nonfinite_warning_count = 0;
+
 	/* iterate over individuals data */
 	double lasttime = -DBL_MAX;
 	let advanconfig = advanfuncs->advanconfig;
@@ -380,7 +389,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			let cmt = RECORDINFO_CMT_0offset(recordinfo, ptr);
 			if (cmt < 0 || cmt >= advanfuncs->nstate) {
 				let _cmt = RECORDINFO_CMT(recordinfo, ptr);
-				fatal(logstream, "CMT (%i) not within number of states (%i): ID %f time %f record %i\n", _cmt, advanfuncs->nstate, id, time, i + record_offset);
+				fatal(logstream, "CMT (%i, %f) not within number of states (%i): ID %f time %f record %i\n", cmt, _cmt, advanfuncs->nstate, id, time, i + record_offset);
 			}
 
 			let amt = RECORDINFO_AMT(recordinfo, ptr);
@@ -443,8 +452,14 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 		var yhat = 0.;
 		if (evid == 0 || predictall) {
 			yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
-			if (!gsl_finite(yhat))
-				fatal(logstream, "YHAT non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
+			if (!gsl_finite(yhat)) {
+				if (obs_yhat_nonfinite_warning_count < 1) {
+					warning(logstream, "YHAT non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
+					++obs_yhat_nonfinite_warning_count;
+					if (obs_yhat_nonfinite_warning_count <= 1)
+						warning(logstream, "supressing further YHAT non-finite for ID\n", id);
+				}
+			}
 		}
 
 		/* observations */
@@ -453,11 +468,22 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			/* prediction variance of observations should be finite and positive */
 			let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 			if (!gsl_finite(yhatvar))
-				fatal(logstream, "YHATVAR non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
+				if (obs_yhatvar_nonfinite_warning_count < 1) {
+					warning(logstream, "YHATVAR non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
+					++obs_yhatvar_nonfinite_warning_count;
+					if (obs_yhatvar_nonfinite_warning_count <= 1)
+						warning(logstream, "supressing further YHATVAR non-finite for ID %f\n", id);
+			}
 
 			/* predictions with zero error are an error */
-			if (evid == 0 && yhatvar == 0.)
-				fatal(logstream, "YHATVAR zero (%f): ID %f time %f record %i\n", yhatvar, id, time, i + record_offset);
+			if (evid == 0 && yhatvar == 0.) {
+				if (obs_yhatvar_zero_warning_count < 1) {
+					warning(logstream, "YHATVAR zero (%f): ID %f time %f record %i\n", yhatvar, id, time, i + record_offset);
+					++obs_yhatvar_zero_warning_count;
+					if (obs_yhatvar_zero_warning_count >= 1) 
+						warning(logstream, "supressing further YHATVAR zero warnings for ID %f\n", id);
+				}
+			}
 		}
 
 		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);

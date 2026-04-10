@@ -29,7 +29,8 @@ typedef struct {
 	size_t len;
 } ERRCTX;
 
-void add_errctx(ERRCTX * errctx, const char* format, ... );
+void errctx_add(ERRCTX * errctx, const char* format, ... );
+void errctx_clear(ERRCTX * errctx);
 
 #ifdef __cplusplus
 }

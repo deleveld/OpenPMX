@@ -20,12 +20,26 @@
 
 #include <stdio.h>
 
+#include "vector.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 ssize_t openpmx_getdelim(char **lineptr, size_t *n, int delim, FILE *stream);
+
+void strip_firstlast_space(char* s);
  
+typedef VECTOR(char*) VECPTR;
+
+typedef enum {
+	GET_DELIM_SEP_COMMA,		/* force comma separator */
+	GET_DELIM_SEP_WHITESPACE,	/* force whitespace separator */
+	GET_DELIM_SEP_ANY,			/* use comma separator if comma exists */
+} GET_DELIM_SEP;
+
+int get_delim_tokens(char* line, VECPTR* namevec, const GET_DELIM_SEP sep);
+
 #ifdef __cplusplus
 }
 #endif

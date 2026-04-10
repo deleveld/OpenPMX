@@ -5,6 +5,7 @@ filename <- args[1]
 datafile <- args[2]
 
 # the file names we are looking for
+configfile <- paste0(filename, ".graphics")
 extfile <- paste0(filename, ".ext")
 phifile <- paste0(filename, ".phi")
 covfile <- paste0(filename, ".covariates")
@@ -12,7 +13,25 @@ yhatfile <- paste0(filename, ".yhat")
 pdffile <- paste0(filename, ".pdf")
 
 # read in files
+
+config <- NA
+if (file.exists(configfile)) {
+	cat(sprintf("read graphics config %s\n", configfile))
+	config <- read.table(configfile, header=TRUE, na.strings = "")
+}
+
 data <- NA
+# datafile not given, extract from control file
+if (!file.exists(datafile)) {
+	file_lines <- readLines(filename, warn = FALSE)
+	file_content <- paste(file_lines, collapse = "\n")
+	data_match <- regmatches(file_content, regexec("\\$DATA\\(([^)]+)\\)", file_content))
+	datafile <- data_match[[1]][2]
+	if (!is.na(datafile)) {
+		datafile <- gsub("['\"]", "", datafile)
+		datafile <- trimws(datafile)
+	}
+}
 if (file.exists(datafile)) {
 	cat(sprintf("read data %s\n", datafile))
 	data <- read.table(datafile, header=TRUE, stringsAsFactors=FALSE)
@@ -88,6 +107,19 @@ if (file.exists(yhatfile)) {
 }
 pdf(pdffile)
 
+get_config_setting <- function(name_val, sub_val, sub_type, default)
+{
+	if (!is.data.frame(config))
+		return (default)
+	
+	d <- config[config[["NAME"]] == name_val & 
+				config[["VALUE"]] == sub_val &
+				config[["TYPE"]] == sub_type, ]
+	if (nrow(d) == 1) 
+		return (d$SETTING)
+	return (default)
+}
+
 # parameter vs. iteration
 if (is.data.frame(ext)) {
 	cat(sprintf("plot ext\n"))
@@ -131,7 +163,6 @@ if (is.data.frame(cov) && is.data.frame(phi)) {
 		plot(x=x, y=y, type="n", ylim=ylim, xlab=cname, ylab=ename)
 		points(x=x, y=y, col="grey")
 		abline(h=0)
-		grid()
 
 		l1 <- lm(y ~ x)
 		coef <- summary(l1)$coefficients
@@ -144,14 +175,64 @@ if (is.data.frame(cov) && is.data.frame(phi)) {
 			legend <- sprintf("p=%.4g", pval_slope)
 		}
 		if (legend != "") {
-			abline(l1, col="red")
+			abline(l1, col="red", lw=3)
 			legend("topright",
 				legend=legend,
 				bty="n")
 		}
+		grid()
+	}
+
+	plot_categorical_covariate <- function(x, y, ylim, cname, ename)
+	{
+		dall <- density(y)
+		plot(dall,
+			 xlim = ylim,
+			 ylim = range(c(dall$y, dall$y*1.5)),
+			 main = NA, 
+			 xlab = ename, 
+			 col = NA)
+
+		grp_col <- 2
+		legend_text <- NULL
+		legend_col <- NULL
+		legend_lw <- NULL
+		
+		for (grp in unique(x)) {
+			sel <- grp == x 
+			dgrp <- density(y[sel])
+
+			g1 <- y[sel]
+			g2 <- y[!sel]
+			w <- wilcox.test(g1, g2, alternative="two.sided")
+
+			lw <- 1
+			p_val <-w$p.value 
+			if (p_val < 0.05) {
+				lw <- 3
+				grp_name <- get_config_setting(cname, grp, "name", grp)
+
+				legend_text <- c(legend_text, sprintf("%s (p=%.3g)", grp_name, p_val))
+				legend_col <- c(legend_col, grp_col)
+				legend_lw <- c(legend_lw, lw)
+			}
+
+			lines(dgrp, col=grp_col, lw=lw)
+			grp_col <- grp_col + 1
+		}
+		grid()
+
+		if (!is.null(legend_text)) {
+			legend("topright",
+					legend=legend_text,
+					col=legend_col,
+					lw=legend_lw,
+					bty="n", cex=0.8)
+		}
 	}
 
 	for (cname in names(cov)) {
+		n_plots <- 0
 		par(mfrow=c(2,2), cex=0.9)
 
 		for (ename in names(phi)) {
@@ -163,9 +244,31 @@ if (is.data.frame(cov) && is.data.frame(phi)) {
 				iseta <- TRUE
 
 			if (iseta && !all(y == 0)) {
-				plot_continuous_covariate(x, y, ylim, cname, ename)
+
+				val <- get_config_setting(cname, ".", "covariate", "missing")
+				if (val == "missing") {
+					if (length(unique(x)) <= 5) {
+						val = "categorical"
+					}
+				}
+				if (val == "categorical") {
+					plot_categorical_covariate(x, y, ylim, cname, ename)
+				} else {
+					plot_continuous_covariate(x, y, ylim, cname, ename)
+				}
+
+				if (n_plots == 0) {
+					t <- get_config_setting(cname, ".", "name", NA);
+					if (!is.na(t))
+						title(t, outer=TRUE, line=-1)
+					else
+						title(cname, outer=TRUE, line=-1)
+				}	
+				n_plots <- n_plots + 1
+				if (n_plots >= prod(par("mfrow")))
+					n_plots <- 0
 			}
-		}
+		}		
 	}
 }
 
@@ -192,11 +295,20 @@ if (is.data.frame(yhatdata)) {
 		timelim <- range(yhatdata[timevalid, "TIME"])
 
 		for (dname in dvid_types) {
+			n_plots <- 0
 			par(mfrow=c(2,2), cex=0.9)
 
-			cat(sprintf("plot yhatdata dvid %i\n", dname))
+			logy <- ""
+			logxy <- ""
+			if (get_config_setting("DVID", dname, "scale", "") == "log") {
+				logy <- "y"
+				logxy <- "xy"
+			}
+			
 			valid <- yhatdata[["YHATVAR"]] != 0 & preddvid == dname
 			if (!all(valid == FALSE)) {
+				cat(sprintf("plot yhatdata dvid %i\n", dname))
+
 				id <- yhatdata[valid, "ID"]
 				dv <- as.numeric(yhatdata[valid, "DV"])
 				yhat <- as.numeric(yhatdata[valid, "YHAT"])
@@ -209,7 +321,7 @@ if (is.data.frame(yhatdata)) {
 					x <- ppred
 					y <- dv
 					lim <- range(c(lim, ppred))
-					plot(x=x, y=y, type="n", xlab="PRED", ylab="DV", xlim=lim, ylim=lim)
+					plot(x=x, y=y, type="n", xlab="PRED", ylab="DV", xlim=lim, ylim=lim, log=logxy)
 					points(x=x, y=y, col=pointcol)
 					abline(coef = c(0,1))
 					grid()
@@ -220,7 +332,7 @@ if (is.data.frame(yhatdata)) {
 				x <- yhat
 				y <- dv
 				lim <- range(c(x, y))
-				plot(x=x, y=y, type="n", xlab="YHAT", ylab="DV", xlim=lim, ylim=lim)
+				plot(x=x, y=y, type="n", xlab="YHAT", ylab="DV", xlim=lim, ylim=lim, log=logxy)
 				points(x=x, y=y, col=pointcol)
 				abline(coef = c(0,1))
 				grid()
@@ -249,7 +361,7 @@ if (is.data.frame(yhatdata)) {
 						x <- time
 						y1 <- dv
 						y2 <- ppred
-						plot(x=x, y=y1, type="n", xlab="TIME", ylab="DV, PRED", xlim=timelim, ylim=lim)
+						plot(x=x, y=y1, type="n", xlab="TIME", ylab="DV, PRED", xlim=timelim, ylim=lim, log=logy)
 						points(x=x, y=y1, col=pointcol)
 						for (i in unique(id)) 
 							plot_lines(i, id, x, y2)
@@ -261,18 +373,25 @@ if (is.data.frame(yhatdata)) {
 					x <- time
 					y1 <- dv
 					y2 <- yhat
-					plot(x=x, y=y1, type="n", xlab="TIME", ylab="DV, YHAT", xlim=timelim, ylim=lim)
+					plot(x=x, y=y1, type="n", xlab="TIME", ylab="DV, YHAT", xlim=timelim, ylim=lim, log=logy)
 					points(x=x, y=y1, col=pointcol)
 					for (i in unique(id)) 
 						plot_lines(i, id, x, y2)
 					grid()
 				}
-				title(sprintf("data type %i", dname), outer=TRUE, line=-1)
+				if (n_plots == 0) {
+					t <- get_config_setting("DVID", dname, "name", NA);
+					if (!is.na(t))
+						title(t, outer=TRUE, line=-1)
+					else
+						title(sprintf("data type %i", dname), outer=TRUE, line=-1)
+				}
+				n_plots <- n_plots + 1
+				if (n_plots >= prod(par("mfrow")))
+					n_plots <- 0
 			}
 		}
 	}
 }
-
-
-
 dummy <- dev.off()
+cat("done\n")

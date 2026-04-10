@@ -25,18 +25,18 @@
 #include "popmodel.h"
 #include "defines.h"
 #include "print.h"
+#include "omegafixed.h"
 #include "utils/c22.h"
 #include "utils/various.h"
 #include "utils/errctx.h"
 
 #include <gsl/gsl_math.h>
 
-POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
+POPMODEL popmodel_init(const THETATYPE* const theta,
+					   const OMEGABLOCKSTYPE* const omegablocks,
+					   const double* sigma,
+					   ERRCTX* errctx)
 {
-	let theta = pmx->theta;
-	let omegablocks = pmx->omega;
-	let sigma = pmx->sigma;
-
 	POPMODEL ret = { 0 };
 	ret.ntheta = 0;
 	ret.nblock = 0;
@@ -75,7 +75,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 		if (!gsl_finite(theta[i].lower) ||
 			!gsl_finite(theta[i].value) ||
 			!gsl_finite(theta[i].upper)) {
-			add_errctx(errctx, "THETA invalid { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
+			errctx_add(errctx, "THETA invalid { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
 			goto failed;
 		}
 		
@@ -86,13 +86,13 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 		if (est == ESTIMATE) {
 			if (theta[i].value < theta[i].lower ||
 				theta[i].value > theta[i].upper) {
-				add_errctx(errctx, "THETA outside boundary { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
+				errctx_add(errctx, "THETA outside boundary { %g, %g, %g }\n", theta[i].lower, theta[i].value, theta[i].upper);
 				goto failed;
 			}
 
 			if (theta[i].value == theta[i].lower ||
 				theta[i].value == theta[i].upper) {
-				add_errctx(errctx, "THETA at boundary { %g, %g, %g, ESTIMATE }\n", theta[i].lower, theta[i].value, theta[i].upper);
+				errctx_add(errctx, "THETA at boundary { %g, %g, %g, ESTIMATE }\n", theta[i].lower, theta[i].value, theta[i].upper);
 				goto failed;
 			}
 		}
@@ -103,7 +103,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 			theta[i].value != 0. ||
 			theta[i].upper != 0. ||
 			theta[i].type != THETA_INVALID) {
-			add_errctx(errctx, "THETA not fully initialized { %g, %g, %g, ??? }\n", theta[i].lower, theta[i].value, theta[i].upper);
+			errctx_add(errctx, "THETA not fully initialized { %g, %g, %g, ??? }\n", theta[i].lower, theta[i].value, theta[i].upper);
 			goto failed;
 		}
 	}
@@ -121,7 +121,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 		ret.nblock += 1;
 	}
 	if (ret.nomega > OPENPMX_OMEGA_MAX) {
-		add_errctx(errctx, "Omega size (%i) is too large, max is %i\n", ret.nomega, OPENPMX_OMEGA_MAX);
+		errctx_add(errctx, "Omega size (%i) is too large, max is %i\n", ret.nomega, OPENPMX_OMEGA_MAX);
 		goto failed;
 	}
 
@@ -173,14 +173,14 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 			}
 
 		} else {
-			add_errctx(errctx, "invalid OMEGA block type (%i)\n", type);
+			errctx_add(errctx, "invalid OMEGA block type (%i)\n", type);
 			goto failed;
 		}
 
 		/* make sure there are no extra values in list we are ignoring */
 		for (int i=n; i<OPENPMX_OMEGABLOCKSIZE_MAX; i++) {
 			if (v[i] != 0.) {
-				add_errctx(errctx, "excess value (%f) in omega block\n", v[i]);
+				errctx_add(errctx, "excess value (%f) in omega block\n", v[i]);
 				goto failed;
 			}
 		}
@@ -196,7 +196,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 			if (i == j && v <= 0.) {
 				ret.omega[i][j] = fabs(v);
 				if (ret.omegafixed[i][j] == OMEGAFIXED_SAME) {
-					add_errctx(errctx, "variances on diagonal of a SAME block cannot be fixed\n");
+					errctx_add(errctx, "variances on diagonal of a SAME block cannot be fixed\n");
 					goto failed;
 				}
 				ret.omegafixed[i][j] = OMEGAFIXED_FIXED;
@@ -217,7 +217,7 @@ POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx)
 		let v = sigma[i];
 
 		if (!gsl_finite(v)) {
-			add_errctx(errctx, "invalid sigma[%i] %g\n", i, v);
+			errctx_add(errctx, "invalid sigma[%i] %g\n", i, v);
 			goto failed;
 		}
 		
@@ -306,7 +306,7 @@ void extfile_header(FILE * f,
 	forcount(i, popmodel->nomega) {
 		forcount(j, i+1) {
 			let fixed = popmodel->omegafixed[i][j];
-			let v = omegafixed_to_ext_fixedval(fixed);
+			let v = omegafixed_encode(fixed);
 			fprintf(f, OPENPMX_TABLE_FORMAT, v);
 		}
 	}
@@ -371,7 +371,11 @@ void extfile_header(FILE * f,
 	fflush(f);
 }
 
-void extfile_append(FILE* f, const POPMODEL* const popmodel, const double runtime_s, const int iter, const int ineval)
+void extfile_append(FILE* f,
+					const POPMODEL* const popmodel,
+					const double runtime_s,
+					const int iter,
+					const int ineval)
 {
 	fprintf(f, OPENPMX_IFORMAT, iter);
 
@@ -450,26 +454,21 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 {
 	const char* message = 0;
 	switch (popmodel->result.type) {
-		case OBJFN_INVALID:		message = "invalid";	break;
+		case OBJFN_INVALID:		break;
 		case OBJFN_CURRENT:		message = "current";	break;
 		case OBJFN_FINAL:		message = "final";		break;
 		case OBJFN_EVALUATE:	message = "evaluate";	break;
 		default:
 			assert(0);
 	}
-	assert(message);
-	info(f2, "popmodel %s\n", message);
-
 	if (popmodel->result.type != OBJFN_INVALID && timestamp != -DBL_MAX) {
-		if (popmodel->result.type == OBJFN_EVALUATE ||
-			popmodel->result.type == OBJFN_CURRENT ||
-			popmodel->result.type == OBJFN_FINAL) {
-			if (timestamp != DBL_MAX)
-				info(f2, "time %.3f ", timestamp);
-			info(f2, "neval %i ", popmodel->result.neval);
-			info(f2, "objfn %.6f ", popmodel->result.objfn);
-			info(f2, "nparam %i\n", popmodel->result.nparam);
-		}
+		info(f2, "popmodel %s\n", message);
+
+		if (timestamp != DBL_MAX)
+			info(f2, "time %.3f ", timestamp);
+		info(f2, "neval %i ", popmodel->result.neval);
+		info(f2, "objfn %.6f ", popmodel->result.objfn);
+		info(f2, "nparam %i\n", popmodel->result.nparam);
 	}
 	
 	/* info about theta */
@@ -507,7 +506,7 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 
 void popmodel_eval_information(const POPMODEL* const popmodel,
 							   const double runtime_s,
-							   const int neval,
+							   const int ineval,
 							   const bool details,
 							   FILE* outstream,
 							   FILE* extstream,
@@ -519,7 +518,7 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 	info_iteration(outstream, runtime_s, popmodel, suffix);
 
 	if (extstream) 
-		extfile_append(extstream, popmodel, runtime_s, popmodel->result.neval, neval);
+		extfile_append(extstream, popmodel, runtime_s, popmodel->result.neval, ineval);
 }
 
 

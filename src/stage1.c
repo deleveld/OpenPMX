@@ -42,7 +42,7 @@
 typedef struct {
 	double* const testeta;
 	const NONZERO* const nonzero;
-	int* const neval;
+	int* const ineval;
 	const STAGE1CONFIG* const stage1;
 	const IEVALUATE_ARGS ievaluate_args;
 	double* const eval_msec;
@@ -67,7 +67,7 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 	clock_gettime(CLOCK_REALTIME, &t3);
 	let objfn_term1_term2 = individual_fasteval(ievaluate_args);
 	timespec_duration(&t3, stage1_params->eval_msec);
-	*(stage1_params->neval) += 1;
+	*(stage1_params->ineval) += 1;
 
 	/* functions for Bae and Yim objective function Term 3 */
 	var term3 = sample_min2ll(nreta, reta, stage1_params->nonzero);
@@ -112,8 +112,8 @@ static void estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 	double upper[OPENPMX_OMEGA_MAX];
 	let nreta = nonzero->n;
 	forcount(i, nreta) {
-		lower[i] = -DBL_MAX;
-		upper[i] = DBL_MAX;
+		lower[i] = -1e6; // -DBL_MAX;
+		upper[i] = 1e6; // DBL_MAX;
 		if (reta[i] != 0.)
 			all_eta_zero = false;
 	}
@@ -234,7 +234,7 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 							f_plus_h, yhatvar_plus_h,	/* we need output */
 							0, 0);			/* dont need to calculate objfn */
 		timespec_duration(&t3, eval_msec);
-		*(params->neval) += 1;
+		*(params->ineval) += 1;
 
 		/* step eta backward */
 		let below = v - step;
@@ -248,7 +248,7 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 							f_minus_h, yhatvar_minus_h,	/* we need output */
 							0, 0);			/* dont need to calculate objfn */
 		timespec_duration(&t3, eval_msec);
-		*(params->neval) += 1;
+		*(params->ineval) += 1;
 
 		/* calculate derivatives, scaling by yhatvar */
 		const RECORD* ptr = record;
@@ -443,7 +443,7 @@ void stage1_thread(INDIVID* const individ,
 	let stage1_params = (const STAGE1_PARAMS) {
 		.testeta = testeta,
 		.nonzero = nonzero,
-		.neval = &stage1_ineval,
+		.ineval = &stage1_ineval,
 		.stage1 = &options->estimate.stage1,
 		.ievaluate_args = ievaluate_args_init(individ->record,
 											  individ->nrecord,

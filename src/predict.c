@@ -62,7 +62,6 @@ static void idata_predict_yhat_thread(INDIVID* const individ,
 
 	/* reset yhatvar when we write yhat */
 	memset(individ->yhatvar, 0, individ->nrecord * sizeof(double));
-	
 	individual_evaluate(&ievaluate_args,
 						individ->imodel,		/* do write imodel */
 						individ->predictvars,	/* do write predictvars */
@@ -108,6 +107,7 @@ static void idata_predict_pred_thread(INDIVID* const individ,
 	clock_gettime(CLOCK_REALTIME, &t3);
 
 	/* only write pred */
+	memset(individ->pred, 0, individ->nrecord * sizeof(double));
 	individual_evaluate(&ievaluate_args,
 						0,				/* dont write imodel */
 						0,				/* dont write predictvars */
@@ -146,7 +146,7 @@ void pmx_predict(OPENPMX* pmx)
 
 	var options = options_init(pmx);
 	ERRCTX errctx = { 0 };
-	var popmodel = popmodel_init(pmx, &errctx);
+	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
 		fatal(0, "%s", errctx.errmsg);
 
@@ -163,7 +163,7 @@ void pmx_predict_pred(OPENPMX* pmx)
 
 	var options = options_init(pmx);
 	ERRCTX errctx = { 0 };
-	var popmodel = popmodel_init(pmx, &errctx);
+	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
 		fatal(0, "%s", errctx.errmsg);
 

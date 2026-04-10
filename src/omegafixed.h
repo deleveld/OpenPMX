@@ -25,13 +25,13 @@ extern "C" {
 typedef unsigned char OMEGAFIXED;
 enum {
 	OMEGAFIXED_ESTIMATE = 0,
-	OMEGAFIXED_FIXED = 1,
-	OMEGAFIXED_SAME = 2,
+	OMEGAFIXED_FIXED,
+	OMEGAFIXED_SAME,
 };
 
 /* Conversion to the value in the .ext file from OMEGAFIXED. This is 
  * used when writing the .ext file header in popmodel.c */
-static inline double omegafixed_to_ext_fixedval(const OMEGAFIXED f)
+static inline double omegafixed_encode(const OMEGAFIXED f)
 {
 	int v = -1.; 
 	if (f == OMEGAFIXED_ESTIMATE)
@@ -45,7 +45,7 @@ static inline double omegafixed_to_ext_fixedval(const OMEGAFIXED f)
 
 /* Conversion to OMEGAFIXED from the value in the .ext file. This is
  * used in reload.c */
-static inline OMEGAFIXED omegafixed_from_ext_fixedval(const int val)
+static inline OMEGAFIXED omegafixed_decode(const int val)
 {
 	OMEGAFIXED ret = OMEGAFIXED_ESTIMATE; /* for val == 0 */
 	if (val == 1)

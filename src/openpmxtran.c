@@ -30,28 +30,13 @@
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
+#include <string.h>
 
 #include "../include/openpmx.h"
 #include "utils/c22.h"
 #include "utils/vector.c"
 #include "utils/errctx.c"
-
-static void strip_firstlast_space(char* s)
-{
-	/* remove space at begin */
-	char* begin = s;
-	while (*begin && isspace((unsigned char)*begin))
-		++begin;
-
-	/* remove space at end */
-	size_t len = strlen(begin);
-	while (len > 0 && isspace((unsigned char)begin[len - 1]))
-		--len;
-
-	/* copy over, must allow overlap */
-	memmove(s, begin, len);
-	s[len] = '\0';
-}
+#include "utils/getdelim.c"
 
 static int strip_enclosing(char* s, const char terminal_begin, const char terminal_end)
 {
@@ -183,70 +168,6 @@ static void strip_comments_robust(char *s)
     *dst = '\0';
 }
 
-typedef VECTOR(char*) VECPTR;
-
-typedef enum {
-	GET_DELIM_SEP_COMMA,		/* force comma separator */
-	GET_DELIM_SEP_WHITESPACE,	/* force whitespace separator */
-	GET_DELIM_SEP_ANY,			/* use comma separator if comma exists */
-} GET_DELIM_SEP;
-
-static int get_delim_tokens_comma(char* line, VECPTR* namevec)
-{
-	if (line[0] == ',')
-		return 1;
-	
-	char *running = line;
-	char *token;
-	while ((token = strsep(&running, ",")) != NULL) {
-		strip_firstlast_space(token);
-		if (strlen(token)) {
-			vector_append(*namevec, token);
-
-		/* missing token */
-		} else
-			return 1;
-	}
-	return 0;
-}
-
-static void get_delim_tokens_whitespace(char* line, VECPTR* namevec)
-{
-	char *saveptr;
-	let delim = " \t\r\n";
-	char *token = strtok_r(line, delim, &saveptr); 
-	while (token != NULL) {
-		vector_append(*namevec, token);
-		token = strtok_r(NULL, delim, &saveptr);
-	}
-}
-
-static int get_delim_tokens(char* line, VECPTR* namevec, const GET_DELIM_SEP sep)
-{
-	var s = sep;
-	if (sep == GET_DELIM_SEP_ANY) {
-		if (strchr(line, ',')) 
-			s = GET_DELIM_SEP_COMMA;
-		else
-			s = GET_DELIM_SEP_WHITESPACE;
-	}
-	
-	/* comma separated, means a single comma separates */
-	if (s == GET_DELIM_SEP_COMMA) {
-		return get_delim_tokens_comma(line, namevec);
-
-	/* whitespace separated, means multiple whitespace separates */
-	} else if (s == GET_DELIM_SEP_WHITESPACE) {
-		get_delim_tokens_whitespace(line, namevec);
-		
-	/* this should never happen */
-	} else {
-		assert(0);
-	}
-		
-	return 0;
-}
-
 static VECPTR split_sections(char *buf)
 {
     VECPTR sections = { 0 };
@@ -255,7 +176,6 @@ static VECPTR split_sections(char *buf)
         vector_append(sections, 0);    // synthetic empty preamble
 
     vector_append(sections, buf);      // preamble text, or first $ section
-
     for (char *p = buf; *p != '\0'; p++) {
         if (*p == '\n' && *(p + 1) == '$') {
             *p = '\0';
@@ -276,7 +196,7 @@ static section_content extract_args_content(char *payload, ERRCTX* errctx)
     // '(' must appear as first char in payload
     char *open = payload;
     if (*open != '(') {
-		add_errctx(errctx, "%s: missing '('\n", __func__);
+		errctx_add(errctx, "%s: missing '('\n", __func__);
         return (section_content) { 0 };
 	}
 
@@ -285,11 +205,11 @@ static section_content extract_args_content(char *payload, ERRCTX* errctx)
 	while (*close && *close != ')' && *close != '(')
 		close++;
 	if (*close == '(') {
-		add_errctx(errctx, "%s: unexpected nested '('\n", __func__);
+		errctx_add(errctx, "%s: unexpected nested '('\n", __func__);
 		return (section_content) { 0 };
 	}
 	if (*close == '\0') {
-		add_errctx(errctx, "%s: missing ')'\n", __func__);
+		errctx_add(errctx, "%s: missing ')'\n", __func__);
 		return (section_content) { 0 };
 	}
 
@@ -304,6 +224,8 @@ static section_content extract_args_content(char *payload, ERRCTX* errctx)
 		.content = close + 1,
 	};
 }
+
+typedef typeof(((OPENPMX){0}).omega[0].type) OMEGA_TYPE;
 
 typedef struct {
 	const char* filename;
@@ -328,10 +250,12 @@ typedef struct {
 	} diffeqn;
 	struct {
 		const char* code;
+		bool nonmem_init;
 	} theta;
 	struct {
-		int type;
+		OMEGA_TYPE type;
 		VECPTR args;
+		const char* code;
 	} omega[OPENPMX_OMEGABLOCK_MAX];
 	int nomega;
 	struct {
@@ -360,6 +284,11 @@ static void handle_preamble(RESULT* result, char* payload, ERRCTX* errctx)
 
 static void handle_data(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
+	if (result->data.file) {
+		errctx_add(errctx, "%s: second $DATA()\n", __func__);
+		return;
+	}
+
 	let text = extract_args_content(payload, errctx);
 	if (errctx->len)
 		return;
@@ -370,7 +299,12 @@ static void handle_data(RESULT* result, char* payload, ERRCTX* errctx)
 }
 
 static void handle_advan(RESULT* result, char* payload, ERRCTX* errctx) 
-{ 
+{
+	if (result->advan.method) {
+		errctx_add(errctx, "%s: second $ADVAN()\n", __func__);
+		return;
+	}
+	
 	let text = extract_args_content(payload, errctx);
 	if (errctx->len)
 		return;
@@ -381,27 +315,37 @@ static void handle_advan(RESULT* result, char* payload, ERRCTX* errctx)
 
 static void handle_imodel(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
+	if (result->imodel.code) {
+		errctx_add(errctx, "%s: %s: second $IMODEL()\n", __func__);
+		return;
+	}
+	
 	let text = extract_args_content(payload, errctx);
 	if (errctx->len)
 		return;
 	
 	let err = get_delim_tokens(text.args, &result->imodel.args, GET_DELIM_SEP_ANY);
 	if (err) {
-		add_errctx(errctx, "%s: %s: parse error\n", __func__, payload);
+		errctx_add(errctx, "%s: %s: parse error\n", __func__, payload);
 		return;
 	}
 	result->imodel.code = text.content;
 }
 
 static void handle_predict(RESULT* result, char* payload, ERRCTX* errctx) 
-{ 
+{
+	if (result->predict.code) {
+		errctx_add(errctx, "%s: %s: second $PREDICT()\n", __func__);
+		return;
+	}
+	
 	let text = extract_args_content(payload, errctx);
 	if (errctx->len)
 		return;
 
 	let err = get_delim_tokens(text.args, &result->predict.args, GET_DELIM_SEP_ANY);
 	if (err) {
-		add_errctx(errctx, "%s: %s: parse error\n", __func__, payload);
+		errctx_add(errctx, "%s: %s: parse error\n", __func__, payload);
 		return;
 	}
 	result->predict.code = text.content;
@@ -409,7 +353,10 @@ static void handle_predict(RESULT* result, char* payload, ERRCTX* errctx)
 
 static void handle_diffeqn(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
-	(void)errctx; /* nothing to fail */
+	if (result->diffeqn.code) {
+		errctx_add(errctx, "%s: %s: second $DIFFEQN()\n", __func__);
+		return;
+	}
 
 	strip_firstlast_space(payload);
 	result->diffeqn.code = payload;
@@ -417,71 +364,113 @@ static void handle_diffeqn(RESULT* result, char* payload, ERRCTX* errctx)
 
 static void handle_theta(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
-	(void)errctx; /* nothing to fail */
+	if (result->theta.code) {
+		errctx_add(errctx, "%s: %s: second $THETA\n", __func__);
+		return;
+	}
 
 	strip_firstlast_space(payload);
+
+	result->theta.nonmem_init = false;
+	if (strchr(payload, '{') == 0) 
+		result->theta.nonmem_init = true;
+	
 	result->theta.code = payload;
 }
 
 static void _handle_omega_helper(RESULT* result,
 								 char* payload,
-								 const int omega_type,
+								 const OMEGA_TYPE omega_type,
 								 ERRCTX* errctx) 
-{ 
+{
+	let n = result->nomega;
+	if (n >= OPENPMX_OMEGABLOCK_MAX) {
+		errctx_add(errctx, "%s: too many omega blocks\n", __func__);
+		return;
+	}
+
+	/* allow the direct C initialization of an omega block */
+	if (payload[0] != '(') {
+		result->omega[n].type = OMEGA_INVALID;
+		vector_resize(result->omega[n].args, 0);
+		result->omega[n].code = payload;
+		goto block_done;
+	}
+
+	/* the other "(...)" style */
 	let text = extract_args_content(payload, errctx);
 	if (errctx->len)
 		return;
 
-	let n = result->nomega;
-	if (n >= OPENPMX_OMEGABLOCK_MAX) {
-		add_errctx(errctx, "%s: too many omega blocks\n", __func__);
-		return;
-	}
-
 	result->omega[n].type = omega_type;
-
 	let err = get_delim_tokens(text.args, &result->omega[n].args, GET_DELIM_SEP_ANY);
 	if (err) {
-		add_errctx(errctx, "%s: parse error \"%s\"\n", __func__, payload);
+		errctx_add(errctx, "%s: parse error \"%s\"\n", __func__, payload);
 		return;
 	}
-	result->nomega = n + 1;
-
 	if (strlen(text.content)) {
-		add_errctx(errctx, "%s: parse error \"%s\"\n", __func__, text.content);
+		errctx_add(errctx, "%s: parse error \"%s\"\n", __func__, text.content);
 		return;
 	}
+	result->omega[n].code = 0;
+
+block_done:
+	result->nomega = n + 1;
 }
 
 static void handle_omega(RESULT* result, char* payload, ERRCTX* errctx) 
-{ 
+{
+	/* if there is a direct C-code initializer, then that C-code is
+	 * output for this block and OMEGA_DIAG is overridden */
+	
 	_handle_omega_helper(result, payload, OMEGA_DIAG, errctx); 
 }
 
 static void handle_omegablock(RESULT* result, char* payload, ERRCTX* errctx) 
-{ 
+{
+	if (payload[0] != '(') {
+		errctx_add(errctx, "%s: $OMEGABLOCK not followed by '('\n", __func__);
+		return; 
+	}
+	
 	_handle_omega_helper(result, payload, OMEGA_BLOCK, errctx); 
 }
 
 static void handle_omegasame(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
+	if (payload[0] != '(') {
+		errctx_add(errctx, "%s: $OMEGASAME not followed by '('\n", __func__);
+		return; 
+	}
+	
 	_handle_omega_helper(result, payload, OMEGA_SAME, errctx); 
 }
 
 static void handle_sigma(RESULT* result, char* payload, ERRCTX* errctx) 
-{ 
-	let text = extract_args_content(payload, errctx);
-	if (errctx->len)
-		return;
+{
+	char* input;
 
-	let err = get_delim_tokens(text.args, &result->sigma.args, GET_DELIM_SEP_ANY);
-	if (err) {
-		add_errctx(errctx, "%s: parse error \"%s\"\n", __func__, payload);
-		return;
+	/* allow the direct C initialization of an omega block */
+	if (payload[0] != '(') {
+		input = payload;
+
+	/* the other "(...)" style */
+	} else {
+		let text = extract_args_content(payload, errctx);
+		if (errctx->len)
+			return;
+		input = text.args;
+
+		if (strlen(text.content)) {
+			errctx_add(errctx, "%s: parse error \"%s\"\n", __func__, text.content);
+			return;
+		}
 	}
-		
-	if (strlen(text.content)) {
-		add_errctx(errctx, "%s: parse error \"%s\"\n", __func__, text.content);
+
+	/* get sigma array */
+	let err = get_delim_tokens(input, &result->sigma.args, GET_DELIM_SEP_ANY);
+	if (err) {
+		errctx_add(errctx, "%s: parse error \"%s\"\n", __func__, payload);
 		return;
 	}
 }
@@ -489,7 +478,7 @@ static void handle_sigma(RESULT* result, char* payload, ERRCTX* errctx)
 static void handle_main(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	if (result->main.code) {
-		add_errctx(errctx, "%s: second $MAIN\n", __func__);
+		errctx_add(errctx, "%s: second $MAIN\n", __func__);
 		return;
 	}
 
@@ -567,7 +556,7 @@ static RESULT result_construct(VECPTR* sections, ERRCTX* errctx)
 			}
 		}
 		if (!matched) {
-			add_errctx(errctx, "%s: unknown section '%s'\n", __func__, keyword);
+			errctx_add(errctx, "%s: unknown section '%s'\n", __func__, keyword);
 			goto failed;
 		}
 	}
@@ -592,46 +581,46 @@ static file_content read_file(const char* filename, ERRCTX* errctx)
 	char* buffer = 0;
 	var fp = fopen(filename, "rb");
 	if (!fp) {
-		add_errctx(errctx, "%s: fopen \"%s\" failed\n", __func__, filename);
+		errctx_add(errctx, "%s: fopen \"%s\" failed\n", __func__, filename);
 		goto failed;
 	}
 
     if (fseek(fp, 0, SEEK_END) != 0) {
-		add_errctx(errctx, "%s: fseek end failed\n", __func__);
+		errctx_add(errctx, "%s: fseek end failed\n", __func__);
 		goto failed;
 	}
 
-    let filesize = ftell(fp);
+    long filesize = ftell(fp);
 	if (filesize == -1L) {
-		add_errctx(errctx, "%s: ftell failed\n", __func__);
+		errctx_add(errctx, "%s: ftell failed\n", __func__);
 		goto failed;
 	}
     
     if (fseek(fp, 0, SEEK_SET) != 0) {
-		add_errctx(errctx, "%s: fseek begin failed\n", __func__);
+		errctx_add(errctx, "%s: fseek begin failed\n", __func__);
 		goto failed;
 	}
 	
 	buffer = mallocvar(char, filesize + 1);
     if (!buffer) {
-		add_errctx(errctx, "%s: malloc failed\n", __func__);
+		errctx_add(errctx, "%s: malloc failed\n", __func__);
 		goto failed;
 	}
 
     let bytesRead = fread(buffer, 1, filesize, fp);
     if (ferror(fp)) {
-		add_errctx(errctx, "%s: fread failed\n", __func__);
+		errctx_add(errctx, "%s: fread failed\n", __func__);
 		goto failed;
 	}
     buffer[bytesRead] = '\0';
 
     if (bytesRead == 0) {
-		add_errctx(errctx, "%s: file empty\n", __func__);
+		errctx_add(errctx, "%s: file empty\n", __func__);
 		goto failed;
 	}
 
     if (buffer[bytesRead - 1] != '\n') {
-		add_errctx(errctx, "%s: file must end with newline\n", __func__);
+		errctx_add(errctx, "%s: file must end with newline\n", __func__);
 		goto failed;
 	}
 
@@ -660,79 +649,98 @@ static void datainfo_destroy(DATAINFO* datainfo)
 	vector_free(datainfo->elems);
 }
 
+static double checked_atof(const char* str, ERRCTX* errctx)
+{
+	char *end;
+	errno = 0;
+	let val = strtod(str, &end);
+	if (errno != 0 || end == str || *end != '\0') {
+		errctx_add(errctx, "%s: invalid data \"%s\"\n", __func__, str);
+		return 0;
+	}
+	return val;
+}
+
 static DATAINFO datainfo_create(file_content* dataptr, ERRCTX* errctx)
 {
-    DATAINFO ret = { 0 };
-    char* line = dataptr->mutptr;
+	DATAINFO ret = { 0 };
+	char* line = dataptr->mutptr;
+	VECPTR v = { 0 };
 
-    /* sanity check */
-    if (!line || !*line) {
-        add_errctx(errctx, "%s: data file is empty\n", __func__);
-        return ret;
-    }
+	/* sanity check */
+	if (!line || !*line) {
+		errctx_add(errctx, "%s: data file is empty\n", __func__);
+		return ret;
+	}
 
-    /* get first line, terminate it so we can read tokens */
-    char* next_newline = strchr(line, '\n');
-    if (next_newline) 
-        *next_newline = '\0';
+	/* get first line, terminate it so we can read tokens */
+	char* next_newline = strchr(line, '\n');
+	if (next_newline) 
+		*next_newline = '\0';
 
-    /* determine separator based on header line */
-    var sep = GET_DELIM_SEP_WHITESPACE;
-    if (strchr(line, ','))
-        sep = GET_DELIM_SEP_COMMA;
+	/* determine separator based on header line */
+	var sep = GET_DELIM_SEP_WHITESPACE;
+	if (strchr(line, ','))
+		sep = GET_DELIM_SEP_COMMA;
 
-    /* parse the header */
-    strip_firstlast_space(line);
-    let err = get_delim_tokens(line, &ret.header, sep);
-    if (err || ret.header.size == 0) {
-        add_errctx(errctx, "%s: parse error or empty data header\n", __func__);
-        goto failed;
-    }
+	/* parse the header */
+	strip_firstlast_space(line);
+	let err = get_delim_tokens(line, &ret.header, sep);
+	if (err || ret.header.size == 0) {
+		errctx_add(errctx, "%s: parse error or empty data header\n", __func__);
+		goto failed;
+	}
 
-    /* data row loop */
-    int linenum = 1;
-    line = next_newline ? next_newline + 1 : NULL;
+	/* data row loop */
+	int linenum = 1;
+	line = next_newline ? next_newline + 1 : NULL;
 
-    while (line && *line) {
-        linenum++;
-        next_newline = strchr(line, '\n');
-        if (next_newline) 
-            *next_newline = '\0';
+	vector_reserve(v, ret.header.size);
+	while (line && *line) {
+		linenum++;
+		next_newline = strchr(line, '\n');
+		if (next_newline) 
+			*next_newline = '\0';
 
-        /* prepare temporary vector for the row */
-        VECPTR v = { 0 };
-        vector_reserve(v, ret.header.size);
-        
-        strip_firstlast_space(line);
-        get_delim_tokens(line, &v, sep);
+		vector_resize(v, 0);
+		strip_firstlast_space(line);
+		get_delim_tokens(line, &v, sep);
 
-        /* strict size check - fails on blank lines or count mismatch */
-        if (v.size != ret.header.size) {
-            add_errctx(errctx, "%s: data row %i has %i elements, header has %i\n",
-                       __func__, linenum, v.size, ret.header.size);
-            vector_free(v);
-            goto failed;
-        }
-        
-        vector_appendn(ret.elems, v.mutptr, v.size);
-        vector_free(v);
+		/* strict size check - fails on blank lines or count mismatch */
+		if (v.size != ret.header.size) {
+			errctx_add(errctx, "%s: data row %i has %i elements, header has %i\n",
+					   __func__, linenum, v.size, ret.header.size);
+			goto failed;
+		}
 
-        /* advance to start of next line or stop if buffer ends */
-        line = next_newline ? next_newline + 1 : NULL;
-    }
+		/* check for valid values */
+		forvector_val(value, v) {
+			if (!streq(value, ".")) {
+				(void)checked_atof(value, errctx);
+				if (errctx->len) 
+					goto failed;
+			}
+		}
+		
+		vector_appendn(ret.elems, v.mutptr, v.size);
 
-    /* final check - ensure at least one row of data exists */
-    if (linenum < 2) {
-        add_errctx(errctx, "%s: no data rows after header\n", __func__);
-        goto failed;
-    }
+		/* advance to start of next line or stop if buffer ends */
+		line = next_newline ? next_newline + 1 : NULL;
+	}
 
-    return ret;
+	/* final check - ensure at least one row of data exists */
+	if (linenum < 2) {
+		errctx_add(errctx, "%s: no data rows after header\n", __func__);
+		goto failed;
+	}
+	vector_free(v);
+	return ret;
 
 failed:
-    vector_free(ret.header);
-    vector_free(ret.elems);
-    return (DATAINFO) { 0 };
+	vector_free(v);
+	vector_free(ret.header);
+	vector_free(ret.elems);
+	return (DATAINFO) { 0 };
 }
 
 static int checked_atoi(const char* str, ERRCTX* errctx)
@@ -741,7 +749,7 @@ static int checked_atoi(const char* str, ERRCTX* errctx)
 	errno = 0;
 	let val = strtol(str, &end, 10);
 	if (errno != 0 || end == str || *end != '\0') {
-		add_errctx(errctx, "%s: invalid value \"%s\"\n", __func__, str);
+		errctx_add(errctx, "%s: invalid value \"%s\"\n", __func__, str);
 		return 0;
 	}
 	return (int)val;
@@ -777,7 +785,6 @@ static void template_data_array(FILE* fp,
 								ERRCTX* errctx)
 {
 	(void)result;
-	(void)datainfo;
 	(void)errctx;
 	
 	fprintf(fp, "typedef struct RECORD {\n");
@@ -792,9 +799,17 @@ static void template_data_array(FILE* fp,
 	forvector_val(v, *elems) {
 		if (ncols == 0)
 			fprintf(fp, "\t{ ");
-		
-		if (streq(v, "."))
+
+/// An "." as a data entry is replaced by NAN.
+		if (streq(v, ".")) {
 			v = "NAN";
+
+		} else {
+			(void)checked_atof(v, errctx);
+			if (errctx->len)
+				return;
+		}
+
 		fprintf(fp, "%s, ", v);
 		
 		++ncols;
@@ -836,7 +851,7 @@ static void template_imodel_code(FILE* fp,
 
 	/* its an error to have no model code */
 	if (!result->imodel.code || strlen(result->imodel.code) == 0) {
-		add_errctx(errctx, "%s: no $IMODEL code\n", __func__);
+		errctx_add(errctx, "%s: no $IMODEL code\n", __func__);
 		return;
 	}
 
@@ -871,6 +886,7 @@ static void template_diffeqn_code(FILE* fp,
 {
 	(void)errctx;
 	(void)datainfo;
+	
 	write_code(fp, result->diffeqn.code, 
 			   "\t/* no diffeqn code */\n\t(void)_dadt;\n");
 }
@@ -882,6 +898,7 @@ static void template_record_fields_define(FILE* fp,
 {
 	(void)result;
 	(void)errctx;
+	
 	forvector_val(v, datainfo->header) 
 		fprintf(fp, "\tconst double %s = _record->%s; (void)%s;\n", v, v, v);
 }
@@ -893,6 +910,7 @@ static void template_imodel_fields_define(FILE* fp,
 {
 	(void)datainfo;
 	(void)errctx;
+	
 	forvector_val(v, result->imodel.args) 
 		fprintf(fp, "\tconst double %s = _imodel->%s; (void)%s;\n", v, v, v);
 }
@@ -904,6 +922,7 @@ static void template_predparams_fields_declare(FILE* fp,
 {
 	(void)datainfo;
 	(void)errctx;
+	
 	forvector_val(v, result->predict.args) 
 		fprintf(fp, "\tdouble %s;\n", v);
 }
@@ -927,6 +946,7 @@ static void template_predparams_fields_set(FILE* fp,
 {
 	(void)datainfo;
 	(void)errctx;
+	
 	write_args(fp, "_predparams->", &result->predict.args, "");
 }
 
@@ -937,6 +957,7 @@ static void template_record_fields_writeable_define(FILE* fp,
 {
 	(void)result;
 	(void)errctx;
+	
 	write_args(fp, "double ", &datainfo->header, "_record->");
 }
 
@@ -947,6 +968,7 @@ static void template_data_preprocess_code(FILE* fp,
 {
 	(void)errctx;
 	(void)datainfo;
+	
 	write_code(fp, result->data.code, "\t/* no data preprocess code */\n");
 }
 
@@ -957,6 +979,7 @@ static void template_record_fields_writeback(FILE* fp,
 {
 	(void)result;
 	(void)errctx;
+	
 	write_args(fp, "_record->", &datainfo->header, "");
 }
 
@@ -1057,7 +1080,7 @@ static void template_advan_init(FILE* fp,
 		}
 	}
 	if (!methodname) {
-		add_errctx(errctx, "%s: invalid advan \"%s\"\n", __func__, method);
+		errctx_add(errctx, "%s: invalid advan \"%s\"\n", __func__, method);
 		return;
 	}
 
@@ -1065,14 +1088,203 @@ static void template_advan_init(FILE* fp,
 	fprintf(fp, "\t\t%s\n", result->advan.init);
 }
 
+static const char *my_strcasestr(const char *haystack, const char *needle)
+{
+	size_t needle_len = strlen(needle);
+	if (needle_len == 0)
+		return haystack;
+	for (; *haystack; haystack++) {
+		const char *h = haystack;
+		const char *n = needle;
+		while (*n && tolower((unsigned char)*h) == tolower((unsigned char)*n)) {
+			h++;
+			n++;
+		}
+		if (*n == '\0')
+			return haystack;
+	}
+	return NULL;
+}
+
+static bool keyword_present(const char *s, const char *kw)
+{
+    const char *hit = my_strcasestr(s, kw);
+    if (!hit)
+		return false;
+    char after = hit[strlen(kw)];
+    return !isalnum((unsigned char)after) && after != '_';
+}
+
+/**
+ * Parses NONMEM style (val FIXED) or (val, val, val). Returns false on
+ * syntax errors like consecutive commas. Outputs to the provided FILE*.
+ * The input line is modified in place (null terminators are inserted to
+ *  delimit numeric tokens).
+ */
+static void transform_pmx_line(FILE *fp, char *line, ERRCTX* errctx)
+{
+	char *p = line;
+
+	while (*p != '\0') {
+		// 1. Skip leading whitespace to find the start of a group
+		while (isspace((unsigned char)*p))
+			p++;
+		if (*p == '\0')
+			break;
+
+		// 2. Strict Check: If it's not an opening paren, it's an illegal character/comment
+		if (*p != '(') {
+			errctx_add(errctx, "%s: Unexpected character '%c' found outside parentheses\n", __func__, *p);
+			return;
+		}
+
+		// --- Parsing inside the (...) 
+		char *cursor = p + 1;
+		const char *val_starts[3] = {NULL};
+		int val_lens[3] = {0};
+		int found = 0;
+		bool is_fixed = (keyword_present(cursor, "FIXED") || keyword_present(cursor, "FIX"));
+
+		for (int i = 0; i < 3; i++) {
+			while (isspace((unsigned char)*cursor))
+				cursor++;
+			
+			// Check for illegal characters/comments inside the parens
+			if (*cursor != '-' && *cursor != '.' && !isdigit((unsigned char)*cursor) && 
+				*cursor != ',' && *cursor != ')' && !isalpha((unsigned char)*cursor)) {
+				errctx_add(errctx, "%s: Illegal character '%c' inside group\n", __func__, *cursor);
+				return;
+			}
+
+			if (*cursor == ',') {
+				errctx_add(errctx, "%s: consecutive or leading comma detected\n", __func__);
+				return;
+			}
+
+			char *token_start = cursor;
+			char *endptr;
+			errno = 0;
+			(void)strtod(cursor, &endptr);
+			if (cursor == endptr) {
+				errctx_add(errctx, "%s: no digit parsed at \"%s\"\n", __func__, cursor);
+				break;
+			}
+			if (errno == ERANGE) {
+				errctx_add(errctx, "%s: out of double range \"%s\"\n", __func__, cursor);
+				break;
+			}
+
+			val_starts[found] = token_start;
+			val_lens[found] = (int)(endptr - token_start);
+			found++;
+
+			cursor = endptr;
+			while (isspace((unsigned char)*cursor))
+				cursor++;
+			if (*cursor == ',')
+				cursor++;
+			else if (*cursor == ')' || isalpha((unsigned char)*cursor))
+				break;
+		}
+		if (found == 0) {
+			errctx_add(errctx, "%s: no values found\n", __func__);
+			return;
+		}
+
+		// Output logic...
+		if (found > 0) {
+			fprintf(fp, "    {%.*s, %.*s, %.*s, %s },\n",
+					val_lens[0], val_starts[0],
+					(found >= 2) ? val_lens[1] : val_lens[0], (found >= 2) ? val_starts[1] : val_starts[0],
+					(found >= 3) ? val_lens[2] : val_lens[0], (found >= 3) ? val_starts[2] : val_starts[0],
+					is_fixed ? "FIXED" : "ESTIMATE");
+		}
+
+		// 3. Close the group and update p
+		char *close = strchr(cursor, ')');
+		if (!close) {
+			errctx_add(errctx, "%s: Missing closing parenthesis\n", __func__);
+			return;
+		}
+		p = close + 1; // Move p to just after the ')' for the next loop iteration
+	}
+}
+
 static void template_theta_init(FILE* fp, 
 								const RESULT* const result, 
 								const DATAINFO* const datainfo, 
 								ERRCTX* errctx)
 {
-	(void)errctx;
 	(void)datainfo;
-	write_code(fp, result->theta.code, "\t/* no theta init code */\n");
+
+	/* NONMEM style initializer */
+	if (result->theta.nonmem_init) {
+		var codecopy = strdup(result->theta.code);
+		transform_pmx_line(fp, codecopy, errctx);
+		free(codecopy);
+
+		if (errctx->len)
+			return;
+
+	/* C-style initializer */
+	} else {
+		write_code(fp, result->theta.code, "\t/* no theta init code */\n");
+	}
+}
+
+static void _omega_args_to_code(FILE* fp, const int type, const VECPTR* args, ERRCTX* errctx)
+{
+	var ndim = -1;
+	var print_values = true;
+	var type_name = "";
+
+	if (type == OMEGA_DIAG) {
+		type_name = "OMEGA_DIAG";
+		ndim = args->size;
+		
+	} else if (type == OMEGA_BLOCK) {
+		type_name = "OMEGA_BLOCK";
+		/* calculate block dimensions */
+		/* https://www.wolframalpha.com/input?i2d=true&i=solve+k%5C%2844%29+n%3Dk*Divide%5B%5C%2840%29k%2B1%5C%2841%29%2C2%5D */
+		let n = args->size;
+		ndim = (int)floor((sqrt(8 * n + 1) - 1) / 2);
+
+		/* double check that the size is consistant */
+		let nvals = ndim * (ndim + 1) / 2;
+		if (n != nvals) {
+			errctx_add(errctx, "%s: omega block size inconsistant (%i,%i,%i)\n",
+					   __func__, n, ndim, nvals);
+			return;
+		}
+		
+	} else if (type == OMEGA_SAME) {
+		type_name = "OMEGA_SAME";
+		if (args->size != 1) {
+			errctx_add(errctx, "%s: omega same size is not 1 (%i)\n", __func__, args->size);
+			return;
+		}
+		
+		/* extract omega size catching errors */
+		ndim = checked_atoi(args->ptr[0], errctx);
+		if (errctx->len) {
+			errctx_add(errctx, "%s: invalid omega same \"%s\"\n", __func__, args->ptr[0]);
+			return;
+		}
+		print_values = false;
+		
+	} else {
+		errctx_add(errctx, "%s: invalid omega type (%i)\n", __func__, type);
+		return;
+	}
+
+	fprintf(fp, "\t\t{ %s, %i, { ", type_name, ndim);
+	if (print_values) {
+		forvector(j, *args) {
+			let v = args->ptr[j];
+			fprintf(fp, "%s, ", v);
+		}
+	}
+	fprintf(fp, " } },\n");
 }
 
 static void template_omega_init(FILE* fp, 
@@ -1084,58 +1296,16 @@ static void template_omega_init(FILE* fp,
 	
 	forcount(i, result->nomega) {
 		var type = result->omega[i].type;
-		let args = result->omega[i].args;
-		var ndim = -1;
-		var type_name = "";
+		let args = &result->omega[i].args;
+		let code = result->omega[i].code;
+		if (code && strlen(code)) {
+			fprintf(fp, "%s", code);
 
-		var print_values = true;
-		if (type == OMEGA_DIAG) {
-			type_name = "OMEGA_DIAG";
-			ndim = args.size;
-			
-		} else if (type == OMEGA_BLOCK) {
-			type_name = "OMEGA_BLOCK";
-			/* calculate block dimensions */
-			/* https://www.wolframalpha.com/input?i2d=true&i=solve+k%5C%2844%29+n%3Dk*Divide%5B%5C%2840%29k%2B1%5C%2841%29%2C2%5D */
-			let n = args.size;
-			ndim = (int)floor((sqrt(8 * n + 1) - 1) / 2);
-
-			/* double check that the size is consistant */
-			let nvals = ndim * (ndim + 1) / 2;
-			if (n != nvals) {
-				add_errctx(errctx, "%s: omega block size inconsistant (%i,%i,%i)\n",
-						   __func__, n, ndim, nvals);
-				return;
-			}
-			
-		} else if (type == OMEGA_SAME) {
-			type_name = "OMEGA_SAME";
-			if (args.size != 1) {
-				add_errctx(errctx, "%s: omega same size is not 1 (%i)\n", __func__, args.size);
-				return;
-			}
-			
-			/* extract omega size catching errors */
-			ndim = checked_atoi(args.ptr[0], errctx);
-			if (errctx->len) {
-				add_errctx(errctx, "%s: invalid omega same \"%s\"\n", __func__, args.ptr[0]);
-				return;
-			}
-			print_values = false;
-			
 		} else {
-			add_errctx(errctx, "%s: invalid omega type (%i)\n", __func__, type);
-			return;
+			_omega_args_to_code(fp, type, args, errctx);
+			if (errctx->len)
+				return;
 		}
-	
-		fprintf(fp, "\t\t{ %s, %i, { ", type_name, ndim);
-		if (print_values) {
-			forvector(j, args) {
-				let v = args.ptr[j];
-				fprintf(fp, "%s, ", v);
-			}
-		}
-		fprintf(fp, " } },\n");
 	}
 }
 
@@ -1162,6 +1332,12 @@ static void template_main_code(FILE* fp,
 	(void)datainfo;
 	write_code(fp, result->main.code, "\t/* no main code */\n");
 }
+
+#if defined(__MSYS__) || defined(__MINGW32__)
+#ifndef NAME_MAX
+#define NAME_MAX 255
+#endif
+#endif /* defined(__MSYS__) || defined(__MINGW32__) */
 
 static void expand_template(const char* grfilename, 
 							char* template, 
@@ -1206,7 +1382,7 @@ static void expand_template(const char* grfilename,
 	snprintf(c_filename, sizeof(c_filename), "%s.c", grfilename);
 	var fp = fopen(c_filename, "w");
 	if (!fp) {
-		add_errctx(errctx, "%s: could not open \"%s\"\n", __func__, c_filename);
+		errctx_add(errctx, "%s: could not open \"%s\"\n", __func__, c_filename);
 		goto done;
 	}
 	
@@ -1316,7 +1492,7 @@ static void check_names(const RESULT* const result, const DATAINFO* const datain
 		let v1 = allnames.ptr[i - 1];
 		let v2 = allnames.ptr[i];
 		if (strcmp(v1, v2) == 0) {
-			add_errctx(errctx, "%s: name \"%s\" has multiple definitions\n", __func__, v1);
+			errctx_add(errctx, "%s: name \"%s\" has multiple definitions\n", __func__, v1);
 			goto done;
 		}
 	}
@@ -1324,11 +1500,11 @@ static void check_names(const RESULT* const result, const DATAINFO* const datain
 	/* look for invalid names */
 	forvector_val(v, allnames) {
 		if (!is_valid_identifier(v)) {
-			add_errctx(errctx, "%s: invalid name \"%s\"\n", __func__, v);
+			errctx_add(errctx, "%s: invalid name \"%s\"\n", __func__, v);
 			goto done;
 		}
 		if (is_keyword(v)) {
-			add_errctx(errctx, "%s: \"%s\" is a C keyword\n", __func__, v);
+			errctx_add(errctx, "%s: \"%s\" is a C keyword\n", __func__, v);
 			goto done;
 		}
 	}
@@ -1342,7 +1518,7 @@ static void check_names(const RESULT* const result, const DATAINFO* const datain
 			(strcmp(v, "OBJ") == 0) ||
 			(strcmp(v, "INEVAL") == 0) ||
 			(strcmp(v, "NAN") == 0)) {
-			add_errctx(errctx, "%s: name \"%s\" is reserved\n", __func__, v);
+			errctx_add(errctx, "%s: name \"%s\" is reserved\n", __func__, v);
 			goto done;
 		}
 	}
@@ -1639,10 +1815,6 @@ char openpmxtran_template[] =
 "	},\n"
 "};\n"
 "\n"
-"OPENPMX current(void)\n"
-"{\n"
-"	return pmx_copy(&openpmx);\n"
-"}\n"
 "void estimate_config(ESTIMCONFIG* estimconfig)\n"
 "{\n"
 "	pmx_estimate(&openpmx, estimconfig);\n"
@@ -1696,11 +1868,18 @@ char openpmxtran_template[] =
 "	}\n"
 "}\n"
 "\n"
+"extern void server_queue(void);\n"
+"\n"
 "int main(void)\n"
 "{\n"
+"	/* enabling exceptions can sometimes help debugging */\n"
+"	/* feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW); */\n"
+"\n"
 "	/* do any preprocessing defined in the $DATA code */\n"
 "	openpmxtran_data_preprocess();\n"
-"//	feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW);\n"
+"\n"
+"	/* wait in the server queue if necessary */\n"
+"	server_queue();\n"
 "\n"
 "{{MAIN_CODE}}\n"
 "\n"

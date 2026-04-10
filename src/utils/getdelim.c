@@ -16,8 +16,10 @@
  */
 
 #include <stdlib.h>
+#include <ctype.h>
 
 #include "getdelim.h"
+#include "c22.h"
 
 ssize_t openpmx_getdelim(char **lineptr, size_t *n, int delim, FILE *stream)
 {
@@ -32,7 +34,7 @@ ssize_t openpmx_getdelim(char **lineptr, size_t *n, int delim, FILE *stream)
     }
 
     size_t pos = 0;
-    int c;
+    int c = EOF;
     while ((c = fgetc(stream)) != EOF) {
         if (pos + 1 >= *n) {
             size_t new_size = *n * 2;
@@ -52,5 +54,86 @@ ssize_t openpmx_getdelim(char **lineptr, size_t *n, int delim, FILE *stream)
     return pos;
 }
 
+void strip_firstlast_space(char* s)
+{
+	/* remove space at begin */
+	char* begin = s;
+	while (*begin && isspace((unsigned char)*begin))
+		++begin;
+
+	/* remove space at end */
+	size_t len = strlen(begin);
+	while (len > 0 && isspace((unsigned char)begin[len - 1]))
+		--len;
+
+	/* copy over, must allow overlap */
+	memmove(s, begin, len);
+	s[len] = '\0';
+}
+
+static int get_delim_tokens_comma(char* line, VECPTR* namevec)
+{
+    if (line[0] == ',')
+        return 1;
+
+    char *start = line;
+    char *end;
+
+    while ((end = strchr(start, ',')) != NULL) {
+        *end = '\0';
+        strip_firstlast_space(start);
+        if (strlen(start)) {
+            vector_append(*namevec, start);
+        } else
+            return 1;   /* missing token */
+        start = end + 1;
+    }
+
+    /* Handle the last (or only) token after the final comma */
+    strip_firstlast_space(start);
+    if (strlen(start)) {
+        vector_append(*namevec, start);
+    } else
+        return 1;   /* missing token */
+
+    return 0;
+}
+
+static void get_delim_tokens_whitespace(char* line, VECPTR* namevec)
+{
+	char *saveptr;
+	let delim = " \t\r\n";
+	char *token = strtok_r(line, delim, &saveptr); 
+	while (token != NULL) {
+		vector_append(*namevec, token);
+		token = strtok_r(NULL, delim, &saveptr);
+	}
+}
+
+int get_delim_tokens(char* line, VECPTR* namevec, const GET_DELIM_SEP sep)
+{
+	var s = sep;
+	if (sep == GET_DELIM_SEP_ANY) {
+		if (strchr(line, ',')) 
+			s = GET_DELIM_SEP_COMMA;
+		else
+			s = GET_DELIM_SEP_WHITESPACE;
+	}
+	
+	/* comma separated, means a single comma separates */
+	if (s == GET_DELIM_SEP_COMMA) {
+		return get_delim_tokens_comma(line, namevec);
+
+	/* whitespace separated, means multiple whitespace separates */
+	} else if (s == GET_DELIM_SEP_WHITESPACE) {
+		get_delim_tokens_whitespace(line, namevec);
+		
+	/* this should never happen */
+	} else {
+		return 2;
+	}
+		
+	return 0;
+}
 
 

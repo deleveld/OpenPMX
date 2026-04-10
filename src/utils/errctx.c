@@ -22,12 +22,12 @@
 
 static void verrctx(ERRCTX *errctx, const char *format, va_list args)
 {
-	size_t capacity = sizeof(errctx->errmsg);
+	const size_t capacity = sizeof(errctx->errmsg);
 	if (errctx->len >= capacity - 1) 
 		return;
 
-	size_t available = capacity - errctx->len;
-	int written = vsnprintf(&errctx->errmsg[errctx->len], available, format, args);
+	const size_t available = capacity - errctx->len;
+	const int written = vsnprintf(&errctx->errmsg[errctx->len], available, format, args);
 	if (written > 0) {
 		if ((size_t)written >= available) 
 			errctx->len = capacity - 1; 
@@ -36,10 +36,16 @@ static void verrctx(ERRCTX *errctx, const char *format, va_list args)
 	}
 }
 
-void add_errctx(ERRCTX *errctx, const char *format, ...)
+void errctx_add(ERRCTX *errctx, const char *format, ...)
 {
     va_list args;
     va_start(args, format);
     verrctx(errctx, format, args);
     va_end(args);
+}
+
+void errctx_clear(ERRCTX * errctx)
+{
+	errctx->errmsg[0] = '\0';
+	errctx->len = 0;
 }

@@ -21,12 +21,13 @@
 #include <stdio.h>
 
 #include "openpmx.h"
-#include "omegafixed.h"
 #include "utils/errctx.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef typeof(((OPENPMX){0}).result) PMXRESULT;
 
 typedef struct {
 	double lower[OPENPMX_THETA_MAX];
@@ -44,14 +45,20 @@ typedef struct {
 	int nomega;
 
 	double sigma[OPENPMX_SIGMA_MAX];
-	int sigmafixed[OPENPMX_SIGMA_MAX];
+	unsigned char sigmafixed[OPENPMX_SIGMA_MAX];
 	int nsigma;
 
 	/* filled in during estimation iterations */
 	PMXRESULT result;
 } POPMODEL;
 
-POPMODEL popmodel_init(const OPENPMX* const pmx, ERRCTX* errctx);
+typedef typeof(((OPENPMX){0}).theta[0]) THETATYPE;
+typedef typeof(((OPENPMX){0}).omega[0]) OMEGABLOCKSTYPE;
+
+POPMODEL popmodel_init(const THETATYPE* const theta,
+					   const OMEGABLOCKSTYPE* const omegablocks,
+					   const double* sigma,
+					   ERRCTX* errctx);
 
 void extfile_header(FILE * f,
 					const POPMODEL* const popmodel,
