@@ -318,7 +318,6 @@ static bool stabilize_initial_objfn(STAGE2_PARAMS* params)
 		 timestamp,
 		 popmodel->result.neval,
 		 popmodel->result.objfn);
-		 
 	if (!isfinite(popmodel->result.objfn))
 		fatal(params->outstream, "objective function not finite\n");
 	
