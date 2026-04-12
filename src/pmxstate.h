@@ -36,7 +36,7 @@ typedef struct PMXSTATE {
 	gsl_rng* rng;
 } PMXSTATE;
 
-void pmx_popparam_writeback(OPENPMX* const pmx, const POPMODEL* const popmodel);
+void pmx_popmodel_writeback(OPENPMX* const pmx, const POPMODEL* const popmodel);
 
 void pmxstate_ensure(OPENPMX* const pmx);
 

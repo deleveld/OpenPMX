@@ -1317,14 +1317,14 @@ static void _omega_args_to_code(FILE* fp, const int type, const VECPTR* args, ER
 	} else if (type == OMEGA_SAME) {
 		type_name = "OMEGA_SAME";
 		if (args->size != 1) {
-			errctx_add(errctx, "%s: omega same size is not 1 (%i)\n", __func__, args->size);
+			errctx_add(errctx, "%s: omegasame too many arguments (%i)\n", __func__, args->size);
 			return;
 		}
 		
 		/* extract omega size catching errors */
 		ndim = checked_atoi(args->ptr[0], errctx);
 		if (errctx->len) {
-			errctx_add(errctx, "%s: invalid omega same \"%s\"\n", __func__, args->ptr[0]);
+			errctx_add(errctx, "%s: invalid omegasame \"%s\"\n", __func__, args->ptr[0]);
 			return;
 		}
 		print_values = false;
@@ -1609,12 +1609,13 @@ static void write_files(const RESULT* result, ERRCTX* errctx)
 
 int main(int argc, char* argv[])
 {
+	let filename = strrchr("/" __FILE__, '/') + 1;
+
 	if (argc != 2 && argc != 3) {
 		fprintf(stderr, "Usage: %s <controlfile> [datafile]\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
  
-	let filename = strrchr("/" __FILE__, '/') + 1;
 	let grfilename = argv[1];
 	var datafilename = (const char*)0;
 	if (argc == 3 && strlen(argv[2]))

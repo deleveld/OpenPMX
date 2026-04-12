@@ -33,7 +33,7 @@ static PMXSTATE* pmxstate_alloc(const OPENPMX* const pmx)
 	ERRCTX errctx = { 0 };
 	let popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
-		fatal(0, "%s", errctx.errmsg);
+		fatal(0, "%s: %s", __func__, errctx.errmsg);
 
 	var temp = (PMXSTATE) {
 		.advanfuncs = advanfuncs,
@@ -95,7 +95,7 @@ void pmx_cleanup(OPENPMX* pmx)
 	pmx->state = 0;
 }
 
-void pmx_popparam_writeback(OPENPMX* const pmx, const POPMODEL* const popmodel)
+void pmx_popmodel_writeback(OPENPMX* const pmx, const POPMODEL* const popmodel)
 {
 	let theta = popmodel->theta;
 	let ntheta = popmodel->ntheta;

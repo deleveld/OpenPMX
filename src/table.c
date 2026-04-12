@@ -79,6 +79,16 @@ static void table_close(TABLE* const table)
 	free(table->fields);
 }
 
+static bool check_for_whitespace(const char* p)
+{
+	let len = strlen(p);
+	forcount(i, len) {
+		if (isspace(p[i]))
+			return true;
+	}
+	return false;
+}
+
 static TABLE table_open(const IDATA* const idata,
 						const ADVANFUNCS* const advanfuncs,
 						const POPMODEL* const popmodel,
@@ -186,15 +196,26 @@ done_file_open:
 
 /// The table fields are indicated by a string which will be tokenized
 /// with whitespace or comma.
-	VECPTR v = { 0 };
-	let err = get_delim_tokens(ret.fields, &v, GET_DELIM_SEP_ANY);
+	VECPTR tokens = { 0 };
+	let err = get_delim_tokens(ret.fields, &tokens, GET_DELIM_SEP_ANY);
 	if (err) {
 		errctx_add(errctx, "%s: table names tokens failed\n", __func__);
 		table_close(&ret);
 		return (TABLE) { 0 };
 	}
-	vector_appendn(ret.fieldnames, v.ptr, v.size);
-	vector_free(v);
+	
+	/* check for invalid table fields */
+	forvector_val(p, tokens) {
+		if (check_for_whitespace(p)) {
+			errctx_add(errctx, "%s: table field \"%s\" is invalid\n", __func__, p);
+			table_close(&ret);
+			return (TABLE) { 0 };
+		}
+	}
+
+	/* table fields are OK, use them */
+	vector_appendn(ret.fieldnames, tokens.ptr, tokens.size);
+	vector_free(tokens);
 
 	/* write the header out */
 	forvector_val(fieldname, ret.fieldnames) 

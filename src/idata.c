@@ -242,10 +242,8 @@ void idata_set_eta(IDATA* const idata, const double* eta)
 
 static FILE* idata_results_fopen(const char* name, const char* ext, const char* mode)
 {
-	let nchars = strlen(name) + strlen(ext) + 1;
-	char fname[nchars];
-	strcpy(fname, name);
-	strcat(fname, ext);
+	char fname[PATH_MAX];
+	snprintf(fname, sizeof(fname), "%s%s", name, ext);
 	return fopen(fname, mode);
 }
 

@@ -51,12 +51,10 @@ typedef struct {
 	const ADVANFUNCS* const advanfuncs;
 	ENCODE test;
 	const OPTIONS* const options;
-
 	struct {
 		POPMODEL* model;
 		double* eta;
 	} best;
-
 	struct timespec begin;
 	FILE* outstream;
 	FILE* extstream;
@@ -172,14 +170,14 @@ static bool bobyqa_error(const int retcode, const char* phase, FILE* stream)
 		int code;
 		const char* msg;
 	} errors[] = {
-		{ BOBYQA_BAD_NPT,              "NPT is not in the required interval"            },
-		{ BOBYQA_TOO_CLOSE,            "insufficient space between the bounds"          },
-		{ BOBYQA_ROUNDING_ERRORS,      "too much cancellation in a denominator"         },
-		{ BOBYQA_TOO_MANY_EVALUATIONS, "maximum number of function evaluations exceeded"},
-		{ BOBYQA_STEP_FAILED,          "a trust region step has failed to reduce Q"     },
+		{ BOBYQA_BAD_NPT,              "NPT is not in the required interval"             },
+		{ BOBYQA_TOO_CLOSE,            "insufficient space between the bounds"           },
+		{ BOBYQA_ROUNDING_ERRORS,      "too much cancellation in a denominator"          },
+		{ BOBYQA_TOO_MANY_EVALUATIONS, "maximum number of function evaluations exceeded" },
+		{ BOBYQA_STEP_FAILED,          "a trust region step has failed to reduce Q"      },
 	};
 
-	var errmsg = "unknown";
+	const char* errmsg = "unknown";
 	forarray(i, errors) {
 		if (errors[i].code == retcode) {
 			errmsg = errors[i].msg;
@@ -480,7 +478,7 @@ static STAGE2_PARAMS stage2_params_init(const char* filename,
 	};
 	clock_gettime(CLOCK_REALTIME, &params.begin);
 	if (idata->nindivid <= 0)
-		fatal(outstream, "optim cannot estimate, no individuals\n");
+		fatal(outstream, "%s: optim cannot estimate, no individuals\n", __func__);
 
 	/* save the current, but with objfn to invalid and nparam as well */
 	*params.best.model = params.test.popmodel;
@@ -545,7 +543,9 @@ static void estimate_popmodel(const char* filename,
 
 	/* update results to screen and log */
 	let timestamp = get_timestamp(&params);
-	popmodel_information(params.outstream, popmodel, timestamp);
+	popmodel_information(params.outstream,
+						 popmodel,
+						 timestamp);
 
 /// At the end of estimation the phi file is written and a trailer is 
 /// put onto the ext file. Also the yhat file is written with prediction
@@ -586,7 +586,7 @@ void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	ERRCTX errctx = { 0 };
 	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
-		fatal(0, "%s", errctx.errmsg);
+		fatal(0, "%s: %s", __func__, errctx.errmsg);
 
 	estimate_popmodel(pmx->filename,
 					  &pstate->idata,
@@ -594,7 +594,7 @@ void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 					  &popmodel,
 					  &options);
 
-	pmx_popparam_writeback(pmx, &popmodel);
+	pmx_popmodel_writeback(pmx, &popmodel);
 }
 
 /// Evaluation is the same as estimation but with maxeval=0.
@@ -614,7 +614,7 @@ void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 	ERRCTX errctx = { 0 };
 	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
-		fatal(0, "%s", errctx.errmsg);
+		fatal(0, "%s: %s", __func__, errctx.errmsg);
 
 	estimate_popmodel(pmx->filename,
 					  &pstate->idata,
@@ -622,7 +622,7 @@ void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 					  &popmodel,
 					  &options);
 
-	pmx_popparam_writeback(pmx, &popmodel);
+	pmx_popmodel_writeback(pmx, &popmodel);
 }
 
 void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
@@ -642,7 +642,7 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	ERRCTX errctx = { 0 };
 	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
-		fatal(0, "%s", errctx.errmsg);
+		fatal(0, "%s: %s", __func__, errctx.errmsg);
 
 	estimate_popmodel(pmx->filename,
 					  &pstate->idata,
@@ -650,7 +650,7 @@ void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 					  &popmodel,
 					  &options);
 
-	pmx_popparam_writeback(pmx, &popmodel);
+	pmx_popmodel_writeback(pmx, &popmodel);
 }
 
 

@@ -16,6 +16,7 @@
  */
 
 #include <math.h>
+#include <limits.h>
 
 #include "openpmx.h"
 #include "defines.h"
@@ -35,8 +36,6 @@
 /// as `reload()`. This loads the population paramaters, setting their
 /// structure to that in the file.
 
-typedef VECTOR(const char*) TOKENVEC;
-
 typedef struct {
 	enum {
 		COL_IGNORE = 0,
@@ -47,13 +46,13 @@ typedef struct {
 	double value;
 	int fixed;
 	
-	/* for theta */
-    int num;        /* THETA or SIGMA number (1-based) */
+	/* for theta and sigma */
+    int num;        /* 1-based */
 	double theta_upper;
 	double theta_lower;
 
 	/* for omega */
-    int row, col;   /* OMEGA indices (1-based) */
+    int row, col;   /* 1-based */
 	int blocknum;
 } COLINFO;
 
@@ -148,19 +147,6 @@ static COLINFO parse_col_name(const char *name, ERRCTX* errctx)
 	return ci;
 }
 
-/* modifies line and makes a vector of pointers to tokens */
-static void get_delim_token_ptrs(char* line,
-								 TOKENVEC* namevec)
-{
-	char *saveptr;
-	let delim = " \t\r\n";
-	char *token = strtok_r(line, delim, &saveptr); 
-	while (token != NULL) {
-		vector_append(*namevec, token);
-		token = strtok_r(NULL, delim, &saveptr);
-	}
-}
-
 typedef VECTOR(COLINFO) EXTCOLS;
 
 static void parse_extcols_line(char *line,
@@ -170,8 +156,8 @@ static void parse_extcols_line(char *line,
 							   const int linenum)
 {
 	/* read in a line of values */
-	TOKENVEC vals = { 0 };
-	get_delim_token_ptrs(line, &vals);
+	VECPTR vals = { 0 };
+	get_delim_tokens(line, &vals, GET_DELIM_SEP_WHITESPACE);
 
 	/* error if number of values detected didnt match */
 	if (vals.size != extcols->size) {
@@ -218,7 +204,7 @@ static void read_extcols(const char *filename, EXTCOLS* extcols, ERRCTX* errctx)
 {
 	char *line = NULL;
 	char* header_text = 0;
-	TOKENVEC header_elem = { 0 };
+	VECPTR header_elem = { 0 };
 
     FILE *stream = fopen(filename, "r");
     if (!stream) {
@@ -237,7 +223,7 @@ static void read_extcols(const char *filename, EXTCOLS* extcols, ERRCTX* errctx)
 
 	/* read and translate header */
 	header_text = strdup(line);
-	get_delim_token_ptrs(header_text, &header_elem);
+	get_delim_tokens(header_text, &header_elem, GET_DELIM_SEP_WHITESPACE);
 	forvector_val(name, header_elem) {
 		let colinfo = parse_col_name(name, errctx);
 		if (errctx->len) {
@@ -281,7 +267,7 @@ static RELOADPARAM params_init_from_file(const char* filename,
     forcount(i, OPENPMX_OMEGABLOCK_MAX)
 		p.omega[i].type = OMEGA_INVALID;
 
-	/* read in coloumns and exit if error */
+	/* read in colomns and exit if error */
 	EXTCOLS extcols = { 0 };
 	read_extcols(filename, &extcols, errctx);
 	if (errctx->len)
@@ -415,23 +401,18 @@ failed:
 
 static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel)
 {
+	char filename[PATH_MAX];
 	ERRCTX errctx = { 0 };
 
-	const char* filename = args->filename;
-	char* filename_buffer = 0;
-	if (!filename) {
-		if (!dest->filename) {
-			errctx_add(&errctx, "%s: no default ext filename\n", __func__);
-			goto failed;
-		}
-		/* construct the default filename, where we expect the ext file
-		 * would normally be */
-		let len = strlen(dest->filename) + strlen(OPENPMX_EXTFILE);
-		filename_buffer = mallocvar(char, len + 1);
-		strcpy(filename_buffer, dest->filename);
-		strcat(filename_buffer, OPENPMX_EXTFILE);
-		filename = filename_buffer;
-	}
+	if (args->filename) 
+		snprintf(filename, sizeof(filename), "%s", args->filename);
+	else if (dest->filename) 
+		snprintf(filename, sizeof(filename), "%s%s", dest->filename, OPENPMX_EXTFILE);
+	else 
+		errctx_add(&errctx, "%s: could not determine filename\n", __func__);
+	if (errctx.len)
+		goto failed;
+
 	/* read in the source from the ext file */
     var src = params_init_from_file(filename, &errctx);
 	if (errctx.len)
@@ -457,23 +438,19 @@ static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel
 		goto failed;
 
 	if (!args->force) {
-		var ntheta_bad = (s.ntheta != d.ntheta);
-		var nblock_bad = (s.nblock != d.nblock);
-		var nomega_bad = (s.nomega != d.nomega);
-		var nsigma_bad = (s.nsigma != d.nsigma);
-		if (ntheta_bad) {
+		if (s.ntheta != d.ntheta) {
 			errctx_add(&errctx, "%s: theta count mismatch\n", __func__);
 			goto failed;
 		}
-		if (nblock_bad) {
+		if (s.nblock != d.nblock) {
 			errctx_add(&errctx, "%s: omega block count mismatch\n", __func__);
 			goto failed;
 		}
-		if (nomega_bad) {
+		if (s.nomega != d.nomega) {
 			errctx_add(&errctx, "%s: omega count mismatch\n", __func__);
 			goto failed;
 		}
-		if (nsigma_bad) {
+		if (s.nsigma != d.nsigma) {
 			errctx_add(&errctx, "%s: sigma count mismatch\n", __func__);
 			goto failed;
 		}
@@ -501,7 +478,7 @@ static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel
 		forcount(i, s.nomega) {
 			forcount(j, s.nomega) {
 				if (s.omegafixed[i][j] !=  d.omegafixed[i][j]) {
-					errctx_add(&errctx, "%s: omega fixed mismatch \n", __func__);
+					errctx_add(&errctx, "%s: omega fixed mismatch\n", __func__);
 					goto failed;
 				}
 			}
@@ -532,16 +509,17 @@ static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel
 	memcpy(dest->omega, src.omega, s.nblock*sizeof(OMEGABLOCKSTYPE));
 	memcpy(dest->sigma, src.sigma, s.nsigma*sizeof(double));
 	
-	/* overwrite other paramaters */
-	for (int i=s.ntheta; i<OPENPMX_THETA_MAX; i++)
-		memset(&dest->theta[i], 0, sizeof(THETATYPE));
+	/* overwrite other paramaters with invalid values */
+	int i;
+	for (i=s.ntheta; i<OPENPMX_THETA_MAX; i++) 
+		dest->theta[i] = (THETATYPE){ 0 };
 
-	for (int i=s.nsigma; i<OPENPMX_SIGMA_MAX; i++)
-		dest->sigma[i] = 0.;
+	for (i=s.nsigma; i<OPENPMX_SIGMA_MAX; i++) 
+		dest->sigma[i] = NAN;
 
-	for (int i=s.nblock; i<OPENPMX_OMEGABLOCK_MAX; i++)
-		memset(&dest->omega[i], 0, sizeof(OMEGABLOCKSTYPE));
-
+	for (i=s.nblock; i<OPENPMX_OMEGABLOCK_MAX; i++) 
+		dest->omega[i] = (OMEGABLOCKSTYPE){ 0 };
+	
 	/* Test by making a POPMODEL which may catch some errors */
 	*popmodel = popmodel_init(dest->theta, dest->omega, dest->sigma, &errctx);
 	if (errctx.len)
@@ -550,20 +528,12 @@ static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel
 		fprintf(stdout, "popparam reload \"%s\"\n", filename);
 		popmodel_information(0, popmodel, 0);
 	}
-
-	/* cleanup */
-	/* return with success */
-	if (filename_buffer)
-		free(filename_buffer);
 	return 0;
 
 failed:
-	/* failure path */
-	free(filename_buffer);
-
 	if (!args->silent) {
 		if (errctx.len)
-			fprintf(stderr, "%s", errctx.errmsg);
+			fprintf(stderr, "%s: %s", __func__, errctx.errmsg);
 	}
 
 	/* if it failed but it was optional, then dont pass error */
@@ -608,16 +578,16 @@ void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
 			 * const members. */
 			let idata = &state->idata;
 			let advanfuncs = state->advanfuncs;
+			let advanconfig = advanfuncs->advanconfig;
 			idata_destruct(idata);
 			var newidata = idata_construct(&advanfuncs->recordinfo,
 										   popmodel.ntheta,
 										   popmodel.nomega,
 										   popmodel.nsigma,
 										   advanfuncs->nstate,
-										   advanfuncs->advanconfig->imodelfields.size,
-										   advanfuncs->advanconfig->predictfields.size);
+										   advanconfig->imodelfields.size,
+										   advanconfig->predictfields.size);
 			memcpy(idata, &newidata, sizeof(newidata));
 		}
 	}
 }
-

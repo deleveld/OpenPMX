@@ -218,7 +218,6 @@ void scatter_threads(const IDATA* const idata,
 		individs[i] = index_time[i].individ;
 	free(index_time);
 
-
 #if defined(OPENPMX_PARALLEL_PTHREADS)
 	if (!tpool.init) {
 		pthread_mutex_init(&tpool.mutex, NULL);
