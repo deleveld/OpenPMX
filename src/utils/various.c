@@ -26,7 +26,7 @@ double timespec_time_difference(const struct timespec* const begin,
 void timespec_duration(const struct timespec* const begin, double* eval)
 {
 	struct timespec end;
-	clock_gettime(CLOCK_REALTIME, &end);
+	clock_gettime(CLOCK_MONOTONIC, &end);
 
 	const double delta = timespec_time_difference(begin, &end);
 

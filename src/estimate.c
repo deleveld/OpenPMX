@@ -63,7 +63,7 @@ typedef struct {
 static double get_timestamp(const STAGE2_PARAMS* const params)
 {
 	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
+	clock_gettime(CLOCK_MONOTONIC, &now);
 	return timespec_time_difference(&params->begin, &now) / 1000.;
 }
 
@@ -476,7 +476,7 @@ static STAGE2_PARAMS stage2_params_init(const char* filename,
 		.outstream = outstream,
 		.extstream = extstream,
 	};
-	clock_gettime(CLOCK_REALTIME, &params.begin);
+	clock_gettime(CLOCK_MONOTONIC, &params.begin);
 	if (idata->nindivid <= 0)
 		fatal(outstream, "%s: optim cannot estimate, no individuals\n", __func__);
 

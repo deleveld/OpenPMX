@@ -46,6 +46,7 @@ typedef struct {
 	const STAGE1CONFIG* const stage1;
 	const IEVALUATE_ARGS ievaluate_args;
 	double* const eval_msec;
+	const int nobs;
 } STAGE1_PARAMS;
 
 static double stage1_evaluate_individual_iobjfn(const long int nreta,
@@ -64,7 +65,7 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 
 	/* functions for Bae and Yim objective function Term 1 and Term 2 */
 	struct timespec t3;
-	clock_gettime(CLOCK_REALTIME, &t3);
+	clock_gettime(CLOCK_MONOTONIC, &t3);
 	let objfn_term1_term2 = individual_fasteval(ievaluate_args);
 	timespec_duration(&t3, stage1_params->eval_msec);
 	*(stage1_params->ineval) += 1;
@@ -198,7 +199,7 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 	var f_minus_h = mallocvar(double, nrecord);
 	var yhatvar_plus_h = mallocvar(double, nrecord);
 	var yhatvar_minus_h = mallocvar(double, nrecord);
-	var J = gsl_matrix_alloc(nrecord, nreta);
+	var J = gsl_matrix_alloc(params->nobs, nreta);
 	let nomega = popparam->nomega;
 	assert(gradient_step != 0.);
 
@@ -212,7 +213,7 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 		let v = reta[j];
 
 		/* use the omega diagonal for step size */
-		double step = gradient_step;
+		var step = gradient_step;
 		let i = nonzero->rowcol[j];
 		let omega_var = icov[i * nomega + i];
 		if (omega_var != 0.)
@@ -226,7 +227,7 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 		xx[j] = above;
 		unreduce_eta(testeta, xx, nonzero);
 		struct timespec t3;
-		clock_gettime(CLOCK_REALTIME, &t3);
+		clock_gettime(CLOCK_MONOTONIC, &t3);
 		individual_evaluate(ievaluate_args,
 							0,				/* dont save imodel */
 							0,				/* dont save predictvars */
@@ -240,7 +241,7 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 		let below = v - step;
 		xx[j] = below;
 		unreduce_eta(testeta, xx, nonzero);
-		clock_gettime(CLOCK_REALTIME, &t3);
+		clock_gettime(CLOCK_MONOTONIC, &t3);
 		individual_evaluate(ievaluate_args,
 							0,				/* dont save imodel */
 							0,				/* dont save predictvars */
@@ -251,18 +252,17 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 		*(params->ineval) += 1;
 
 		/* calculate derivatives, scaling by yhatvar */
+		var iobs = 0;
 		const RECORD* ptr = record;
 		forcount(k, nrecord) {
-			let evid = RECORDINFO_EVID(recordinfo, ptr);
-			var deriv = 0.;
-			if (evid == 0) {
+			if (RECORDINFO_EVID(recordinfo, ptr) == 0) {
 				let dv = RECORDINFO_DV(recordinfo, ptr);
 				let upper = (f_plus_h[k] - dv) / sqrt(yhatvar_plus_h[k]);
 				let lower = (f_minus_h[k] - dv) / sqrt(yhatvar_minus_h[k]);
-				deriv = (upper - lower) / (above - below);
+				let deriv = (upper - lower) / (above - below);
+				gsl_matrix_set(J, iobs, j, deriv);
+				++iobs;
 			}
-			gsl_matrix_set(J, k, j, deriv);
-
 			ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
 		}
 	}
@@ -384,7 +384,7 @@ static double stage1_icov_resample(const gsl_matrix * const reducedicov,
 		let eivar = gsl_vector_get(eval, i);
 
 		/* weighting via SD */
-		if (0) {
+		if (1) {
 			let eisd1 = sqrt(eivar);						/* distance in positive direction */
 			let eisd2 = sqrt(eivar); 						/* distance in negative direction */
 			let eiwgtsd = (eisd1 * w1 + eisd2 * w2) / 2.;	/* average the weights, i.e, two of them weighted by 0.5 */
@@ -423,7 +423,7 @@ void stage1_thread(INDIVID* const individ,
 	double* icov = individ->icov;
 
 	struct timespec t1;
-	clock_gettime(CLOCK_REALTIME, &t1);
+	clock_gettime(CLOCK_MONOTONIC, &t1);
 
 	/* reset result to nothing */
 	individ->obs_min2ll = 0.;
@@ -455,6 +455,7 @@ void stage1_thread(INDIVID* const individ,
 											  popmodel->sigma,
 											  popmodel->nsigma,
 											  scatteroptions ? scatteroptions->logstream : 0),
+		.nobs = individ->nobs,
 		.eval_msec = &individ->eval_msec,
 	};
 	double reta[OPENPMX_OMEGA_MAX] = { };
@@ -494,7 +495,7 @@ void stage1_thread(INDIVID* const individ,
 	/* TODO: maybe dont fill in the values if we will sample the ICOV later?
 	   but we do need yhatvar for the calculation of the covariance second term */
 	struct timespec t3;
-	clock_gettime(CLOCK_REALTIME, &t3);
+	clock_gettime(CLOCK_MONOTONIC, &t3);
 	double obs_min2ll = 0.;
 	double obs_lndet = 0.;
 	individual_evaluate(&stage1_params.ievaluate_args,

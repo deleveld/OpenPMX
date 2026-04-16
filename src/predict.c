@@ -47,6 +47,10 @@ static void idata_predict_yhat_thread(INDIVID* const individ,
 		etaarray[i] = NAN;
 	memcpy(etaarray, individ->eta, popmodel->nomega * sizeof(double));
 
+	memset(individ->yhatvar, 0, individ->nrecord * sizeof(double));
+
+	struct timespec t3;
+	clock_gettime(CLOCK_MONOTONIC, &t3);
 	let ievaluate_args = ievaluate_args_init(individ->record,
 											 individ->nrecord,
 											 advanfuncs,
@@ -57,11 +61,7 @@ static void idata_predict_yhat_thread(INDIVID* const individ,
 											 popmodel->sigma,
 											 popmodel->nsigma,
 											 scatteroptions ? scatteroptions->logstream : 0);
-	struct timespec t3;
-	clock_gettime(CLOCK_REALTIME, &t3);
-
 	/* reset yhatvar when we write yhat */
-	memset(individ->yhatvar, 0, individ->nrecord * sizeof(double));
 	individual_evaluate(&ievaluate_args,
 						individ->imodel,		/* do write imodel */
 						individ->predictvars,	/* do write predictvars */
@@ -93,6 +93,10 @@ static void idata_predict_pred_thread(INDIVID* const individ,
 	forcount(i, popmodel->nomega)
 		etaarray[i] = 0.;
 
+	memset(individ->pred, 0, individ->nrecord * sizeof(double));
+
+	struct timespec t3;
+	clock_gettime(CLOCK_MONOTONIC, &t3);
 	let ievaluate_args = ievaluate_args_init(individ->record,
 											 individ->nrecord,
 											 advanfuncs,
@@ -103,11 +107,7 @@ static void idata_predict_pred_thread(INDIVID* const individ,
 											 popmodel->sigma,
 											 popmodel->nsigma,
 											 scatteroptions ? scatteroptions->logstream : 0);
-	struct timespec t3;
-	clock_gettime(CLOCK_REALTIME, &t3);
-
 	/* only write pred */
-	memset(individ->pred, 0, individ->nrecord * sizeof(double));
 	individual_evaluate(&ievaluate_args,
 						0,				/* dont write imodel */
 						0,				/* dont write predictvars */

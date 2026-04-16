@@ -134,6 +134,13 @@ POPMODEL popmodel_init(const THETATYPE* const theta,
 		let ndim = omegablocks[i].ndim;
 		let v = omegablocks[i].values;
 		let type = omegablocks[i].type;
+		
+		/* OMEGASAME cannot be first */
+		if (i == 0 && type == OMEGA_SAME) {
+			errctx_add(errctx, "OMEGA SAME cannot be first block\n");
+			goto failed;
+		}
+		
 		var n = 0;
 		if (type == OMEGA_BLOCK) {
 			forcount(r, ndim) {
@@ -247,17 +254,17 @@ void extfile_header(FILE * f,
 	fprintf(f, OPENPMX_SFORMAT, "ITERATION");
 	let ntheta = popmodel->ntheta;
 	forcount(i, ntheta) {
-		sprintf(temp, "THETA%i", i + indexoffset);
+		snprintf(temp, sizeof(temp), "THETA%i", i + indexoffset);
 		fprintf(f, OPENPMX_HEADER_FORMAT, temp);
 	}
 	let nsigma = popmodel->nsigma;
 	forcount(i, nsigma) {
-		sprintf(temp, "SIGMA(%i,%i)", i + indexoffset, i + indexoffset);
+		snprintf(temp, sizeof(temp), "SIGMA(%i,%i)", i + indexoffset, i + indexoffset);
 		fprintf(f, OPENPMX_HEADER_FORMAT, temp);
 	}
 	forcount(i, popmodel->nomega) {
 		forcount(j, i+1) {
-			sprintf(temp, "OMEGA(%i,%i)", i + indexoffset, j + indexoffset);
+			snprintf(temp, sizeof(temp), "OMEGA(%i,%i)", i + indexoffset, j + indexoffset);
 			fprintf(f, OPENPMX_HEADER_FORMAT, temp);
 		}
 	}

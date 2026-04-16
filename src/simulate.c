@@ -50,6 +50,8 @@ static void simulate_with_error_thread(INDIVID* const individ,
 		etacopy[i] = NAN;
 	memcpy(etacopy, individ->eta, nomega * sizeof(double));
 
+	struct timespec t3;
+	clock_gettime(CLOCK_MONOTONIC, &t3);
 	let ievaluate_args = ievaluate_args_init(individ->record,
 											 individ->nrecord,
 											 advanfuncs,
@@ -60,9 +62,6 @@ static void simulate_with_error_thread(INDIVID* const individ,
 											 popmodel->sigma,
 											 popmodel->nsigma,
 											 scatteroptions->logstream);
-
-	struct timespec t3;
-	clock_gettime(CLOCK_REALTIME, &t3);
 	individual_simulate(&ievaluate_args,
 						individ->imodel,
 						individ->predictvars,

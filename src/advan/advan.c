@@ -201,7 +201,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		if (intervalstop > currenttime) {
 
 			/* collect the infusion rates between now and the intervalstop */
-			double totalrates[OPENPMX_STATE_MAX];
+			double totalrates[nstate];
 			memset(totalrates, 0, nstate * sizeof(double));
 			for (int i=0; i<advan->ninfusions; i++) {
 				let v = &advan->infusions[i];

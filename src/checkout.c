@@ -46,7 +46,7 @@ static void idata_checkout_thread(INDIVID* const individ,
 	(void)options;
 
 	struct timespec t3;
-	clock_gettime(CLOCK_REALTIME, &t3);
+	clock_gettime(CLOCK_MONOTONIC, &t3);
 
 	/* checkout is at ETA at 0 */
 	double eta[OPENPMX_OMEGA_MAX];

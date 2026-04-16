@@ -130,7 +130,7 @@ static bool server_flush(void)
 	static struct timespec last_flush;
 
 	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
+	clock_gettime(CLOCK_MONOTONIC, &now);
 	if (!init_flush || timespec_time_difference(&last_flush, &now) > OPENPMX_SERVER_FLUSH_PERIOD_MS) {
 		init_flush = true;
 		last_flush = now;
