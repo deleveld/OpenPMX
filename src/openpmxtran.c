@@ -624,14 +624,14 @@ failed:
 typedef struct {
 	char* mutptr;
 	int size;
-} file_content;
+} FILECONTENT;
 
-static void file_content_destroy(file_content* file)
+static void file_content_destroy(FILECONTENT* file)
 {
 	free(file->mutptr);
 }
 
-static file_content read_file(const char* filename, ERRCTX* errctx)
+static FILECONTENT read_file(const char* filename, ERRCTX* errctx)
 {
 	char* buffer = 0;
 	var fp = fopen(filename, "rb");
@@ -680,7 +680,7 @@ static file_content read_file(const char* filename, ERRCTX* errctx)
 	}
 
 	fclose(fp);
-	return (file_content) {
+	return (FILECONTENT) {
 		.mutptr = buffer,
 		.size = bytesRead,
 	};
@@ -690,7 +690,7 @@ failed:
 		free(buffer);
 	if (fp)
 		fclose(fp);
-	return (file_content) { 0 };
+	return (FILECONTENT) { 0 };
 }
 
 typedef struct {
@@ -716,7 +716,7 @@ static double checked_atof(const char* str, ERRCTX* errctx)
 	return val;
 }
 
-static DATAINFO datainfo_create(file_content* dataptr, ERRCTX* errctx)
+static DATAINFO datainfo_create(FILECONTENT* dataptr, ERRCTX* errctx)
 {
 	DATAINFO ret = { 0 };
 	char* line = dataptr->mutptr;

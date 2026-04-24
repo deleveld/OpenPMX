@@ -380,7 +380,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 
 void pmx_table(OPENPMX* pmx,
 			   const char* fields,
-			   const TABLECONFIG* const tableconfig)
+			   TABLECONFIG* const tableconfig)
 {
 	pmxstate_ensure(pmx);
 

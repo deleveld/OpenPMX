@@ -259,6 +259,7 @@ typedef struct {
 	double step_refine;
 	double step_final;
 	int maxeval;
+	double nsig;
 	double dobjfn;
 
 	bool details;
@@ -278,7 +279,7 @@ typedef struct {
 	bool firstonly;
 } TABLECONFIG;
 
-void pmx_table(OPENPMX* pmx, const char* fields, const TABLECONFIG* const tableconfig);
+void pmx_table(OPENPMX* pmx, const char* fields, TABLECONFIG* const tableconfig);
 
 /*---------------------------------------------------------------------*/
 /* reload */
@@ -290,7 +291,24 @@ typedef struct {
 	const bool silent;
 } RELOADCONFIG;
 
-void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args);
+void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* const args);
+
+/*---------------------------------------------------------------------*/
+/* profile */
+/*---------------------------------------------------------------------*/
+typedef struct {
+	enum {
+		PROFILE_INVALID = 0,
+		PROFILE_THETA,
+		PROFILE_OMEGA,
+		PROFILE_SIGMA,
+	} type;
+	const int index;
+	const double value;
+	ESTIMCONFIG estimconfig;
+} PROFILECONFIG;
+
+OPENPMX pmx_profile_evaluate(const OPENPMX* const source, PROFILECONFIG* const args);
 
 /*---------------------------------------------------------------------*/
 /* utility functions */

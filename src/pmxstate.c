@@ -97,12 +97,12 @@ void pmx_cleanup(OPENPMX* pmx)
 
 void pmx_popmodel_writeback(OPENPMX* const pmx, const POPMODEL* const popmodel)
 {
-	let theta = popmodel->theta;
 	let ntheta = popmodel->ntheta;
-	let thetaestim = popmodel->thetaestim;
 	forcount(i, ntheta) {
-		if (thetaestim[i] == ESTIMATE)
-			pmx->theta[i].value = theta[i];
+		pmx->theta[i].lower = popmodel->lower[i];
+		pmx->theta[i].value = popmodel->theta[i];
+		pmx->theta[i].upper = popmodel->upper[i];
+		pmx->theta[i].type = popmodel->thetaestim[i];
 	}
 
 	let omega = popmodel->omega;
@@ -122,7 +122,7 @@ void pmx_popmodel_writeback(OPENPMX* const pmx, const POPMODEL* const popmodel)
 					double v = omega[offset + i][offset + i];
 					let f = omegafixed[offset + i][offset + i];
 					/* fixed omegas on diagonal are negative */
-					if (f != 0 && v != 0.)
+					if (f != 0)
 						v = -fabs(v);
 					pmx->omega[k].values[i] = v;
 				}
@@ -135,7 +135,7 @@ void pmx_popmodel_writeback(OPENPMX* const pmx, const POPMODEL* const popmodel)
 						double v = omega[offset + i][offset + j];
 						let f = omegafixed[offset + i][offset + j];
 						/* fixed omegas on diagonal are negative */
-						if (f != 0 && v != 0. && i == j)
+						if (f != 0)
 							v = -fabs(v);
 						pmx->omega[k].values[blocki] = v;
 						blocki++;
@@ -160,8 +160,9 @@ void pmx_popmodel_writeback(OPENPMX* const pmx, const POPMODEL* const popmodel)
 	forcount(i, nsigma) {
 		var v = sigma[i];
 		var f = sigmafixed[i];
-		if (f == 0)
-			pmx->sigma[i] = v;
+		if (f != 0)
+			v = -fabs(v);
+		pmx->sigma[i] = v;
 	}
 
 	pmx->result = popmodel->result;

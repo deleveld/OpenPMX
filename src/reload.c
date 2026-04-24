@@ -399,7 +399,7 @@ failed:
     return p;
 }
 
-static int reload_popparam(OPENPMX* dest, RELOADCONFIG* args, POPMODEL* popmodel)
+static int reload_popparam(OPENPMX* dest, const RELOADCONFIG* const args, POPMODEL* popmodel)
 {
 	char filename[PATH_MAX];
 	ERRCTX errctx = { 0 };
@@ -559,7 +559,7 @@ failed:
 /// - `.silent=true,` Setting this supresses a message showing the
 /// structure of the newly loaded population paramaters.
 
-void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* args)
+void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* const args)
 {
 	POPMODEL popmodel;
 	let err = reload_popparam(dest, args, &popmodel);

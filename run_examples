@@ -18,6 +18,7 @@ fi
 (cd examples/schnider; ../../openpmx schnider_eigen.gr)
 (cd examples/schnider; ../../openpmx schnider_eigen_threecomp.gr)
 (cd examples/schnider; ../../openpmx schnider_reload.gr)
+(cd examples/schnider; ../../openpmx schnider_profile.gr)
 
 (cd examples/c; gcc -W -Wall -Wextra -O2 theo_eigen.c     -I../../include -I../../src -lgsl -lgslcblas -lm; ./${BINARY}; rm ${BINARY})
 

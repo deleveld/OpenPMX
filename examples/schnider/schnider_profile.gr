@@ -27,9 +27,16 @@ $THETA
 	{   0.1,   2,   5,  ESTIMATE     },
 	{   0.1,   2,   5,  ESTIMATE     },
 	{   0.1,   1,   5,  ESTIMATE     },
-	{   -.1,   0.01,   .1,  ESTIMATE     },
+	{   -.1,   0,   .1,  ESTIMATE     },
 $OMEGA(0.1, 0.1, 0.1, 0.1, 0., 0.)
 $SIGMA(0.1)
 $MAIN
 	estimate();
-	table("ID TIME DV PRED IPRED");
+	
+	PROFILECONFIG profileconfig = { 
+		.type = PROFILE_THETA,
+		.index = 4,
+		.value = 2.5,
+	};
+	OPENPMX profile = pmx_profile_evaluate(&openpmx, &profileconfig);
+	pmx_cleanup(&profile);

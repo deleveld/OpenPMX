@@ -62,6 +62,8 @@ ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate)
 		ret.step_final = v * 10.;
 	if (ret.maxeval == 0)
 		ret.maxeval = 10000;
+	if (ret.nsig == 0.)
+		ret.nsig = 3.;
 	if (ret.dobjfn == 0.)
 		ret.dobjfn = 1.e-3;
 

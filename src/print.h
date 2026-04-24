@@ -29,7 +29,9 @@ void print_serialize(const bool serial);
 
 void openpmx_printf(FILE* stream1, FILE* stream2, const char* prefix, const char* format, ... );
 
-void fatal(FILE* stream, const char* format, ... );
+void fatal(FILE* stream, const char* format, ... )
+	 __attribute__ ((noreturn));
+	 
 void warning(FILE* stream, const char* format, ... );
 void info(FILE* stream, const char* format, ... );
  

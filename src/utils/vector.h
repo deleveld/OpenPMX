@@ -51,18 +51,18 @@ extern "C" {
 
 #define vector_append(_mxvect, ...)                                    \
 	do {                                                               \
-		__auto_type _mxvectptr = &(_mxvect);                    \
-		__auto_type mx__n = _mxvectptr->size;                            \
+		__auto_type _mxvectptr = &(_mxvect);                           \
+		__auto_type mx__n = _mxvectptr->size;                          \
 		vector_resize(*_mxvectptr, mx__n + 1);                         \
 		_mxvectptr->mutptr[mx__n] = (__VA_ARGS__);                     \
 	} while (0)
 
 #define vector_appendn(_mxvect, _dat, _n)                              \
 	do {                                                               \
-		__auto_type _mxvectptr = &(_mxvect);                    \
-		__auto_type _datptr = (_dat);                                 \
-		__auto_type _datn = (int)(_n);                                   \
-		__auto_type _oldn = _mxvectptr->size;                            \
+		__auto_type _mxvectptr = &(_mxvect);                           \
+		__auto_type _datptr = (_dat);                                  \
+		__auto_type _datn = (int)(_n);                                 \
+		__auto_type _oldn = _mxvectptr->size;                          \
 		vector_resize(*_mxvectptr, _oldn + _datn);                     \
 		memcpy(&_mxvectptr->mutptr[_oldn], _datptr, _datn * sizeof(_mxvectptr->ptr[0])); \
 	} while (0)

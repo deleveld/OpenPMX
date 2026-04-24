@@ -33,10 +33,10 @@ typedef struct {
 	double lower[OPENPMX_THETA_MAX];
 	double theta[OPENPMX_THETA_MAX];
 	double upper[OPENPMX_THETA_MAX];
-	unsigned char thetaestim[OPENPMX_THETA_MAX]; /* openpmx.theta[0].type */
+	unsigned char thetaestim[OPENPMX_THETA_MAX]; 		/* openpmx.theta[0].type */
 	int ntheta;
 
-	unsigned char blocktype[OPENPMX_OMEGABLOCK_MAX]; /* openpmx.omega[0].type */
+	unsigned char blocktype[OPENPMX_OMEGABLOCK_MAX];	/* openpmx.omega[0].type */
 	int blockdim[OPENPMX_OMEGABLOCK_MAX];
 	int nblock;
 
@@ -77,8 +77,7 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 							   const int neval,
 							   const bool details,
 							   FILE* outstream,
-							   FILE* extstream,
-							   const char* suffix);
+							   FILE* extstream);
 
 void popmodel_information(FILE* f2,
 						  const POPMODEL* const popmodel,

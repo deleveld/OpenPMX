@@ -68,7 +68,7 @@ POPMODEL popmodel_init(const THETATYPE* const theta,
 	/* count thetas, omegas, sigmas */
 	forcount(i, OPENPMX_THETA_MAX) {
 		let est = theta[i].type;
-		if (est == THETA_INVALID) 
+		if (est == THETA_INVALID)
 			break;
 		ret.ntheta = i + 1;
 
@@ -446,15 +446,11 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runti
 
 static void info_iteration(FILE* f1,
 						   const double runtime_s,
-						   const POPMODEL* popmodel,
-						   const char* suffix)
+						   const POPMODEL* popmodel)
 {
 	let _objfn = popmodel->result.objfn;
 	let neval = popmodel->result.neval;
-	info(f1, "time %.3f neval %i objfn %.6f", runtime_s, neval, _objfn);
-	if (suffix)
-		info(f1, "%s", suffix);
-	info(f1, "\n");
+	info(f1, "time %.3f neval %i objfn %.6f\n", runtime_s, neval, _objfn);
 }
 
 void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double timestamp)
@@ -516,13 +512,12 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 							   const int ineval,
 							   const bool details,
 							   FILE* outstream,
-							   FILE* extstream,
-							   const char* suffix)
+							   FILE* extstream)
 {
 	if (details)
 		popmodel_information(outstream, popmodel, runtime_s);
 
-	info_iteration(outstream, runtime_s, popmodel, suffix);
+	info_iteration(outstream, runtime_s, popmodel);
 
 	if (extstream) 
 		extfile_append(extstream, popmodel, runtime_s, popmodel->result.neval, ineval);

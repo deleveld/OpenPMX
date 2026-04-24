@@ -22,6 +22,7 @@
 #include <assert.h>
 #include <math.h>
 #include <float.h>
+#include <string.h>
 
 #include "encode.h"
 #include "linalg.h"
@@ -197,11 +198,11 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 	omegainfo_update_inverse_lndet(omegainfo, popmodel->omega);
 
 	/* we write directly into the offset */
-	var x = encode->offset;
+	var offset = encode->offset;
 	encode->has_offsets = true;
 	
 /// Different transformations are possible to address theta bounds but 
-/// the default is to use tanh/atanh. 
+/// the default is to use tanh/atanh.
 	var n = 0;
 	let etheta = popmodel->theta;
 	let ntheta = popmodel->ntheta;
@@ -211,7 +212,7 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 			let l = popmodel->lower[i];
 			let v = etheta[i];
 			let u = popmodel->upper[i];
-			x[n] = theta_transform(v, l, u);
+			offset[n] = theta_transform(v, l, u);
 			++n;
 		}
 	}
@@ -227,7 +228,7 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 #else
 			let s = sigma[i];
 #endif
-			x[n] = log(s);
+			offset[n] = log(s);
 			++n;
 		}
 	}
@@ -284,13 +285,13 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 #else
 						let s = popmodel->omega[r][c];
 #endif
-						x[n] = log(s);
+						encode->offset[n] = log(s);
 					} else {
 						let s = gsl_matrix_get(z, j, i);
 						/* see above webpage close to the text
 						 * "The final stage of the transform reverses the
 						 * hyperbolic tangent transform, which is defined by" */
-						x[n] = atanh(s);
+						offset[n] = atanh(s);
 					}
 					++n;
 				}
