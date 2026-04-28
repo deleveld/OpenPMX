@@ -210,6 +210,7 @@ typedef struct {
 		} type;
 		int nparam;
 		int neval;
+		double nsig;
 	} result;
 
 	/* internal use */
@@ -304,11 +305,15 @@ typedef struct {
 		PROFILE_SIGMA,
 	} type;
 	const int index;
-	const double value;
-	ESTIMCONFIG estimconfig;
+	double value; 	/* input: value, output: final value */
+	double dobjfn;	/* input: targeted profile, output: achieved profile */
+	double dobjfn_tol;
+	int maxeval;	/* input: maximum evaluations, output: achieved iterations */
+	ESTIMCONFIG estimate;
 } PROFILECONFIG;
 
 OPENPMX pmx_profile_evaluate(const OPENPMX* const source, PROFILECONFIG* const args);
+OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args);
 
 /*---------------------------------------------------------------------*/
 /* utility functions */

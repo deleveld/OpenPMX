@@ -465,13 +465,16 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 			assert(0);
 	}
 	if (popmodel->result.type != OBJFN_INVALID && timestamp != -DBL_MAX) {
-		info(f2, "popmodel %s\n", message);
+		info(f2, "result %s\n", message);
 
 		if (timestamp != DBL_MAX)
 			info(f2, "time %.3f ", timestamp);
-		info(f2, "neval %i ", popmodel->result.neval);
-		info(f2, "objfn %.6f ", popmodel->result.objfn);
-		info(f2, "nparam %i\n", popmodel->result.nparam);
+		info(f2, "neval %i", popmodel->result.neval);
+		info(f2, " objfn %.6f", popmodel->result.objfn);
+		if (popmodel->result.nsig != 0.)
+			info(f2, " nsig %.1f", popmodel->result.nsig);
+		info(f2, " nparam %i", popmodel->result.nparam);
+		info(f2, "\n");
 	}
 	
 	/* info about theta */

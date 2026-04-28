@@ -134,6 +134,7 @@ static void encode_evaluate(ENCODE* const test,
 	popmodel->result.objfn = idata_objfn(idata, omegainfo->omega_nonzero_lndet);
 	popmodel->result.type = OBJFN_CURRENT;
 	popmodel->result.neval += 1;
+	popmodel->result.nsig = 0.;
 }
 
 static double focei_stage2_evaluate_population_objfn(const long int _xlength,
@@ -193,23 +194,19 @@ static bool bobyqa_error(const int retcode, const char* phase, FILE* stream)
 
 static double compute_nsig_param(const double old_val, const double new_val)
 {
-    let eps = 1e-12;
-    var scale = fmax(fabs(new_val), fabs(old_val));
-    scale = fmax(scale, eps);
-
+    let scale = fmax(fabs(new_val), fabs(old_val));
     var delta = fabs(new_val - old_val);
     if (delta == 0.)
         return DBL_MAX;
-
     let nsig = -log10(delta / scale);
     return (nsig < 0.0) ? 0.0 : nsig;
 }
 
-static double current_nsig(const POPMODEL* const old_popmodel,
-						   const POPMODEL* const popmodel)
+static double iteration_nsig(const POPMODEL* const old_popmodel,
+							 const POPMODEL* const popmodel)
 {
 	var min_nsig = DBL_MAX;
-
+	
 	let ntheta = popmodel->ntheta;
 	forcount(i, ntheta) {
 		let nsig = compute_nsig_param(old_popmodel->theta[i],
@@ -241,21 +238,21 @@ static double converged_nsig(const POPMODEL* const popmodel, const double rhoend
 	encode_offset(&encoder, popmodel);
 	
 	var nsig = DBL_MAX;
-	forcount(i, encoder.nparam) {
-		double x[encoder.nparam];
-		memset(x, 0, sizeof(x));
+	double x[encoder.nparam];
+	memset(x, 0, sizeof(x));
 
+	forcount(i, encoder.nparam) {
 		x[i] = rhoend;
 		encode_update(&encoder, x);
-		let n1 = current_nsig(popmodel, &encoder.popmodel);
-		if (n1 < nsig)
-			nsig = n1;
+		let n1 = iteration_nsig(popmodel, &encoder.popmodel);
+		nsig = fmin(n1, nsig);
 
 		x[i] = -rhoend;
 		encode_update(&encoder, x);
-		let n2 = current_nsig(popmodel, &encoder.popmodel);
-		if (n2 < nsig)
-			nsig = n2;
+		let n2 = iteration_nsig(popmodel, &encoder.popmodel);
+		nsig = fmin(n2, nsig);
+
+		x[i] = 0.;
 	}
 	return nsig;
 }
@@ -347,16 +344,17 @@ static bool focei(STAGE2_PARAMS* const params)
 
 			/* inform about the progress */
 			char nsig_msg[16] = "(*)";
-			var nsig = current_nsig(&last_best, best);
-			if (nsig != DBL_MAX)
+			let nsig = iteration_nsig(&last_best, best);
+			if (nsig != DBL_MAX) {
 				snprintf(nsig_msg, sizeof(nsig_msg), "%.1f", nsig);
+				best->result.nsig = nsig;
+			}
 			let dobjfn = best->result.objfn - lastobjfn;
 			if (!options->estimate.details && !options->estimate.verbose)
 				printf("\033[F");
-			let timestamp = get_timestamp(params);
 			info(params->outstream,
 				 "time %.3f neval %i objfn %.6f nsig %s dobjfn %.6f\n",
-				 timestamp,
+				 get_timestamp(params),
 				 best->result.neval,
 				 best->result.objfn,
 				 nsig_msg,
@@ -371,15 +369,17 @@ static bool focei(STAGE2_PARAMS* const params)
 			/* check if we have no progress */
 			lastobjfn = best->result.objfn;
 			if (fabs(dobjfn) < fabs(options->estimate.dobjfn)) {
-				info(params->outstream, "optim no progress nsig %.1f dobjfn %.6f\n", nsig, dobjfn);
+				info(params->outstream, "optim stalled nsig %s dobjfn %.6f\n", nsig_msg, dobjfn);
 				break;
 			}
 		}
 	}
 	free(w);
+	
 	if (converged) {
 		let nsig = converged_nsig(best, options->estimate.step_final);
-		info(params->outstream, "optim converged nsig %.1f\n", nsig);
+		best->result.nsig = nsig;
+		info(params->outstream, "optim final nsig %.1f\n", nsig);
 	}
 	
 #endif

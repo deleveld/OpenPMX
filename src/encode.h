@@ -25,6 +25,8 @@
 extern "C" {
 #endif
 
+#define ENCODE_LOWER_TRI_SIZE(n) (((n) * ((n) + 1)) / 2)
+
 typedef struct {
 	POPMODEL popmodel;
 	OMEGAINFO omegainfo;
@@ -33,7 +35,7 @@ typedef struct {
 	 * and lower triangular omega but it is hard to get the right number
 	 * and we statically allocate so its not much of an issue to have
 	 * room for too many elements */
-	double offset[OPENPMX_THETA_MAX + OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX + OPENPMX_SIGMA_MAX];
+	double offset[OPENPMX_THETA_MAX + ENCODE_LOWER_TRI_SIZE(OPENPMX_OMEGA_MAX) + OPENPMX_SIGMA_MAX];
 	bool has_offsets;
 } ENCODE;
 

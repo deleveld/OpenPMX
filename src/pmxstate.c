@@ -76,6 +76,7 @@ static void pmxstate_free(PMXSTATE* pstate)
 OPENPMX pmx_copy(const OPENPMX* const pmx)
 {
 	OPENPMX ret = *pmx;
+	ret.filename = 0;
 	ret.state = 0;
 	return ret;
 }
@@ -89,9 +90,16 @@ void pmx_copy_popparam(OPENPMX* dest, const OPENPMX* const src)
 	dest->result = (PMXRESULT) { 0 };
 }
 
+void pmx_copy_model(OPENPMX* dest, const OPENPMX* const src)
+{
+	pmx_copy_popparam(dest, src);
+	memcpy(&dest->result, &src->result, sizeof(dest->result));
+}
+
 void pmx_cleanup(OPENPMX* pmx)
 {
-	pmxstate_free(pmx->state);
+	if (pmx->state)
+		pmxstate_free(pmx->state);
 	pmx->state = 0;
 }
 

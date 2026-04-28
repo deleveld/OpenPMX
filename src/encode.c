@@ -88,6 +88,7 @@ ENCODE encode_init(const POPMODEL* const popmodel)
 	ret.popmodel.result.type = OBJFN_INVALID;
 	ret.popmodel.result.nparam = n;
 	ret.popmodel.result.neval = 0;
+	ret.popmodel.result.nsig = 0.;
 
 	return ret;
 }
@@ -475,5 +476,6 @@ void encode_update(ENCODE* encode, const double* x)
 	/* invalidate the objfn because we dont know it anymore */
 	popmodel->result.objfn = DBL_MAX;
 	popmodel->result.type = OBJFN_INVALID;
+	popmodel->result.nsig = 0.;
 }
 

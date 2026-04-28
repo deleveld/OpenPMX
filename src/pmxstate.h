@@ -38,6 +38,10 @@ typedef struct PMXSTATE {
 
 void pmx_popmodel_writeback(OPENPMX* const pmx, const POPMODEL* const popmodel);
 
+OPENPMX pmx_copy(const OPENPMX* const pmx);
+void pmx_copy_popparam(OPENPMX* dest, const OPENPMX* const src);
+void pmx_copy_model(OPENPMX* dest, const OPENPMX* const src);
+
 void pmxstate_ensure(OPENPMX* const pmx);
 
 #ifdef __cplusplus
