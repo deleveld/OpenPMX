@@ -33,10 +33,23 @@ $SIGMA(0.1)
 $MAIN
 	estimate();
 	
-	PROFILECONFIG profileconfig = { 
+	PROFILECONFIG p = {
 		.type = PROFILE_THETA,
-		.index = 4,
-		.value = 2.5,
+		.index = 3,
+		.value = 100,
+		.dobjfn = 15.,
+		.name = "V3"
 	};
-	OPENPMX profile = pmx_profile_evaluate(&openpmx, &profileconfig);
-	pmx_cleanup(&profile);
+	profile(&p);
+	double left = p.value;
+
+	p.value = 400.;
+	p.append = true;
+	profile(&p);
+	double right = p.value;
+	
+	p.maxeval = 1;
+	for (p.value=left; p.value<=right; p.value+=(right-left)/10.) 
+		profile(&p);
+	
+	

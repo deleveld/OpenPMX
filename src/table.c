@@ -382,7 +382,7 @@ void pmx_table(OPENPMX* pmx,
 			   const char* fields,
 			   TABLECONFIG* const tableconfig)
 {
-	pmxstate_ensure(pmx);
+	pmx_ensure_state(pmx);
 
 	ERRCTX errctx = { 0 };
 	let popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);

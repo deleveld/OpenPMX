@@ -48,10 +48,6 @@ typedef struct ADVANFUNCS {
 	const ADVANCONFIG* const advanconfig;
 	const RECORDINFO recordinfo;
 	const int nstate;
-
-	/* non-zero for the eigensystem solver. Needed for $IMODEL() to be
-	 * able to define the eigensystem. */
-	double* eigen_sysmat;
 } ADVANFUNCS;
 
 ADVANFUNCS* advanfuncs_alloc(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
@@ -70,6 +66,8 @@ typedef struct {
 	double end;
 } ADVANINFUSION;
 
+typedef struct TCICONTROL TCICONTROL;
+
 typedef struct ADVAN {
 	const ADVANFUNCS* advanfuncs;
 
@@ -85,6 +83,9 @@ typedef struct ADVAN {
 
 	/* only for eigensystem advancer */
 	double* eigen_sysmat_data;
+
+	/* only for TCI dosing controller, freed at destruct */
+	TCICONTROL* tcicontrol;
 } ADVAN;
 
 void advan_base_construct(ADVAN* advanbase, const ADVANFUNCS* advanfuncs);

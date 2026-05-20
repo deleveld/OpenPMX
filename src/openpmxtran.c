@@ -38,6 +38,7 @@
 #include "utils/errctx.c"
 #include "utils/getdelim.c"
 
+#define OPENPMX_FUNCTIONS_MAX	10
 #define OPENPMX_FILE_RECORDS_MAX	10
 
 static int strip_enclosing(char* s, const char terminal_begin, const char terminal_end)
@@ -170,36 +171,36 @@ static void strip_comments_robust(char *s)
     *dst = '\0';
 }
 
-static VECPTR split_sections(char *buf)
+static VECPTR split_blocks(char *buf)
 {
-    VECPTR sections = { 0 };
+    VECPTR blocks = { 0 };
 
     if (buf[0] == '$')
-        vector_append(sections, 0);    // synthetic empty preamble
+        vector_append(blocks, 0);    // synthetic empty preamble
 
-    vector_append(sections, buf);      // preamble text, or first $ section
+    vector_append(blocks, buf);      // preamble text, or first $ block
     for (char *p = buf; *p != '\0'; p++) {
         if (*p == '\n' && *(p + 1) == '$') {
             *p = '\0';
-            vector_append(sections, p + 1);
+            vector_append(blocks, p + 1);
             p++;
         }
     }
-    return sections;
+    return blocks;
 }
 
 typedef struct {
 	char* args;		/* points to things in () at the start  */
 	char* content;	/* points to after ')' */
-} section_content;
+} block_content;
 
-static section_content extract_args_content(char *payload, ERRCTX* errctx)
+static block_content extract_args_content(char *payload, ERRCTX* errctx)
 {
     // '(' must appear as first char in payload
     char *open = payload;
     if (*open != '(') {
 		errctx_add(errctx, "%s: missing '('\n", __func__);
-        return (section_content) { 0 };
+        return (block_content) { 0 };
 	}
 
 	// Walk forward to find the closing ')', error on any nested '('
@@ -208,11 +209,11 @@ static section_content extract_args_content(char *payload, ERRCTX* errctx)
 		close++;
 	if (*close == '(') {
 		errctx_add(errctx, "%s: unexpected nested '('\n", __func__);
-		return (section_content) { 0 };
+		return (block_content) { 0 };
 	}
 	if (*close == '\0') {
 		errctx_add(errctx, "%s: missing ')'\n", __func__);
-		return (section_content) { 0 };
+		return (block_content) { 0 };
 	}
 
     *open  = '\0';      // terminate keyword
@@ -221,7 +222,7 @@ static section_content extract_args_content(char *payload, ERRCTX* errctx)
 	strip_firstlast_space(open + 1);
 	strip_firstlast_space(close + 1);
 
-    return (section_content) {
+    return (block_content) {
 		.args = open + 1,
 		.content = close + 1,
 	};
@@ -265,6 +266,10 @@ typedef struct {
 	} sigma;
 	struct {
 		const char* code;
+	} functions[OPENPMX_FUNCTIONS_MAX];
+	int nfunctions;
+	struct {
+		const char* code;
 	} main;
 	struct {
 		const char* name;
@@ -282,7 +287,7 @@ static void result_destroy(RESULT* result)
 	vector_free(result->sigma.args);
 }
 
-/// Any text preceeding the sections defined by $... is ignored and can
+/// Any text preceeding the blocks defined by $... is ignored and can
 /// be used for a description of the control file.
 static void handle_preamble(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
@@ -291,7 +296,7 @@ static void handle_preamble(RESULT* result, char* payload, ERRCTX* errctx)
 	(void)errctx; /* nothing to fail */
 }
 
-/// The `$DATA(...)`	 section defines the data filename and any code for
+/// The `$DATA(...)`	 block defines the data filename and any code for
 /// manipulation of the data file before analysis.
 static void handle_data(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
@@ -309,7 +314,7 @@ static void handle_data(RESULT* result, char* payload, ERRCTX* errctx)
 	result->data.code = text.content;
 }
 
-/// The `$ADVAN(...)` section defines the advancer type and any options
+/// The `$ADVAN(...)` block defines the advancer type and any options
 /// for the advancer.
 static void handle_advan(RESULT* result, char* payload, ERRCTX* errctx) 
 {
@@ -326,7 +331,7 @@ static void handle_advan(RESULT* result, char* payload, ERRCTX* errctx)
 	result->advan.init = text.content;
 }
 
-/// The `$IMODEL(...)` section defines the model paramaters and the code
+/// The `$IMODEL(...)` block defines the model paramaters and the code
 /// to initialize them.
 static void handle_imodel(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
@@ -347,7 +352,7 @@ static void handle_imodel(RESULT* result, char* payload, ERRCTX* errctx)
 	result->imodel.code = text.content;
 }
 
-/// The `$PREDICT(...)` section defines the prediction paramaters and the
+/// The `$PREDICT(...)` block defines the prediction paramaters and the
 /// code to initialize them. The predition for model fitting is returned
 /// as `Y`.
 static void handle_predict(RESULT* result, char* payload, ERRCTX* errctx) 
@@ -369,7 +374,7 @@ static void handle_predict(RESULT* result, char* payload, ERRCTX* errctx)
 	result->predict.code = text.content;
 }
 
-/// The `$DIFFEQN` section defines the differential equation for the
+/// The `$DIFFEQN` block defines the differential equation for the
 /// advan solvers that require this.
 static void handle_diffeqn(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
@@ -382,7 +387,7 @@ static void handle_diffeqn(RESULT* result, char* payload, ERRCTX* errctx)
 	result->diffeqn.code = payload;
 }
 
-/// The `$THETA` section defines the fixed effects. These can be either
+/// The `$THETA` block defines the fixed effects. These can be either
 /// given as `{ lower, initial, upper, ESTIMATE },` or in NONMEM style
 /// as `(lower, initial, upper)` or as `(value FIXED)`.
 static void handle_theta(RESULT* result, char* payload, ERRCTX* errctx) 
@@ -441,7 +446,7 @@ block_done:
 	result->nomega = n + 1;
 }
 
-/// The `$OMEGA()` section defines a diagonal omega matrix block of random
+/// The `$OMEGA()` block defines a diagonal omega matrix block of random
 /// effects. The values are separated by `,` or whitespace. Negative
 /// variances are treated as fixed. 
 static void handle_omega(RESULT* result, char* payload, ERRCTX* errctx) 
@@ -452,7 +457,7 @@ static void handle_omega(RESULT* result, char* payload, ERRCTX* errctx)
 	_handle_omega_helper(result, payload, OMEGA_DIAG, errctx); 
 }
 
-/// The `$OMEGABLOCK()` section defines a block omega matrix block of
+/// The `$OMEGABLOCK()` block defines a block omega matrix block of
 /// random effects. The values are separated by `,` or whitespace.
 /// Negative variances along the diagonal are treated as fixed. 
 static void handle_omegablock(RESULT* result, char* payload, ERRCTX* errctx) 
@@ -465,7 +470,7 @@ static void handle_omegablock(RESULT* result, char* payload, ERRCTX* errctx)
 	_handle_omega_helper(result, payload, OMEGA_BLOCK, errctx); 
 }
 
-/// The `$OMEGASAME(...)` section defines a block which copies the values
+/// The `$OMEGASAME(...)` block defines a block which copies the values
 /// from lower indicies in the omega matrix. This is used for
 /// inter-occasion variability, i.e. multiple etas with variances and
 /// covariances matching those of lower indicies.
@@ -479,7 +484,7 @@ static void handle_omegasame(RESULT* result, char* payload, ERRCTX* errctx)
 	_handle_omega_helper(result, payload, OMEGA_SAME, errctx); 
 }
 
-/// The `$SIGMA()` section defines a diagonal omega matrix block of
+/// The `$SIGMA()` block defines a diagonal omega matrix block of
 /// residual variability. The values are separated by `,` or whitespace.
 /// Negative variances are treated as fixed. 
 static void handle_sigma(RESULT* result, char* payload, ERRCTX* errctx) 
@@ -510,7 +515,18 @@ static void handle_sigma(RESULT* result, char* payload, ERRCTX* errctx)
 		return;
 	}
 }
-/// The `$MAIN` section defines C code which will run after problem
+/// The `$FUNCTIONS` block defines C code which will run after problem
+/// initialization. 
+static void handle_functions(RESULT* result, char* payload, ERRCTX* errctx) 
+{
+	(void)errctx;
+	
+	strip_firstlast_space(payload);
+	let n = result->nfunctions;
+	result->functions[n].code = payload;
+	++result->nfunctions;
+}
+/// The `$MAIN` block defines C code which will run after problem
 /// initialization. 
 static void handle_main(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
@@ -541,34 +557,34 @@ static void handle_file(RESULT* result, char* payload, ERRCTX* errctx)
 }
 
 // ---------------------------------------------------------------------------
-// Extract the keyword from a section string.
-// A section looks like "$THETA\n   ..." or "$DATA(\"file.csv\")\n..."
+// Extract the keyword from a block string.
+// A block looks like "$THETA\n   ..." or "$DATA(\"file.csv\")\n..."
 // We copy characters up to the first whitespace, '(', or '\0'.
 // ---------------------------------------------------------------------------
-static void section_keyword(const char *section, char *out, int out_size)
+static void block_keyword(const char *block, char *out, int out_size)
 {
     int i = 0;
-    while (i < out_size - 1 && section[i] != '\0'
-                            && section[i] != '('
-                            && section[i] != ' '
-                            && section[i] != '\t'
-                            && section[i] != '\n'
-                            && section[i] != '\r') {
-        out[i] = section[i];
+    while (i < out_size - 1 && block[i] != '\0'
+                            && block[i] != '('
+                            && block[i] != ' '
+                            && block[i] != '\t'
+                            && block[i] != '\n'
+                            && block[i] != '\r') {
+        out[i] = block[i];
         i++;
     }
     out[i] = '\0';
 }
 
-/* fill in RESULT from sections */
-static RESULT result_construct(VECPTR* sections, ERRCTX* errctx)
+/* fill in RESULT from blocks */
+static RESULT result_construct(VECPTR* blocks, ERRCTX* errctx)
 {
 	/* dispatch table */
 	static struct {
 		const char name[16];          
 		void (*handler)(RESULT* result, char* payload, ERRCTX* ctx);
 	} dispatch_table[] = {
-		{ "",             handle_preamble },   // section[0]: text before first $
+		{ "",             handle_preamble },   // block[0]: text before first $
 		{ "$DATA",        handle_data     },
 		{ "$ADVAN",       handle_advan    },
 		{ "$IMODEL",      handle_imodel   },
@@ -579,29 +595,30 @@ static RESULT result_construct(VECPTR* sections, ERRCTX* errctx)
 		{ "$OMEGABLOCK",  handle_omegablock },
 		{ "$OMEGASAME",   handle_omegasame },
 		{ "$SIGMA",       handle_sigma    },
+		{ "$FUNCTIONS",   handle_functions },
 		{ "$MAIN",        handle_main     },
 		{ "$FILE",        handle_file     },
 	};
 
 	RESULT ret = { 0 };
-	forvector(i, *sections) {
-		let section = sections->mutptr[i];
+	forvector(i, *blocks) {
+		let block = blocks->mutptr[i];
 
 		// Section 0 is the preamble — no $ keyword, use the NULL-name handler
 		if (i == 0) {
-			dispatch_table[0].handler(&ret, section, errctx);
+			dispatch_table[0].handler(&ret, block, errctx);
 			continue;
 		}
 
 		char keyword[sizeof(dispatch_table[0].name)];
-		section_keyword(section, keyword, sizeof(keyword));
+		block_keyword(block, keyword, sizeof(keyword));
 
 		// Walk the table (skip index 0, that is the preamble catch-all)
 		int matched = 0;
 		for (int h = 1; h < (int)countof(dispatch_table); h++) {
 			let name = dispatch_table[h].name;
 			if (streq(keyword, name)) {
-				let payload = section + strlen(keyword);
+				let payload = block + strlen(keyword);
 				dispatch_table[h].handler(&ret, payload, errctx);
 				if (errctx->len) 
 					goto failed;
@@ -611,10 +628,25 @@ static RESULT result_construct(VECPTR* sections, ERRCTX* errctx)
 			}
 		}
 		if (!matched) {
-			errctx_add(errctx, "%s: unknown section '%s'\n", __func__, keyword);
+			errctx_add(errctx, "%s: unknown block '%s'\n", __func__, keyword);
 			goto failed;
 		}
 	}
+
+	/* check for required blocks */
+	if (!ret.advan.method) {
+		errctx_add(errctx, "%s: Missing $ADVAN(...) block\n", __func__);
+		goto failed;
+	}
+	if (!ret.imodel.code) {
+		errctx_add(errctx, "%s: Missing $IMODEL(...) block\n", __func__);
+		goto failed;
+	}
+	if (!ret.main.code) {
+		errctx_add(errctx, "%s: Missing $MAIN block\n", __func__);
+		goto failed;
+	}
+
 	return ret;
 
 failed:
@@ -834,22 +866,18 @@ static void template_filename(FILE* fp,
 	fprintf(fp, "\"%s\"\n", result->filename);
 }
 
-static void template_data_array(FILE* fp, 
-								const RESULT* const result, 
-								const DATAINFO* const datainfo, 
-								ERRCTX* errctx)
+static void template_record_array(FILE* fp, 
+								  const RESULT* const result, 
+								  const DATAINFO* const datainfo, 
+								  ERRCTX* errctx)
 {
 	(void)result;
 	(void)errctx;
 	
-	fprintf(fp, "typedef struct RECORD {\n");
-	let header = &datainfo->header;
-	forvector_val(v, *header)
-		fprintf(fp, "\tdouble %s;\n", v);
-	fprintf(fp, "} RECORD;\n");
 	fprintf(fp, "RECORD OPENPMXTRAN_DATA_NAME[] = {\n");
 
 	int ncols = 0;
+	let header = &datainfo->header;
 	let elems = &datainfo->elems;
 	forvector_val(v, *elems) {
 		if (ncols == 0)
@@ -944,6 +972,18 @@ static void template_diffeqn_code(FILE* fp,
 	
 	write_code(fp, result->diffeqn.code, 
 			   "\t/* no diffeqn code */\n\t(void)_dadt;\n");
+}
+
+static void template_record_fields_declare(FILE* fp, 
+										  const RESULT* const result, 
+										  const DATAINFO* const datainfo, 
+										  ERRCTX* errctx)
+{
+	(void)result;
+	(void)errctx;
+	
+	forvector_val(v, datainfo->header) 
+		fprintf(fp, "\tdouble %s;\n", v);
 }
 
 static void template_record_fields_define(FILE* fp, 
@@ -1095,53 +1135,15 @@ static void template_advan_init(FILE* fp,
 {
 	(void)datainfo;
 
-/// Within the `$ADVAN(...)` section an advancer must be indicated.
-
-	static const struct {
-		const char* method;
-		const char* funcname;
-	} advan_table[] = {
-		/// + `pred` calls `pmx_advan_pred()` a simple predictor
-		{ "pred",                 "pmx_advan_pred"                 },
-		/// + `onecomp` calls `pmx_advan_onecomp()` a one-compartment model.
-		{ "onecomp",              "pmx_advan_onecomp"              },
-		/// + `onecomp_depot` calls `pmx_advan_onecomp_depot()` a one-compartment model with a depot compartment.
-		{ "onecomp_depot",        "pmx_advan_onecomp_depot"        },
-		/// + `twocomp` calls `pmx_advan_twocomp()` a two-compartment mammilary model.
-		{ "twocomp",              "pmx_advan_twocomp"              },
-		/// + `threecomp` calls `pmx_advan_threecomp()` a three-compartment mammilary model.
-		{ "threecomp",            "pmx_advan_threecomp"            },
-		{ "diffeqn_test",         "pmx_advan_diffeqn_test"         },
-		/// + `diffeqn_libgsl` calls `pmx_advan_diffeqn_libgsl()` a ODE solver from LibGSL.
-		{ "diffeqn_libgsl",       "pmx_advan_diffeqn_libgsl"       },
-		/// + `eigen` calls `pmx_advan_eigen()` a linear eigensystem solver. In the $IMODEL() function
-		/// the eigensystem matrix must be specified by SYSMAT().
-		{ "eigen",                "pmx_advan_eigen"                },
-		/// + `eigen_threecomp` calls `pmx_advan_eigen_threecomp()` a linear eigensystem solver specialized
-		/// to a three compartment model. The eigensystem matrix does not have to be set, it is set automatically.
-		{ "eigen_threecomp",      "pmx_advan_eigen_threecomp"      },
-		/// + `eigen_twocomp` calls `pmx_advan_eigen_twocomp()` a linear eigensystem solver specialized
-		/// to a two compartment model. The eigensystem matrix does not have to be set, it is set automatically.
-		{ "eigen_twocomp",        "pmx_advan_eigen_twocomp"        },
-		/// + `eigen_onecomp_absorb` calls `pmx_advan_eigen_onecomp_absorb()` a linear eigensystem solver specialized
-		/// to a one compartment model with absorbtion. The eigensystem matrix does not have to be set, it is set automatically.
-		{ "eigen_onecomp_absorb", "pmx_advan_eigen_onecomp_absorb" },
-	};
+/// Within the `$ADVAN(...)` block an advancer must be indicated.
 
 	let method = result->advan.method;
-	const char* methodname = NULL;
-	for (int i = 0; i < (int)countof(advan_table); i++) {
-		if (streq(method, advan_table[i].method)) {
-			methodname = advan_table[i].funcname;
-			break;
-		}
-	}
-	if (!methodname) {
+	if (!method) {
 		errctx_add(errctx, "%s: invalid advan \"%s\"\n", __func__, method);
 		return;
 	}
 
-	fprintf(fp, "\t\t.method = %s,\n", methodname);
+	fprintf(fp, "\t\t.method = pmx_advan_%s,\n", method);
 	fprintf(fp, "\t\t%s\n", result->advan.init);
 }
 
@@ -1380,6 +1382,18 @@ static void template_sigma_init(FILE* fp,
 	fprintf(fp, "\n");
 }
 
+static void template_functions_code(FILE* fp, 
+									const RESULT* const result, 
+									const DATAINFO* const datainfo, 
+									ERRCTX* errctx)
+{
+	(void)errctx;
+	(void)datainfo;
+
+	forcount(i, result->nfunctions)
+		write_code(fp, result->functions[i].code, "\t/* no function code */\n");
+}
+
 static void template_main_code(FILE* fp, 
 							   const RESULT* const result, 
 							   const DATAINFO* const datainfo, 
@@ -1410,13 +1424,14 @@ static void expand_template(const char* grfilename,
 						ERRCTX* errctx);
 	} dispatch_table[] = {
 		{ "{{DEFAULT_FILENAME}}",				template_filename },
-		{ "{{DATA_ARRAY}}",						template_data_array },
+		{ "{{RECORD_FIELDS_DECLARE}}",			template_record_fields_declare },
+		{ "{{RECORD_FIELDS_DEFINE}}",			template_record_fields_define },
+		{ "{{RECORD_ARRAY}}",					template_record_array },
 		{ "{{IMODEL_FIELDS_DECLARE}}",			template_imodel_fields_declare },
 		{ "{{IMODEL_FIELDS_DECLARE_AND_SET}}",	template_imodel_fields_declare_set },
 		{ "{{IMODEL_CODE}}",					template_imodel_code },
 		{ "{{IMODEL_FIELDS_SET}}",				template_imodel_fields_set },
 		{ "{{IMODEL_DIFFEQN_CODE}}",			template_diffeqn_code },
-		{ "{{RECORD_FIELDS_DEFINE}}",			template_record_fields_define },
 		{ "{{IMODEL_FIELDS_DEFINE}}",			template_imodel_fields_define },
 		{ "{{PREDPARAMS_FIELDS_DECLARE}}", 		template_predparams_fields_declare },
 		{ "{{PREDICT_CODE}}", 					template_predict_code },
@@ -1431,6 +1446,7 @@ static void expand_template(const char* grfilename,
 		{ "{{THETA_INIT}}", 					template_theta_init },
 		{ "{{OMEGA_INIT}}", 					template_omega_init },
 		{ "{{SIGMA_INIT}}", 					template_sigma_init },
+		{ "{{FUNCTIONS}}", 						template_functions_code },
 		{ "{{MAIN_CODE}}", 						template_main_code },
 	};
 
@@ -1451,7 +1467,7 @@ static void expand_template(const char* grfilename,
 		
 		/* match a template line */
 		char keyword[sizeof(dispatch_table[0].name)];
-		section_keyword(line, keyword, sizeof(keyword));
+		block_keyword(line, keyword, sizeof(keyword));
 
 		/* look for a handler for the template line, call it */
 		int matched = 0;
@@ -1630,11 +1646,11 @@ int main(int argc, char* argv[])
 	}
 	strip_comments_robust(controltext.mutptr);
 
-	/* split into sections with $... */
-	var sections = split_sections(controltext.mutptr);
+	/* split into blocks with $... */
+	var blocks = split_blocks(controltext.mutptr);
 	
-	/* handle each section, write into result */
-	var result = result_construct(&sections, &errctx);
+	/* handle each block, write into result */
+	var result = result_construct(&blocks, &errctx);
 	if (errctx.len) {
 		fprintf(stderr, "%s: %s", filename, errctx.errmsg);
 		exit(EXIT_FAILURE);
@@ -1693,7 +1709,7 @@ int main(int argc, char* argv[])
 	result_destroy(&result);
 	file_content_destroy(&datatext);
 	file_content_destroy(&controltext);
-	vector_free(sections);
+	vector_free(blocks);
 	exit(EXIT_SUCCESS);
 }
 
@@ -1724,14 +1740,22 @@ char openpmxtran_template[] =
 "//#include <fenv.h>\n"
 "#include \"openpmx.h\"\n"
 "\n"
-"#define OPENPMXTRAN_DEFAULT_FILENAME \\\n"
-"{{DEFAULT_FILENAME}}\n"
+"typedef struct RECORD {\n"
+"{{RECORD_FIELDS_DECLARE}}\n"
+"} RECORD;\n"
 "\n"
-"{{DATA_ARRAY}}\n"
+"typedef struct PREDICTVARS {\n"
+"{{PREDPARAMS_FIELDS_DECLARE}}\n"
+"} PREDICTVARS;\n"
 "\n"
 "typedef struct IMODEL {\n"
 "{{IMODEL_FIELDS_DECLARE}}\n"
 "} IMODEL;\n"
+"\n"
+"#define OPENPMXTRAN_DEFAULT_FILENAME \\\n"
+"{{DEFAULT_FILENAME}}\n"
+"\n"
+"{{RECORD_ARRAY}}\n"
 "\n"
 "static void imodel_init(IMODEL* const _imodel,\n"
 "						 ADVANSTATE* const _advanstate)\n"
@@ -1755,6 +1779,9 @@ char openpmxtran_template[] =
 "#define INITTIME(t) 	pmx_advan_inittime(_advanstate, (t))\n"
 "#define A_0(i,v) 		pmx_advan_state_init(_advanstate, (i)-1, (v))\n"
 "#define SYSMAT(...)	pmx_advan_eigen_sysmat(_advanstate, (double[]){ __VA_ARGS__ })\n"
+"#define TCISTARTED()	pmx_advan_tci_started(_advanstate)\n"
+"#define TCIINIT(...)	pmx_advan_tci_init(_advanstate, &(TCICONFIG){ __VA_ARGS__ })\n"
+"#define TCITARGET(v)	pmx_advan_tci_target(_advanstate, (v))\n"
 "\n"
 "{{IMODEL_CODE}}\n"
 "\n"
@@ -1767,14 +1794,13 @@ char openpmxtran_template[] =
 "#undef INITTIME\n"
 "#undef A_0\n"
 "#undef SYSMAT\n"
+"#undef TCISTARTED\n"
+"#undef TCIINIT\n"
+"#undef TCITARGET\n"
 "\n"
 "	/* set IMODEL fields */\n"
 "{{IMODEL_FIELDS_SET}}\n"
 "}\n"
-"\n"
-"typedef struct PREDICTVARS {\n"
-"{{PREDPARAMS_FIELDS_DECLARE}}\n"
-"} PREDICTVARS;\n"
 "\n"
 "static void imodel_diffeqn(double _dadt[],\n"
 "						   const IMODEL* const _imodel,\n"
@@ -1902,29 +1928,10 @@ char openpmxtran_template[] =
 "	},\n"
 "};\n"
 "\n"
-"void estimate_config(ESTIMCONFIG* estimconfig)\n"
-"{\n"
-"	pmx_estimate(&openpmx, estimconfig);\n"
-"}\n"
 "#define estimate(...) pmx_estimate(&openpmx, &(ESTIMCONFIG){ __VA_ARGS__ })\n"
-"\n"
-"void fastestimate_config(ESTIMCONFIG* estimconfig)\n"
-"{\n"
-"	pmx_fastestimate(&openpmx, estimconfig);\n"
-"}\n"
-"#define fastestimate(...) pmx_fastestimate(&openpmx, &(ESTIMCONFIG){ __VA_ARGS__ })\n"
-"\n"
-"void evaluate_config(STAGE1CONFIG* stage1config)\n"
-"{\n"
-"	pmx_evaluate(&openpmx, stage1config);\n"
-"}\n"
 "#define evaluate(...) pmx_evaluate(&openpmx, &(STAGE1CONFIG){ __VA_ARGS__ })\n"
-"\n"
-"void simulate_config(const SIMCONFIG* simconfig)\n"
-"{\n"
-"	pmx_simulate(&openpmx, simconfig);\n"
-"}\n"
 "#define simulate(...) pmx_simulate(&openpmx, &(SIMCONFIG){ __VA_ARGS__ })\n"
+"#define profile(...) pmx_profile(&openpmx, __VA_ARGS__ )\n"
 "\n"
 "void predict(void)\n"
 "{\n"
@@ -1937,13 +1944,14 @@ char openpmxtran_template[] =
 "}\n"
 "\n"
 "#define table(f, ...)	pmx_table(&openpmx, (f), &(TABLECONFIG){ __VA_ARGS__ })\n"
-"\n"
 "#define reload(...) pmx_reload_popparam(&openpmx, &(RELOADCONFIG){ __VA_ARGS__ })\n"
 "\n"
-"#define set_theta(i, ...) pmx_set_theta(&openpmx, (i), &(typeof(((OPENPMX){0}).theta[0])){ __VA_ARGS__ })\n"
-"\n"
-"static void openpmxtran_data_preprocess(void)\n"
+"extern void server_queue(void);\n"
+"static void openpmx_startup(void)\n"
 "{\n"
+"	/* enabling exceptions can sometimes help debugging */\n"
+"	/* feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW); */\n"
+"\n"
 "	RECORD* data = openpmx.data.writeable;\n"
 "	if (!data)\n"
 "		return;\n"
@@ -1953,24 +1961,25 @@ char openpmxtran_template[] =
 "		openpmxtran_data_preprocess_callback(&r);\n"
 "		data[i] = r;\n"
 "	}\n"
-"}\n"
-"\n"
-"extern void server_queue(void);\n"
-"\n"
-"int main(void)\n"
-"{\n"
-"	/* enabling exceptions can sometimes help debugging */\n"
-"	/* feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW); */\n"
-"\n"
-"	/* do any preprocessing defined in the $DATA code */\n"
-"	openpmxtran_data_preprocess();\n"
 "\n"
 "	/* wait in the server queue if necessary */\n"
 "	server_queue();\n"
+"}\n"
+"static void openpmx_shutdown(void)\n"
+"{\n"
+"	pmx_release_state(&openpmx);\n"
+"}\n"
+"\n"
+"{{FUNCTIONS}}\n"
+"\n"
+"int main(void)\n"
+"{\n"
+"\n"
+"	openpmx_startup();\n"
 "\n"
 "{{MAIN_CODE}}\n"
 "\n"
-"	pmx_cleanup(&openpmx);\n"
+"	openpmx_shutdown();\n"
 "	return EXIT_SUCCESS;\n"
 "}\n";
 

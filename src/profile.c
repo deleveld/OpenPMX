@@ -36,9 +36,9 @@
 /// This file implements a function that allows likelihood profiling.
 /// It is available in openpmxtran as `profile()`.
 
-static POPMODEL pmx_profile_initial_popmodel(const OPENPMX* const source,
-											 PROFILECONFIG* const args,
-											 ERRCTX* errctx)
+static POPMODEL profile_popmodel_init(const OPENPMX* const source,
+									  PROFILECONFIG* const args,
+									  ERRCTX* errctx)
 {
 	/* first, basic error checking */
 	if (args->type == PROFILE_INVALID) 
@@ -58,34 +58,39 @@ static POPMODEL pmx_profile_initial_popmodel(const OPENPMX* const source,
 	var index = args->index - (source->data._offset1 ? 1 : 0);
 	switch (args->type) {
 		case PROFILE_THETA:
-			if (index < 0 || index >= popmodel.ntheta)
+			if (index < 0 || index >= popmodel.ntheta) {
 				errctx_add(errctx, "%s: profile theta index (%i) out of bounds", __func__, args->index);
+				goto failed;
+			}
 			break;
 
 		case PROFILE_OMEGA:
-			if (index < 0 || index >= popmodel.nomega)
+			if (index < 0 || index >= popmodel.nomega) {
 				errctx_add(errctx, "%s: profile omega index (%i) out of bounds", __func__, args->index);
-			if (popmodel.omegafixed[index][index] == OMEGAFIXED_SAME)
+				goto failed;
+			}
+			if (popmodel.omegafixed[index][index] == OMEGAFIXED_SAME) {
 				errctx_add(errctx, "%s: cannot profile part of omega same block\n", __func__);
+				goto failed;
+			}
 			break;
 
 		case PROFILE_SIGMA:
-			if (index < 0 || index >= popmodel.nsigma)
+			if (index < 0 || index >= popmodel.nsigma) {
 				errctx_add(errctx, "%s: profile sigma index (%i) out of bounds", __func__, args->index);
+				goto failed;
+			}
 			break;
 
 		default:
 			errctx_add(errctx, "%s: profile type (%i) invalid", __func__, args->type);
+			goto failed;
 	}
 	return popmodel;
 
 failed:
 	return (POPMODEL) { 0 };
 }
-
-static const char profile_theta[] = "theta";
-static const char profile_omega[] = "omega";
-static const char profile_sigma[] = "sigma";
 
 static double popmodel_left_value(const POPMODEL* const popmodel,
 								 const PROFILECONFIG* const args,
@@ -137,16 +142,16 @@ static const char* profile_type(const PROFILECONFIG* const args)
 {
 	switch (args->type) {
 		case PROFILE_THETA:
-			return profile_theta;
+			return "theta";
 
 		case PROFILE_OMEGA:
-			return profile_omega;
+			return "omega";
 
 		case PROFILE_SIGMA:
-			return profile_sigma;
+			return "sigma";
 
 		default:
-			return 0;
+			return "unknown";
 	}
 }
 
@@ -154,15 +159,16 @@ static void pmx_profile_evaluate_helper(OPENPMX* const ret,
 										POPMODEL* const popmodel,
 										const OPENPMX* const source,
 										PROFILECONFIG* const args,
-										const char* direction)
+										const char* name)
 {
 	/* modify the popmodel */
 	popmodel_apply_args(popmodel, args, source->data._offset1);
+	memset(&popmodel->result, 0, sizeof(popmodel->result));
 
 	/* reset pmx object and start it from the best point so far */
-	pmx_cleanup(ret);
-	pmx_popmodel_writeback(ret, popmodel);
-	pmxstate_ensure(ret);
+	pmx_release_state(ret);
+	pmx_copy_popmodel(ret, popmodel);
+	pmx_ensure_state(ret);
 	if (source->state) {
 		assert(ret->state->idata.nindivid == source->state->idata.nindivid);
 		assert(ret->state->idata.nomega == source->state->idata.nomega);
@@ -173,77 +179,92 @@ static void pmx_profile_evaluate_helper(OPENPMX* const ret,
 	char filename[PATH_MAX] = "";
 	if (source->filename) {
 		let type = profile_type(args);
-		snprintf(filename, sizeof(filename), "%s.profile.%s.%i.%s", source->filename, type, args->index, direction);
+		snprintf(filename, sizeof(filename), "%s.profile.%s.%i.%s", source->filename, type, args->index, name);
 		ret->filename = filename;
 	}
 
-	/* do the estimation */
+	/* do the estimation, with the given filename */
 	pmx_estimate(ret, &args->estimate);
 	ret->filename = 0; /* dont let filename dangle */
-
-	/* pass results back by modifying config */
-	args->dobjfn = ret->result.objfn - source->result.objfn;
 }
 
-OPENPMX pmx_profile_evaluate(const OPENPMX* const source, PROFILECONFIG* const args)
+static void get_iter_filename(char* filename, const size_t size, const OPENPMX* const source, const PROFILECONFIG* const args, const char* name)
 {
-	ERRCTX errctx = { 0 };
+	let type = profile_type(args);
+	snprintf(filename, size, "%s.profile.%s.%i.%s.iter", source->filename, type, args->index, name);
+}
 
-	var popmodel = pmx_profile_initial_popmodel(source, args, &errctx); 
-	if (errctx.len) {
-		warning(0, "%s: %s", __func__, errctx.errmsg);
-		return (OPENPMX) { 0 };
-	}
-
-	let left_value = popmodel_left_value(&popmodel, args, source->data._offset1);
-	var direction = "right";
-	if (args->value < left_value)
-		direction = "left";
-
-	var ret = pmx_copy(source);
-	pmx_profile_evaluate_helper(&ret, &popmodel, source, args, direction);
-	return ret;
+static void write_iter_header(FILE* stream)
+{
+	fprintf(stream, OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_SFORMAT "\n",
+				"type", "index", "value", "objfn", "target", "neval");
 }
 
 typedef struct {
 	const double left;
 	const double right;
-	const double dobjfn_target;
 	const double objfn_target;
 	const OPENPMX* const source;
 	PROFILECONFIG* args;
-	const char* direction;
+	const char* name;
 	POPMODEL* popmodel;
 	OPENPMX* ret;
 	int neval;
 	bool converged;
 	FILE* stream;
+	bool final_proposal;
+	bool test_only;
 } PROFILEPARAMS;
 
 static double root_function(double x, void *_params)
 {
 	var params = (PROFILEPARAMS*)_params;
-	let args = params->args;
 
-	if (x == 0.) 
-		return -params->dobjfn_target;
+	/* get the final proposal without evaluation, so we have a proposed
+	 * final estimate which makes more sense as an estimate of the
+	 * profile crossing point */
+	if (params->final_proposal)
+		return 0;
 	
+	let args = params->args;
+	let type = profile_type(args);
+	let target = params->objfn_target;
+
 	/* construct the new value to test */
 	/* sqrt(x) make the root finding more linear and efficient and because
-	 * x-range is [0 1] then there is no issue with domain */
+	 * x-range is [0, 1] then there is no issue with domain */
 	let delta = params->right - params->left;
 	let new_value = params->left + sqrt(x)*delta;
 	args->value = new_value;
 
+	double objfn; 
+	if (x == 0.) {
+		objfn = params->source->result.objfn;
+		goto done;
+	}
+
 	/* test it and return error */
 	var ret = params->ret;
-	pmx_profile_evaluate_helper(ret, params->popmodel, params->source, args, params->direction);
+	pmx_profile_evaluate_helper(ret, params->popmodel, params->source, args, params->name);
+	objfn = ret->result.objfn;
 	params->neval += 1;
-
-	let err = ret->result.objfn - params->objfn_target;
-	info(params->stream, "profile value %f objfn %.6f error %.6f\n",
-						 new_value, ret->result.objfn, err);
+	
+done:
+	if (x != 0. || !params->test_only) {
+		if (!params->test_only)
+			printf("profile test %s %i %s value %g objfn %.6f target %.6f neval %i\n", 
+				   type, args->index, params->name, args->value, objfn, params->objfn_target, params->neval);
+		if (params->stream) {
+			fprintf(params->stream, OPENPMX_SFORMAT OPENPMX_IFORMAT OPENPMX_FFORMAT 
+									OPENPMX_FFORMAT OPENPMX_FFORMAT OPENPMX_IFORMAT "\n",
+									type, args->index, args->value, 
+									objfn, 
+									!params->test_only ? params->objfn_target : 0., 
+									params->neval);
+		}
+	}
    
+	let err = objfn - target;
 	if (fabs(err) < args->dobjfn_tol) 
 		params->converged = true;
 
@@ -253,57 +274,82 @@ static double root_function(double x, void *_params)
 OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 {
 	ERRCTX errctx = { 0 };
+	
+/// If .maxeval=1 and .append=true then we go into "test only" mode which 
+/// only adds a point to the profile. Then the other fields are ignored.
+	let test_only = (args->maxeval == 1 && args->append);
 
-	var popmodel = pmx_profile_initial_popmodel(source, args, &errctx); 
-	if (errctx.len) {
-		warning(0, "%s: %s", __func__, errctx.errmsg);
-		return (OPENPMX) { 0 };
-	}
+	if (args->dobjfn_tol < 0.)
+		fatal(0, "%s: dobjfn_tol (%f) cannot be < 0.\n", __func__, args->dobjfn_tol);
+	if (args->maxeval < 0) 
+		fatal(0, "%s: maxeval (%i) cannot be < 0.\n", __func__, args->maxeval);
+
+	var popmodel = profile_popmodel_init(source, args, &errctx); 
+	if (errctx.len) 
+		fatal(0, "%s: %s", __func__, errctx.errmsg);
 
 	let left_value = popmodel_left_value(&popmodel, args, source->data._offset1);
-	var direction = "right";
-	if (args->value < left_value)
-		direction = "left";
-
+	let right_value = args->value;
+	var name = args->name;
+	if (!name) {
+		name = "right";
+		if (right_value < left_value)
+			name = "left";
+	}
+	
 	var ret = pmx_copy(source);
 
 	FILE* stream = 0;
 	char filename[PATH_MAX] = "";
 	let type = profile_type(args);
 	if (source->filename) {
-		snprintf(filename, sizeof(filename), "%s.profile.%s.%i.%s.iter", source->filename, type, args->index, direction);
+		get_iter_filename(filename, sizeof(filename), source, args, name);
 		ret.filename = filename;
 
-		stream = fopen(filename, "w");
+		/* now open it to add stuff */
+		/* try to open to see if it already exists */
+		stream = fopen(filename, args->append ? "a" : "w");
 		if (!stream)
 			fatal(0, "%s: failed to open \"%s\"\n", __func__, filename);
 			
-		fprintf(stream, "OpenPMX %i.%i.%i hash %s\n", OPENPMX_VERSION_MAJOR, OPENPMX_VERSION_MINOR, OPENPMX_VERSION_RELEASE, OPENPMX_GITHASH);
+		if (!args->append || ftell(stream) == 0)
+			write_iter_header(stream);
 	}
 
-	/* default tolerance is 0.01 objfn units */
-	let default_alpha = 0.01;
-	let default_df = 1.;
-	if (args->dobjfn <= 0.)
-		args->dobjfn = gsl_cdf_chisq_Pinv(1.0 - default_alpha, default_df);
+/// If .dobjfn is 0. then it will be set to the chi-squared distribution 
+/// for alpha 0.01 and 1 degree of freedom. This is approximately 6.63.
+#define DEFAULT_ALPHA	0.01
+#define DEFAULT_DF		1
+	if (args->dobjfn == 0.)
+		args->dobjfn = gsl_cdf_chisq_Pinv(1.0 - DEFAULT_ALPHA, DEFAULT_DF);
+/// The default tolerance is 1 objfn units. This is usually enough that a
+/// smoothed line through the profile points is close to the confidence
+/// limits.
 	if (args->dobjfn_tol <= 0.)
-		args->dobjfn_tol = 0.1;
-	if (args->maxeval <= 0)
+		args->dobjfn_tol = 1.;
+
+/// The default number of root finding evaluations is 10.
+	if (args->maxeval == 0)
 		args->maxeval = 10;
 
+	/* neval start at one because gsl_root_fsolver_set() will call twice
+	 * to bracket the interval. The left side we already take from the 
+	 * source so we dont have to reevaluate it, then the right side will
+	 * be called */
 	var params = (PROFILEPARAMS) {
 		.left = left_value,
-		.right = args->value,
-		.dobjfn_target = args->dobjfn,
+		.right = right_value,
 		.objfn_target = source->result.objfn + args->dobjfn,
 		.source = source,
 		.args = args,
-		.direction = direction,
+		.name = name,
 		.popmodel = &popmodel,
 		.ret = &ret,
 		.converged = false,
 		.stream = stream,
-		.neval = 0,
+		.neval = 0,	
+		.final_proposal = false,
+		.test_only = test_only,
 	};
 	var F = (gsl_function) {
 		.function = root_function,
@@ -312,42 +358,90 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 
 	let vlower = fmin(left_value, args->value);
 	let vupper = fmax(left_value, args->value);
-	info(stream, "profile start %s %i lower %g upper %g\nprofile target %.6f dobjfn %.6f tol %g\n", type, args->index, vlower, vupper, params.objfn_target, args->dobjfn, args->dobjfn_tol);
+	if (!test_only) {
+		printf("profile start %s %i lower %g upper %g\n"
+			   "profile objfn %.6f target %.6f dobjfn %.6f tol %g\n", 
+			   type, args->index, vlower, vupper, 
+			   source->result.objfn, params.objfn_target, args->dobjfn, args->dobjfn_tol);
+	} else {
+		printf("profile test %s %i %s value %g\n", 
+			   type, args->index, name, args->value);
+	}
 
 	/* bracket in normalised [0, 1] space. The root_function maps back
 	 * to [left, right] */
 	var s = gsl_root_fsolver_alloc(gsl_root_fsolver_brent);
 	if (!s)
-		fatal(0, "%s: root solver alloc failed\n", __func__);
+		fatal(0, "%s: profile root solver alloc failed\n", __func__);
 
+	let oldhandler = gsl_set_error_handler_off();
 	int status = gsl_root_fsolver_set(s, &F, 0., 1.);
-	if (status != GSL_SUCCESS)
-		fatal(0, "%s: root solver bracket invalid (%s)", __func__,
-			  gsl_strerror(status));
+	if (status != GSL_SUCCESS && !test_only) 
+		fatal(0, "%s: profile root solver set error %i(%s)\n", __func__, status, gsl_strerror(status));
 
-	do {
+	/* if we are "test only" then we dont need to iterate the root finder
+	 * since the gsl_root_fsolver_set() will have called the bounds and 
+	 * thus tested the intended point. */
+	if (test_only) {
+		printf("profile test complete\n");
+		goto cleanup;
+	}
+
+	/* iterate the root finder */
+	while (1) {
+		if (params.neval >= args->maxeval) {
+			printf("profile maxeval (%i) reached\n", args->maxeval);
+			break;
+		}
 		status = gsl_root_fsolver_iterate(s);
 		if (status != GSL_SUCCESS && status != GSL_CONTINUE) {
-			info(stream, "profile root status no continue (%s)\n", gsl_strerror(status));
+			printf("profile root status no continue (%s)\n", gsl_strerror(status));
 			break;
 		}
-		if (params.neval >= args->maxeval) {
-			info(stream, "profile maxeval (%i) reached\n", args->maxeval);
+		if (params.converged)
 			break;
-		}
-	} while (!params.converged);
+	} 
+
+	/* final estimate, but untested into the output file so the users
+	 * gets the interpolated best guess so far. This can only be done
+	 * by calling gsl_root_fsolver_iterate() which must call the
+	 * root_function(). So we add a flag for this special case and we
+	 * can avoid doing a real evaluation */
+	if (status == GSL_SUCCESS || status == GSL_CONTINUE) {
+		params.final_proposal = true;
+		gsl_root_fsolver_iterate(s);
+	}
+
+/// If doing profile calculations (not test only) then the .value is 
+/// changed to the current best guess as to the point that the profile
+/// likelihood crosses the .dobjfn threshold.
+	/* reset pmx object and point it to the best guess so far. The
+	 * object is emptied so not calling pmx_release_state() is OK. */
+	let x = gsl_root_fsolver_root(s);
+	let delta = params.right - params.left;
+	let new_value = params.left + sqrt(x)*delta;
+	args->value = new_value;
 
 	if (params.converged)
-		info(stream, "profile converged dobjfn %.6f neval %i\n", args->dobjfn, params.neval);
+		printf("profile converged value %g\n", args->value);
 	else
-		info(stream, "profile failed dobjfn %.6f neval %i\n", args->dobjfn, params.neval);
+		printf("profile failed value %g\n", args->value);
+
+	if (stream)
+		fprintf(stream, OPENPMX_SFORMAT OPENPMX_IFORMAT OPENPMX_FFORMAT 
+						OPENPMX_FFORMAT OPENPMX_FFORMAT OPENPMX_IFORMAT "\n",
+						type, args->index, args->value, 
+						0., params.objfn_target, 0);
 
 	/* cleanup */
-	gsl_root_fsolver_free(s);
-
+cleanup:
+	gsl_set_error_handler(oldhandler);
 	ret.filename = 0; /* dont let filename dangle */
+	pmx_release_state(&ret);
+
+	gsl_root_fsolver_free(s);
 	if (stream)
 		fclose(stream);
-
+		
 	return ret;
 }

@@ -141,7 +141,7 @@ void idata_predict_pred(const IDATA* const idata,
 
 void pmx_predict(OPENPMX* pmx)
 {
-	pmxstate_ensure(pmx);
+	pmx_ensure_state(pmx);
 	var pstate = pmx->state;
 
 	var options = options_init(pmx);
@@ -158,7 +158,7 @@ void pmx_predict(OPENPMX* pmx)
 
 void pmx_predict_pred(OPENPMX* pmx)
 {
-	pmxstate_ensure(pmx);
+	pmx_ensure_state(pmx);
 	var pstate = pmx->state;
 
 	var options = options_init(pmx);

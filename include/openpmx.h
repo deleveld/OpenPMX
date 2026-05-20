@@ -37,7 +37,7 @@ extern "C" {
 
 #define OPENPMX_VERSION_MAJOR			0
 #define OPENPMX_VERSION_MINOR			1
-#define OPENPMX_VERSION_RELEASE			4
+#define OPENPMX_VERSION_RELEASE			5
 
 #define OPENPMX_THETA_MAX				64
 #define OPENPMX_OMEGABLOCKSIZE_MAX		64
@@ -121,13 +121,10 @@ typedef struct ADVANCONFIG {
 					  const PREDICTSTATE* const predictstate,
 					  const double* const err,
 					  PREDICTVARS* predparams);
-	const int firstonly;
-	const int predictall;
 
 	const STRUCTINFO imodelfields;
 	const STRUCTINFO predictfields;
 	ADVANFUNCS* (*method)(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
-	const int nstate;
 	
 	/* differential equation callback */
 	void (*diffeqn)(double DADT[],
@@ -137,7 +134,11 @@ typedef struct ADVANCONFIG {
 					const POPPARAM* const popparam,
 					const double T);
 
-	/* extra arguments */
+	/* usually set by user in control file */
+	const int firstonly;
+	const int predictall;
+	const int nstate;
+
 	union {
 		/* for diffeqn solvers */
 		struct {
@@ -160,11 +161,36 @@ ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANC
 ADVANFUNCS* pmx_advan_eigen(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_eigen_threecomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_eigen_twocomp(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
-ADVANFUNCS* pmx_advan_eigen_onecomp_absorb(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
+ADVANFUNCS* pmx_advan_eigen_onecomp_depot(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
+ADVANFUNCS* pmx_advan_eigen_twocomp_depot(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 
 /* differential equation advan methods */
 ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
 ADVANFUNCS* pmx_advan_diffeqn_test(const DATACONFIG* const dataconfig, const ADVANCONFIG* const advanconfig);
+
+/*---------------------------------------------------------------------*/
+/* TCI dose controller */
+/*---------------------------------------------------------------------*/
+typedef struct TCIMODEL {
+	const double k10, k12, k13, k21, k31, ke0;	/* in minutes */
+	const double vc;
+} TCIMODEL;
+
+TCIMODEL pmx_advan_tci_eleveld_propofol(const double AGE,
+										const double WGT,
+										const double HGT,
+										const bool female,
+										const bool opiates);
+
+typedef struct TCICONFIG {
+	const TCIMODEL model;
+	const bool target_effect;
+	const int cmt;
+} TCICONFIG;
+
+bool pmx_advan_tci_started(const ADVANSTATE* advanstate);
+void pmx_advan_tci_init(const ADVANSTATE* advanstate, const TCICONFIG* const tciconfig);
+double pmx_advan_tci_target(const ADVANSTATE* advanstate, const double target);
 
 /*---------------------------------------------------------------------*/
 /* OPENPMX */
@@ -217,7 +243,7 @@ typedef struct {
 	struct PMXSTATE* state;
 } OPENPMX;
 
-void pmx_cleanup(OPENPMX* openpmx);
+void pmx_release_state(OPENPMX* openpmx);
 
 /*---------------------------------------------------------------------*/
 /* prediction */
@@ -258,7 +284,6 @@ typedef struct {
 
 	double step_initial;
 	double step_refine;
-	double step_final;
 	int maxeval;
 	double nsig;
 	double dobjfn;
@@ -268,7 +293,6 @@ typedef struct {
 } ESTIMCONFIG;
 
 void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimconfig);
-void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimconfig);
 
 /*---------------------------------------------------------------------*/
 /* tables */
@@ -287,9 +311,9 @@ void pmx_table(OPENPMX* pmx, const char* fields, TABLECONFIG* const tableconfig)
 /*---------------------------------------------------------------------*/
 typedef struct {
 	const char* filename;
-	const bool force;
-	const bool optional;
-	const bool silent;
+	bool force;
+	bool optional;
+	bool silent;
 } RELOADCONFIG;
 
 void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* const args);
@@ -298,30 +322,24 @@ void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* const args);
 /* profile */
 /*---------------------------------------------------------------------*/
 typedef struct {
+	const char* name;
+	bool append;
 	enum {
 		PROFILE_INVALID = 0,
 		PROFILE_THETA,
 		PROFILE_OMEGA,
 		PROFILE_SIGMA,
 	} type;
-	const int index;
-	double value; 	/* input: value, output: final value */
-	double dobjfn;	/* input: targeted profile, output: achieved profile */
+	int index;
+	double value; 		/* input: bracketing value, output: final value */
+	double dobjfn;		/* input: targeted profile */
 	double dobjfn_tol;
-	int maxeval;	/* input: maximum evaluations, output: achieved iterations */
+	int maxeval;		/* input: maximum evaluations */
 	ESTIMCONFIG estimate;
 } PROFILECONFIG;
 
-OPENPMX pmx_profile_evaluate(const OPENPMX* const source, PROFILECONFIG* const args);
 OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args);
 
-/*---------------------------------------------------------------------*/
-/* utility functions */
-/*---------------------------------------------------------------------*/
-void pmx_set_theta(OPENPMX* dest, 
-				   const int index,
-				   typeof(((OPENPMX){0}).theta[0])* theta);
-				   
 /*---------------------------------------------------------------------*/
 
 #ifdef __cplusplus

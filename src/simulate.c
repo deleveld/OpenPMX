@@ -206,7 +206,7 @@ static void idata_predict_dv(IDATA* const idata,
 
 void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig)
 {
-	pmxstate_ensure(pmx);
+	pmx_ensure_state(pmx);
 	var pstate = pmx->state;
 
 	ERRCTX errctx = { 0 };

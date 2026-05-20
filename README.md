@@ -97,6 +97,7 @@ The PK-PD analysis example is:
 
 # Contributors
 - Your name (yourname@email.com) Very important thing elegantly coded.
+- Erik Olofsen () contributed documentation for the control file.
 - Jona Joachim (jona@joachim.cc) Contributed the eigensystem advancer `$ADVAN(eigen)`
 	which uses eigendecomposition to obtain exact, analytical solutions for any linear
 	compartmental model. It can replace both the analytical ADVANs and
@@ -125,5 +126,6 @@ The PK-PD analysis example is:
 # Philosophy
 - Do one thing and do it well.
 - Fewer dependencies are better.
+- Default settings should work well. 
 - Reproducibility is good.
 

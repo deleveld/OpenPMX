@@ -186,10 +186,12 @@ SOURCEFILES="pmxstate.c options.c ievaluate.c predict.c stage1.c
 			 linalg.c print.c idata.c table.c scatter.c estimate.c
 			 simulate.c reload.c server_queue.c profile.c
 			 dataconfig/dataconfig.c
-			 advan/advan.c advan/pred.c advan/onecomp.c
-			 advan/onecomp_depot.c advan/twocomp.c advan/threecomp.c
+			 advan/advan.c advan/pred.c
+			 advan/onecomp.c advan/onecomp_depot.c
+			 advan/twocomp.c advan/threecomp.c
 			 advan/diffeqn_test.c advan/diffeqn_libgsl.c
-			 advan/eigen.c
+			 advan/eigen.c advan/tci.c
+			 advan/tci/eleveld_propofol.c
 			 utils/vector.c utils/various.c
 			 utils/getdelim.c utils/errctx.c
 			 bobyqa/bobyqa.c"

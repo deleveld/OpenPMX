@@ -53,13 +53,10 @@ ESTIMCONFIG estimconfig_default(const ESTIMCONFIG* const estimate)
 
 	ret.stage1 = stage1config_default(&ret.stage1);
 
-	let v = pow(DBL_EPSILON, 1./3.);
 	if (ret.step_initial == 0.)
 		ret.step_initial = 0.2;
 	if (ret.step_refine == 0.)
 		ret.step_refine = 0.05;
-	if (ret.step_final == 0.)
-		ret.step_final = v * 10.;
 	if (ret.maxeval == 0)
 		ret.maxeval = 10000;
 	if (ret.nsig == 0.)

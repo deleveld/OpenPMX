@@ -465,7 +465,7 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 			assert(0);
 	}
 	if (popmodel->result.type != OBJFN_INVALID && timestamp != -DBL_MAX) {
-		info(f2, "result %s\n", message);
+		info(f2, "popmodel %s\n", message);
 
 		if (timestamp != DBL_MAX)
 			info(f2, "time %.3f ", timestamp);

@@ -12,9 +12,9 @@ covfile <- paste0(filename, ".covariates")
 yhatfile <- paste0(filename, ".yhat")
 pdffile <- paste0(filename, ".pdf")
 
-cat(sprintf("writing \"%s\"\n", pdffile))
-
 # read in files
+
+cat(sprintf("writing \"%s\"\n", pdffile))
 
 config <- NA
 if (file.exists(configfile)) {
@@ -106,6 +106,16 @@ if (file.exists(yhatfile)) {
 		cat(sprintf("bind data and yhat\n"))
 		yhatdata <- cbind(data, yhatdata)
 	}
+}
+
+profiles <- NA
+profilelist <- list.files(pattern=paste0(filename, ".profile.*.iter"))
+for (profile in profilelist) {
+	data <- read.table(profile, header=TRUE, na.strings = "")
+	if (is.data.frame(profiles))
+		profiles <- rbind(profiles, data)
+	else 
+		profiles <- data
 }
 
 pdf(pdffile)
@@ -239,6 +249,8 @@ if (is.data.frame(cov) && is.data.frame(phi)) {
 		n_plots <- 0
 		par(mfrow=c(2,2), cex=0.9)
 
+		cat(sprintf("plot cov %s\n", cname))
+
 		for (ename in names(phi)) {
 			x <- cov[[cname]]
 			y <- phi[[ename]]
@@ -281,10 +293,8 @@ if (is.data.frame(yhatdata)) {
 	cat(sprintf("plot yhatdata\n"))
 	pnames <- names(yhatdata)
 	
-	# do we have a dvid
-	if ("DVID" %in% pnames)
-		preddvid <- yhatdata[["DVID"]]
-	else if ("DVTY" %in% pnames)
+	# do we have a DVTY
+	if ("DVTY" %in% pnames)
 		preddvid <- yhatdata[["DVTY"]]
 	else 
 		preddvid <- rep(1, nrow(yhatdata))
@@ -304,7 +314,8 @@ if (is.data.frame(yhatdata)) {
 
 			logy <- ""
 			logxy <- ""
-			if (get_config_setting("DVID", dname, "scale", "") == "log") {
+			log_scale <- ifelse(get_config_setting("DVTY", dname, "scale", "") == "log", TRUE, FALSE)
+			if (log_scale) {
 				logy <- "y"
 				logxy <- "xy"
 			}
@@ -316,11 +327,17 @@ if (is.data.frame(yhatdata)) {
 				id <- yhatdata[valid, "ID"]
 				dv <- as.numeric(yhatdata[valid, "DV"])
 				yhat <- as.numeric(yhatdata[valid, "YHAT"])
-
+				if (log_scale) {
+					dv <- exp(dv)
+					yhat <- exp(yhat)
+				}
 				lim <- range(c(dv, yhat))
 
 				if ("PRED" %in% pnames) {
 					ppred <- yhatdata[valid, "PRED"]
+					if (log_scale) {
+						ppred <- exp(ppred)
+					}
 
 					x <- ppred
 					y <- dv
@@ -361,6 +378,9 @@ if (is.data.frame(yhatdata)) {
 
 					if ("PRED" %in% pnames) {
 						ppred <- yhatdata[valid, "PRED"]
+						if (log_scale) {
+							ppred <- exp(ppred)
+						}
 						
 						x <- time
 						y1 <- dv
@@ -384,7 +404,7 @@ if (is.data.frame(yhatdata)) {
 					grid()
 				}
 				if (n_plots == 0) {
-					t <- get_config_setting("DVID", dname, "name", NA);
+					t <- get_config_setting("DVTY", dname, "name", NA);
 					if (!is.na(t))
 						title(t, outer=TRUE, line=-1)
 					else
@@ -395,6 +415,57 @@ if (is.data.frame(yhatdata)) {
 					n_plots <- 0
 			}
 		}
+	}
+}
+
+# yhat vs. yhat var for each dvtype
+if (is.data.frame(profiles)) {
+
+	par(mfrow=c(2,2), cex=0.9)
+	
+	p <- profiles
+	p$profilegroup <- paste0(p[["type"]], p[["index"]])
+	groups <- unique(p$profilegroup)
+
+	for (i in groups) {
+		cat(sprintf("plot profile %s\n", i))
+		
+		idata <- p[p$profilegroup == i, ]
+		idata <- idata[idata$objfn != 0., ]
+		final <- idata[idata$neval == 0, ]
+
+		ox <- order(idata$value)
+		idata <- idata[ox, ]
+		
+		minobjfn <- min(idata$objfn)
+		x0 <- idata[idata$objfn - minobjfn < 20., ]
+		xlim <- range(x0$value)
+
+		type <- unique(idata[["type"]])
+		idx <- unique(idata[["index"]])
+		plotname <- paste0(type, "(", idx, ")")
+
+		x <- idata[["value"]]
+		y <- idata[["objfn"]]
+		plot(x=x, y=y, type="n", xlab=plotname, ylab="Objfn", xlim=xlim, ylim=c(min(y), min(y)+20))
+
+		xl <- seq(from=min(x), to=max(x), length.out=100)
+#		sfunc <- splinefun(x=x, y=y, 
+#						   method="natural",
+#						   ties=mean)
+#		lines(x=xl, y=sfunc(xl), col = "blue")
+
+		sobj <- loess(y ~ x, span=0.7)
+		pred <- predict(sobj, data.frame(x=xl), se=TRUE)
+		upper <- pred$fit + 1.96 * pred$se.fit
+		lower <- pred$fit - 1.96 * pred$se.fit
+		polygon(c(xl, rev(xl)), c(upper, rev(lower)), col=rgb(1,0,0,0.15), border=NA)
+		
+		lines(xl, pred$fit, col = "blue")
+
+		points(x=x, y=y)
+		
+		points(x=final[["value"]], y=final[["objfn"]], col="red", pch=16)
 	}
 }
 dummy <- dev.off()

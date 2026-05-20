@@ -33,7 +33,7 @@
 
 /// This file implements a function that modifies an OPENPMX object
 /// from information from a .ext file. It is available in openpmxtran
-/// as `reload()`. This loads the population paramaters, setting their
+/// as `reload()`. This loads the population parameters, setting their
 /// structure to that in the file.
 
 typedef struct {
@@ -169,7 +169,7 @@ static void parse_extcols_line(char *line,
 
 /// Each line of the .ext file is read and saved. This allows
 /// continuation of terminated estimation runs from the population
-/// paramaters from the last full iteration.
+/// parameters from the last full iteration.
 		/* basic value */
 		let iteration = atol(vals.ptr[0]);
 		if (iteration > 0 || iteration == -1000000000) {
@@ -267,7 +267,7 @@ static RELOADPARAM params_init_from_file(const char* filename,
     forcount(i, OPENPMX_OMEGABLOCK_MAX)
 		p.omega[i].type = OMEGA_INVALID;
 
-	/* read in colomns and exit if error */
+	/* read in columns and exit if error */
 	EXTCOLS extcols = { 0 };
 	read_extcols(filename, &extcols, errctx);
 	if (errctx->len)
@@ -418,7 +418,7 @@ static int reload_popparam(OPENPMX* dest, const RELOADCONFIG* const args, POPMOD
 	if (errctx.len)
 		goto failed;
 
-	/// The default is that reloading of the population paramaters fails if: 
+	/// The default is that reloading of the population parameters fails if: 
 	///
 	/// + Any theta bounds dont match
 	/// + Any theta FIXED/ESTIMATE dont match
@@ -509,7 +509,7 @@ static int reload_popparam(OPENPMX* dest, const RELOADCONFIG* const args, POPMOD
 	memcpy(dest->omega, src.omega, s.nblock*sizeof(OMEGABLOCKSTYPE));
 	memcpy(dest->sigma, src.sigma, s.nsigma*sizeof(double));
 	
-	/* overwrite other paramaters with invalid values */
+	/* overwrite other parameters with invalid values */
 	int i;
 	for (i=s.ntheta; i<OPENPMX_THETA_MAX; i++) 
 		dest->theta[i] = (THETATYPE){ 0 };
@@ -548,16 +548,16 @@ failed:
 /// - `.filename="...",` The filename is used as an .ext file to
 /// load the population parameters (theta, omega, and sigma values)
 /// and save them in the OPENPMX object. The default behavior is to load
-/// the population paramaters from the filename of the destination
+/// the population parameters from the filename of the destination
 /// OPENPMX object with a .ext extension added.
-/// - `.force=true,` The loaded population paramaters are copied over
+/// - `.force=true,` The loaded population parameters are copied over
 /// those of the destinantion ignoring any mismatch in structure. The
 /// default is to exit the program if the structures differ.
 /// - `.optional=true,` If reloading fails then the destination OPENPMX
 /// object is not modified and the program continues. The default
 /// behavior is to consider this a fatal error and the program exits.
 /// - `.silent=true,` Setting this supresses a message showing the
-/// structure of the newly loaded population paramaters.
+/// structure of the newly loaded population parameters.
 
 void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* const args)
 {
@@ -569,7 +569,7 @@ void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* const args)
 		dest->result = (PMXRESULT) { 0 };
 
 /// A successful reload invalidates any existing individual level data
-/// in the destinantion OPENPMX object because the numer of etas could
+/// in the destination OPENPMX object because the number of etas could
 /// have been changed. 
 		var state = dest->state;
 		if (state) {

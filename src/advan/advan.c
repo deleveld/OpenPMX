@@ -50,11 +50,15 @@ void advan_base_construct(ADVAN* advan, const ADVANFUNCS* advanfuncs)
 		advan->bioavail[i] = 1.;
 
 	advan->ninfusions = 0;
+
+	advan->eigen_sysmat_data = 0;
+	advan->tcicontrol = 0;
 }
 
 void advan_base_destruct(ADVAN* advan)
 {
-	(void)advan;
+	if (advan->tcicontrol)
+		free(advan->tcicontrol);
 }
 
 ADVANFUNCS* advanfuncs_alloc(const DATACONFIG* dataconfig, const ADVANCONFIG* const advanconfig)
@@ -109,11 +113,16 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			/* If we dont zero the model it keeps the values from the previous
 			 * time we called. This seems to be somewhat elegant in the user code.
 			 * Since the model retains values from the previous record. 
-			 * memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size); */
+			 * so skip this: memset(imodel, 0, advanfuncs->advanconfig->imodelfields.size); */
 			if (nstate)
 				memset(state, 0, nstate * sizeof(double));
 			advan->time = final_time;
 			advan->ninfusions = 0;
+			
+			/* reset any TCI controller if its there */
+			if (advan->tcicontrol) 
+				free(advan->tcicontrol);
+			advan->tcicontrol = 0;
 
 			/* for reset and reset-and-dose we should treat it like a discontinuitiy
 			 * This helps the ODE solver a lot I expect */
@@ -321,7 +330,8 @@ bool pmx_advan_inittime(const ADVANSTATE* advanstate, const double t)
 
 	/* its kind of not clear whether we should or shouldnt ignore the
 	 * extra inittime if another kind of event occurs at the intended
-	 * time, for example an infusion */
+	 * time, for example an infusion. We should probably ignore them
+	 * and condense the records. */
 	bool found_already = false;
 	forcount(i, advan->ninfusions) {
 		let v = &advan->infusions[i];
@@ -363,7 +373,7 @@ void pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate, const double* sysmat)
 {
 	let ret = advanstate->advan->eigen_sysmat_data;
 	if (!ret) {
-		fprintf(stderr, "fatal: advancer does not need eigensystem to be defined\n");
+		fprintf(stderr, "fatal: advancer does not use eigensystem\n");
 		exit(EXIT_FAILURE);
 	}
 	let n = advanstate->current.popparam->nstate;

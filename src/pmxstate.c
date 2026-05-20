@@ -54,16 +54,8 @@ static PMXSTATE* pmxstate_alloc(const OPENPMX* const pmx)
 	return ret;
 }
 
-void pmxstate_ensure(OPENPMX* const pmx)
-{
-	if (!pmx->state)
-		pmx->state = pmxstate_alloc(pmx);
-}
-
 static void pmxstate_free(PMXSTATE* pstate)
 {
-	scatter_cleanup();
-
 	advanfuncs_free((void*)pstate->advanfuncs); /* keeping advanfuncs const in PMXSTATE is nice, but this cludge is needed to free */
 	idata_destruct(&pstate->idata);
 
@@ -71,6 +63,19 @@ static void pmxstate_free(PMXSTATE* pstate)
 		gsl_rng_free(pstate->rng);
 
 	free(pstate);
+}
+
+void pmx_ensure_state(OPENPMX* const pmx)
+{
+	if (!pmx->state)
+		pmx->state = pmxstate_alloc(pmx);
+}
+
+void pmx_release_state(OPENPMX* pmx)
+{
+	if (pmx->state)
+		pmxstate_free(pmx->state);
+	pmx->state = 0;
 }
 
 OPENPMX pmx_copy(const OPENPMX* const pmx)
@@ -96,14 +101,7 @@ void pmx_copy_model(OPENPMX* dest, const OPENPMX* const src)
 	memcpy(&dest->result, &src->result, sizeof(dest->result));
 }
 
-void pmx_cleanup(OPENPMX* pmx)
-{
-	if (pmx->state)
-		pmxstate_free(pmx->state);
-	pmx->state = 0;
-}
-
-void pmx_popmodel_writeback(OPENPMX* const pmx, const POPMODEL* const popmodel)
+void pmx_copy_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel)
 {
 	let ntheta = popmodel->ntheta;
 	forcount(i, ntheta) {
@@ -175,16 +173,3 @@ void pmx_popmodel_writeback(OPENPMX* const pmx, const POPMODEL* const popmodel)
 
 	pmx->result = popmodel->result;
 }
-
-void pmx_set_theta(OPENPMX* dest, 
-				   const int index,
-				   typeof(((OPENPMX){0}).theta[0])* theta)
-{
-	let i = (dest->data._offset1) ? (index-1) : (index);
-	assert(i >= 0);
-	assert(i < OPENPMX_THETA_MAX);
-	dest->theta[i] = *theta;
-	
-	dest->result = (PMXRESULT) { 0 };
-}
-

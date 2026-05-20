@@ -31,10 +31,10 @@
 
 #include <gsl/gsl_blas.h>
 
-//#define ESTIMATE_SD_NOT_VAR
+#define ESTIMATE_SD_NOT_VAR
 
-//#define ENCODE_SPECIAL
-#define ENCODE_ATANH
+#define ENCODE_SPECIAL
+//#define ENCODE_ATANH
 //#define ENCODE_LINEAR
 //#define ENCODE_NONMEM
 
@@ -348,6 +348,8 @@ static void popmodel_omega_update(POPMODEL* const popmodel,
 	fill_in_OMEGA_SAME_blocks(popmodel);
 }
 
+#define UPDATE_SCALE 1.
+
 void encode_update(ENCODE* encode, const double* x)
 {
 	assert(encode->has_offsets == true);
@@ -363,7 +365,7 @@ void encode_update(ENCODE* encode, const double* x)
 	forcount(i, ntheta) {
 		if (thetaestim[i] != FIXED) {
 			var l = popmodel->lower[i];
-			var v = (x[n] + offset[n]);
+			var v = (x[n]/UPDATE_SCALE + offset[n]);
 			var u = popmodel->upper[i];
 			var estvalue = theta_untransform(v, l, u);
 			etheta[i] = estvalue;
@@ -375,7 +377,7 @@ void encode_update(ENCODE* encode, const double* x)
 	let sigmafixed = popmodel->sigmafixed;
 	forcount(i, nsigma) {
 		if (sigmafixed[i] == 0) {
-			let s = (x[n] + offset[n]);
+			let s = (x[n]/UPDATE_SCALE + offset[n]);
 #ifdef ESTIMATE_SD_NOT_VAR
 			sigma[i] = pow(exp(s), 2);
 #else
@@ -408,7 +410,7 @@ void encode_update(ENCODE* encode, const double* x)
 				let c = rowcol[j];
 				let fixed = popmodel->omegafixed[r][c];
 				if (fixed == 0) {
-					let s = (x[n] + offset[n]);
+					let s = (x[n]/UPDATE_SCALE + offset[n]);
 					if (i == j) {
 #ifdef ESTIMATE_SD_NOT_VAR
 						gsl_matrix_set(S, i, i, pow(exp(s), 2));

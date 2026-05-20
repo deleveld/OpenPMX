@@ -100,7 +100,7 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
 			let diff = ya1 - ya2;
 
 /*			yhatvar += (diff * diff) */
-			yhatvar += (diff * diff); /* move multiplication out of loop */
+			yhatvar += (diff * diff); /* / 4.; move multiplication out of loop */
 		}
 	}
 /*	return yhatvar; */

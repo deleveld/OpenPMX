@@ -257,6 +257,33 @@ static double converged_nsig(const POPMODEL* const popmodel, const double rhoend
 	return nsig;
 }
 
+/*
+static void print_converged_nsig(const POPMODEL* const popmodel, const double rhoend)
+{
+	var encoder = encode_init(popmodel);
+	encode_offset(&encoder, popmodel);
+	
+	var nsig = DBL_MAX;
+	double x[encoder.nparam];
+	memset(x, 0, sizeof(x));
+
+	forcount(i, encoder.nparam) {
+		x[i] = rhoend;
+		encode_update(&encoder, x);
+		let n1 = iteration_nsig(popmodel, &encoder.popmodel);
+		nsig = fmin(n1, nsig);
+
+		x[i] = -rhoend;
+		encode_update(&encoder, x);
+		let n2 = iteration_nsig(popmodel, &encoder.popmodel);
+		nsig = fmin(n2, nsig);
+
+		printf("param %i nsig (%f,%f)\n", i, n1, n2); 
+
+		x[i] = 0.;
+	}
+} */
+
 static bool focei(STAGE2_PARAMS* const params)
 {
 	assert(params);
@@ -280,7 +307,6 @@ static bool focei(STAGE2_PARAMS* const params)
 	let maxeval = options->estimate.maxeval;
 	let step_initial = options->estimate.step_initial;
 	let step_refine = options->estimate.step_refine;
-	let step_final = options->estimate.step_final;
 
 #ifdef OPTIMIZER_OUTER_BOBYQA
 	let npt = 2*n+1;			/* reccommended */
@@ -309,13 +335,24 @@ static bool focei(STAGE2_PARAMS* const params)
 						 iprint, neval, w);
 	bobyqa_error(retcode, "stage2 initial", params->outstream); /* warn error, but try refine anyway */
 	neval = maxeval - best->result.neval;
+	
+	/* after initialization run find the final step size consistent with
+	 * getting at least nsig */
+	var nsig_step_final = step_refine / 2.;
+	var nsig = converged_nsig(best, nsig_step_final);
+	while (nsig_step_final >= 1e-8 &&  
+		   nsig <= options->estimate.nsig) {
+		nsig_step_final /= 2.;
+		nsig = converged_nsig(best, nsig_step_final);
+	}
+	info(params->outstream, "optim rho %g %g\n", step_refine, nsig_step_final);
 
 /// After initial optimization, a smaller search space is used from 
 /// rho_refine to rho_final. This is repeated until the change in 
 /// parameters between restarts is greater than nsig or objective 
 /// function between restarts is less than dobjfn.
 	lastobjfn = best->result.objfn;
-	if (neval > 1 && step_final < step_refine) {
+	if (neval > 1 && nsig_step_final < step_refine) {
 		while (!converged) {
 			if (neval <= npt) {
 				info(params->outstream, "optim too few iterations (%i) for refine\n", neval);
@@ -327,12 +364,17 @@ static bool focei(STAGE2_PARAMS* const params)
 			encode_offset(&params->test, best);
 			forcount(i, n)
 				initial[i] = 0.;
-				
+
 			if (!options->estimate.details && !options->estimate.verbose)
 				printf("\n");
 
+			/* setting etas to zero at each restart seems to reduce the 
+			 * risk of local minimums */
+			let idata = params->idata;
+			memset(params->best.eta, 0, idata->nindivid * idata->nomega * sizeof(double));
+
 			rhobeg = step_refine;
-			rhoend = step_final;
+			rhoend = nsig_step_final;
 			retcode = bobyqa(n, npt,
 							 focei_stage2_evaluate_population_objfn, (void*)params,
 							 initial, lower, upper,
@@ -377,7 +419,8 @@ static bool focei(STAGE2_PARAMS* const params)
 	free(w);
 	
 	if (converged) {
-		let nsig = converged_nsig(best, options->estimate.step_final);
+		let nsig = converged_nsig(best, nsig_step_final);
+//		print_converged_nsig(best, options->estimate.step_final);
 		best->result.nsig = nsig;
 		info(params->outstream, "optim final nsig %.1f\n", nsig);
 	}
@@ -391,14 +434,13 @@ static bool focei(STAGE2_PARAMS* const params)
 	return converged;
 }
 
-static bool stabilize_initial_objfn(STAGE2_PARAMS* params)
+static void test_initial_objfn(STAGE2_PARAMS* params)
 {
 	let idata = params->idata;
 	let advanfuncs = params->advanfuncs;
 	let options = params->options;
 	let popmodel = &params->test.popmodel;
 
-	info(params->outstream, "stabilize start\n");
 	idata_set_eta(idata, params->best.eta);
 
 	/* very first evaluation */
@@ -412,45 +454,15 @@ static bool stabilize_initial_objfn(STAGE2_PARAMS* params)
 	if (!isfinite(popmodel->result.objfn))
 		fatal(params->outstream, "objective function not finite\n");
 	
-/// At initial objective function calculation the results may not be 
-/// stable with recalculating resulting in a different objective 
-/// function value. This seems likely due to the changing of the 
-/// initial conditions for each Stage 1 due to updating of the best eta 
-/// value. So for the first evaluation, the objective function value is
-/// recalculated until it is stabel to 0.01 or 10 iterations. If this
-/// stabilization phase fails or requires many iterations then there may
-/// be numerical stability issues with the model and data.
-	int i;
-	let maxiter = 10;
-	for (i=0; i<maxiter; i++) {
-		let lastobjfn = popmodel->result.objfn;
-		encode_evaluate(&params->test, idata, advanfuncs, options);
-		print_model_evaluation(params);
-
-		/* are we stable? */
-		let dobjfn = popmodel->result.objfn - lastobjfn;
-		if (fabs(dobjfn) < 0.01)
-			break;
-	}
-
-	/* warn if we are not stable after 10 iterations */
-	if (i >= maxiter) 
-		warning(params->outstream, "stabilize failed\n");
-	else
-		info(params->outstream, "stabilize done\n");
-
 	/*save the popmodel shouldnt actually have been changed */
 	save_besteta(params);
 	*params->best.model = *popmodel;
-
-	return (i < maxiter);
 }
 
 static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 {
 	let idata = params->idata;
 	let options = params->options;
-	let outstream = params->outstream;
 
 	/* cleanup previous runs */
 	/* at each estimate or evaluate, the pred and state gets reset to zero */
@@ -466,11 +478,7 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 		idata_free_icovresample(idata);
 
 	/* first run so we can set objective function and yhat. */
-	/* this is the first evaluation, the encode_offset at the best model is
-	 * already done. We may have to evaluate several times for a stable objfn */
-	/* after the iterations, we save the besteta which we use to start with later */
-	if (!stabilize_initial_objfn(params))
-		warning(outstream, "initial objfn not stable\n");
+	test_initial_objfn(params);
 
 	/* make sure best has the objfn of what we just stabilized */
 	var best = params->best.model;
@@ -677,7 +685,7 @@ static void estimate_popmodel(const char* filename,
 
 void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 {
-	pmxstate_ensure(pmx);
+	pmx_ensure_state(pmx);
 	var pstate = pmx->state;
 
 	var options = options_init(pmx);
@@ -697,14 +705,14 @@ void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 					  &popmodel,
 					  &options);
 
-	pmx_popmodel_writeback(pmx, &popmodel);
+	pmx_copy_popmodel(pmx, &popmodel);
 }
 
 /// Evaluation is the same as estimation but with maxeval=0.
 
 void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 {
-	pmxstate_ensure(pmx);
+	pmx_ensure_state(pmx);
 	var pstate = pmx->state;
 
 	var options = options_init(pmx);
@@ -725,37 +733,6 @@ void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 					  &popmodel,
 					  &options);
 
-	pmx_popmodel_writeback(pmx, &popmodel);
+	pmx_copy_popmodel(pmx, &popmodel);
 }
-
-void pmx_fastestimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
-{
-	pmxstate_ensure(pmx);
-	var pstate = pmx->state;
-
-	var options = options_init(pmx);
-	if (estimate) {
-		options.estimate = estimconfig_default(estimate);
-		*estimate = options.estimate;
-	}
-	options.estimate.step_initial = 0.5;
-	options.estimate.step_refine = 0.1;
-	options.estimate.step_final = 0.01;
-	options.estimate.nsig = 2.;
-	options.estimate.dobjfn = 0.01;
-
-	ERRCTX errctx = { 0 };
-	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
-	if (errctx.len)
-		fatal(0, "%s: %s", __func__, errctx.errmsg);
-
-	estimate_popmodel(pmx->filename,
-					  &pstate->idata,
-					  pstate->advanfuncs,
-					  &popmodel,
-					  &options);
-
-	pmx_popmodel_writeback(pmx, &popmodel);
-}
-
 

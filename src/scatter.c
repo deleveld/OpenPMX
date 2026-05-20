@@ -156,6 +156,14 @@ done:
 }
 #endif
 
+static bool cleanup_registered = false;
+void scatter_cleanup(void)
+{
+#ifdef OPENPMX_PARALLEL_PTHREADS
+	pthreads_cleanup();
+#endif
+}
+
 /* NOTE: threadtask function must be thread safe and only touch individual data */
 void scatter_threads(const IDATA* const idata,
 					 const ADVANFUNCS* const advanfuncs,
@@ -299,11 +307,11 @@ void scatter_threads(const IDATA* const idata,
 #endif
 
 	free(individs);
+
+	/* make sure to cleanup the threads gets called at program exit */
+	if (!cleanup_registered) {
+		atexit(scatter_cleanup);
+		cleanup_registered = true;
+	}
 }
 
-void scatter_cleanup(void)
-{
-#ifdef OPENPMX_PARALLEL_PTHREADS
-	pthreads_cleanup();
-#endif
-}

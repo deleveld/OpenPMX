@@ -115,7 +115,7 @@ int main(void)
 	};
 
 	pmx_estimate(&openpmx, &(ESTIMCONFIG) { });
-	pmx_cleanup(&openpmx);
+	pmx_release_state(&openpmx);
 
 	return EXIT_SUCCESS;
 }

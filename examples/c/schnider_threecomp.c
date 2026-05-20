@@ -1575,6 +1575,6 @@ int main(void)
 
 	estimate();
 
-	pmx_cleanup(&openpmx);
+	pmx_release_state(&openpmx);
 	return EXIT_SUCCESS;
 }
