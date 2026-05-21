@@ -1739,6 +1739,7 @@ char openpmxtran_template[] =
 "//#define _GNU_SOURCE\n"
 "//#include <fenv.h>\n"
 "#include \"openpmx.h\"\n"
+"#include \"openpmx_model.h\"\n"
 "\n"
 "typedef struct RECORD {\n"
 "{{RECORD_FIELDS_DECLARE}}\n"

@@ -22,4 +22,3 @@ $OMEGA
 $SIGMA 1, 1
 $MAIN
 	estimate();
-

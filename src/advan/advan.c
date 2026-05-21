@@ -175,6 +175,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	/* advance through time and handle infusions and doses when they start
 	 * or stop up until the time of the current record */
 	assert(advan->time <= final_time);
+	double totalrates[nstate];
 	do {
 		let currenttime = advan->time;
 
@@ -210,7 +211,6 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		if (intervalstop > currenttime) {
 
 			/* collect the infusion rates between now and the intervalstop */
-			double totalrates[nstate];
 			memset(totalrates, 0, nstate * sizeof(double));
 			for (int i=0; i<advan->ninfusions; i++) {
 				let v = &advan->infusions[i];

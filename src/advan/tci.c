@@ -22,6 +22,7 @@
 #include "advan/advan.h"
 #include "utils/c22.h"
 
+/* include the ministan sorce directly */ 
 #include "advan/ministan/common.h"
 #include "advan/ministan/cube.c"
 #include "advan/ministan/udfs.c"
@@ -33,7 +34,6 @@
 
 typedef struct TCICONTROL {
 	Config cfg;
-	const double time_scale;	/* convert TIME units to seconds */
 	const int cmt_0;	/* 0-based compartment */
 	double next_time;	/* in TIME units */
 	double totamt; 		/* cumulative dose */
@@ -71,13 +71,13 @@ void pmx_advan_tci_init(const ADVANSTATE* advanstate, const TCICONFIG* const tci
 	 * copy it to malloc memory like this */
 	var tcicfg = (TCICONTROL) {
 		.cfg = {
-			.k10 = tciconfig->model.k10,
-			.k12 = tciconfig->model.k12,
-			.k13 = tciconfig->model.k13,
-			.k21 = tciconfig->model.k21,
-			.k31 = tciconfig->model.k31,
-			.ke0 = tciconfig->model.ke0,
-			.vc  = tciconfig->model.vc,
+			.k10 = tciconfig->k10,
+			.k12 = tciconfig->k12,
+			.k13 = tciconfig->k13,
+			.k21 = tciconfig->k21,
+			.k31 = tciconfig->k31,
+			.ke0 = tciconfig->ke0,
+			.vc  = tciconfig->vc,
 			.target_effect = tciconfig->target_effect,
 			.delta_seconds = 10,
 		},

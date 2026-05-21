@@ -191,7 +191,11 @@ SOURCEFILES="pmxstate.c options.c ievaluate.c predict.c stage1.c
 			 advan/twocomp.c advan/threecomp.c
 			 advan/diffeqn_test.c advan/diffeqn_libgsl.c
 			 advan/eigen.c advan/tci.c
-			 advan/tci/eleveld_propofol.c
+			 models/propofol_eleveld.c
+			 models/propofol_schnider.c
+			 models/remifentanil_eleveld.c
+			 models/remifentanil_minto.c
+			 models/sufentanil_gepts.c
 			 utils/vector.c utils/various.c
 			 utils/getdelim.c utils/errctx.c
 			 bobyqa/bobyqa.c"

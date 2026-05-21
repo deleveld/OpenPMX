@@ -97,6 +97,8 @@ The PK-PD analysis example is:
 
 # Contributors
 - Your name (yourname@email.com) Very important thing elegantly coded.
+- Jona Joachim (jona@joachim.cc) Contributed the code in `src/advan/ministan` which is a modernized version of Stanpump. 
+This is used in code for a TCI dosing controller. See the functions `pmx_advan_tci*`.
 - Erik Olofsen () contributed documentation for the control file.
 - Jona Joachim (jona@joachim.cc) Contributed the eigensystem advancer `$ADVAN(eigen)`
 	which uses eigendecomposition to obtain exact, analytical solutions for any linear

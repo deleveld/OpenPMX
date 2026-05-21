@@ -171,19 +171,9 @@ ADVANFUNCS* pmx_advan_diffeqn_test(const DATACONFIG* const dataconfig, const ADV
 /*---------------------------------------------------------------------*/
 /* TCI dose controller */
 /*---------------------------------------------------------------------*/
-typedef struct TCIMODEL {
+typedef struct {
 	const double k10, k12, k13, k21, k31, ke0;	/* in minutes */
 	const double vc;
-} TCIMODEL;
-
-TCIMODEL pmx_advan_tci_eleveld_propofol(const double AGE,
-										const double WGT,
-										const double HGT,
-										const bool female,
-										const bool opiates);
-
-typedef struct TCICONFIG {
-	const TCIMODEL model;
 	const bool target_effect;
 	const int cmt;
 } TCICONFIG;

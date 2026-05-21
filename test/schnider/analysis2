@@ -40,6 +40,9 @@ R --vanilla --slave <<-RSCRIPT
 	source("../utils/analysis_tables_and_plots.R")
 	source("../utils/analysis_tables_and_plots2.R")
 
+	write.csv(tabbias, file="bias.csv")
+	write.csv(tabrmse, file="rmse.csv")
+
 RSCRIPT
 
 ../utils/_write_figures.sh ${0} ${TEMP}/${0}.ps

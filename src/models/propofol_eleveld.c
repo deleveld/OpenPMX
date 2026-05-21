@@ -15,44 +15,70 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file implements the Eleveld propofol model.
+///
+/// Eleveld DJ, Colin P, Absalom AR, Struys MM. Pharmacokinetic–pharmacodynamic
+/// model for propofol for broad application in anaesthesia and sedation.
+/// British journal of anaesthesia. 2018 May 1;120(5):942-59.
+///
+
 #include <math.h>
 
-#include "openpmx.h"
+#include "openpmx_model.h"
 
-static double eleveld_theta[] = {
-    1.837860e+00,
-    3.238730e+00,
-    5.608800e+00,
-    5.819830e-01,
-    5.596720e-01,
-    1.030460e-01,
-    1.913070e-01,
-    3.744220e+00,
-    2.203300e+00,
-    -1.563300e-02,
-    -2.857090e-03,
-    3.513130e+00,
-    -1.381660e-02,
-    4.223570e+00,
-    7.420430e-01,
-    2.656420e-01,
-    3.498850e-01,
-    -3.849270e-01,
+static double propofol_eleveld_theta[] = {
+	1.837860e+00,
+	3.238730e+00,
+	5.608800e+00,
+	5.819830e-01,
+	5.596720e-01,
+	1.030460e-01,
+	1.913070e-01,
+	3.744220e+00,
+	2.203300e+00,
+	-1.563300e-02,
+	-2.857090e-03,
+	3.513130e+00,
+	-1.381660e-02,
+	4.223570e+00,
+	7.420430e-01,
+	2.656420e-01,
+	3.498850e-01,
+	-3.849270e-01,
+	0,
+	0,
+	1.124750e+00,	// e50=3.08 mg/l
+	-1.921620e+00,	// ke0=0.146 1/min
+	9.298240e+01,	// emax
+	3.877210e-01,	// gamma=1.47
+	2.082830e+00,	// residual error BIS=8.03
+	5.173990e-02,	// age delay
+	-6.348370e-03,	// age e50
+	2.156050e-01,	// venous ke0=1.24 1/min
+	6.386410e-01,	// gamma=1.89
 };
 
-#define THETA(i)	eleveld_theta[(i)-1]
-#define ETA(i) 		0.
-
-TCIMODEL pmx_advan_tci_eleveld_propofol(const double AGE,
-										const double WGT,
-										const double HGT,
-										const bool female,
-										const bool opiates)
+static double THETA(const int i)
 {
-	const double A1V2 = 1.; /* assume arterial */
-	const double M1F2 = (female) ? 2. : 1.;
-	const double PMA = AGE + 40./52;
-	const double TECH = (opiates) ? 2. : 1.;
+	return propofol_eleveld_theta[i - 1];
+}
+
+static double ETA(const int i)
+{
+	(void) i;
+	return 0.;
+}
+
+PROPOFOL_ELEVELD pmx_model_propofol_eleveld(PROPOFOL_ELEVELD_COVARIATES* config)
+{
+	const double AGE = config->age;
+	const double WGT = config->weight;
+	const double HGT = config->height;
+	const double M1F2 = config->female ? 2 : 1;
+	
+	const double A1V2 = 1.; 			/* assume arterial */
+	const double PMA = AGE + 40./52;	/* assume full-term */
+	const double TECH = config->opiates ? 2. : 1.;
 
 	// Al-sallami FFM
 	const double HT2=(HGT/100.)*(HGT/100.);
@@ -113,22 +139,47 @@ TCIMODEL pmx_advan_tci_eleveld_propofol(const double AGE,
 	const double M6 =pow(V3/RV3,0.75) * KQ3 * DQ3;
 	const double Q3 =exp(THETA(6)+ETA(6)) * M6;
 
-	const double TKE0 = -1.921620e+00;
-	const double ke0 = exp(TKE0+ETA(12))*pow(WGT/70.,-0.25);
+	// effect compartment
+	const double E50 =exp(THETA(21)+ETA(11)+THETA(27)*(AGE-35.));
+	const double TKE0=(2-A1V2)*THETA(22) + (A1V2-1)*THETA(28);
+	const double KE0 =exp(TKE0+ETA(12))*pow(WGT/70.,-0.25);
+	const double EMAX=THETA(23);
+	const double GAM =exp(THETA(24));
+	const double GAM1=exp(THETA(29));
 
-	const double k10 = CL / V1;
-	const double k12 = Q2 / V1;
-	const double k21 = Q2 / V2;
-	const double k13 = Q3 / V1;
-	const double k31 = Q3 / V3;
-
-	return (TCIMODEL) {
-		.k10 = k10,
-		.k12 = k12,
-		.k13 = k13,
-		.k21 = k21,
-		.k31 = k31,
-		.ke0 = ke0,
-		.vc = V1,
+	return (PROPOFOL_ELEVELD) {
+		.FFM = FFM,
+		.V1 = V1,
+		.V2 = V2,
+		.V3 = V3,
+		.CL = CL,
+		.Q2 = Q2,
+		.Q3 = Q3,
+		.KE0 = KE0,
+		.E50 = E50,
+		.EMAX = EMAX,
+		.GAM = GAM,
+		.GAM1 = GAM1,
+		.k10 = CL / V1,
+		.k12 = Q2 / V1,
+		.k21 = Q2 / V2,
+		.k13 = Q3 / V1,
+		.k31 = Q3 / V3,
 	};
 }
+
+double pmx_model_propofol_eleveld_bis(PROPOFOL_ELEVELD* model, const double ceff)
+{
+	const double e50 = model->E50;
+	const double emax = model->EMAX;
+	const double gam = model->GAM;
+	const double gam1 = model->GAM1;
+
+	/* low concentrations (< E50) get steeper gamma */
+	const double sig_low  = pow(ceff, gam1) / (pow(ceff, gam1) + pow(e50, gam1));
+	const double sig_high = pow(ceff, gam) / (pow(ceff, gam) + pow(e50, gam));
+	if (ceff < e50)
+		return emax * (1. - sig_low);
+	return emax * (1. - sig_high);
+}
+
