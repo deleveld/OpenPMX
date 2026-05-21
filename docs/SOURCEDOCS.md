@@ -381,28 +381,6 @@ Within the datafile a `.` as a data entry is replaced by NAN.
 
 Within the `$ADVAN(...)` block an advancer must be indicated.
 
-+ `pred` calls `pmx_advan_pred()` a simple predictor
-+ `onecomp` calls `pmx_advan_onecomp()` a one-compartment model.
-+ `onecomp_depot` calls `pmx_advan_onecomp_depot()` a one-compartment model with a depot compartment.
-+ `twocomp` calls `pmx_advan_twocomp()` a two-compartment mammilary model.
-+ `twocomp_depot` calls `pmx_advan_twocomp_depot()` a two-compartment model with a depot compartment.
-+ `threecomp` calls `pmx_advan_threecomp()` a three-compartment mammilary model.
-+ `diffeqn_libgsl` calls `pmx_advan_diffeqn_libgsl()` a ODE solver from LibGSL.
-+ `eigen` calls `pmx_advan_eigen()` a linear eigensystem solver. In the $IMODEL() function
-the eigensystem matrix must be specified by SYSMAT().
-
-+ `eigen_threecomp` calls `pmx_advan_eigen_threecomp()` a linear eigensystem solver specialized
-to a three compartment model. The eigensystem matrix does not have to be set, it is set automatically.
-
-+ `eigen_twocomp` calls `pmx_advan_eigen_twocomp()` a linear eigensystem solver specialized
-to a two compartment model. The eigensystem matrix does not have to be set, it is set automatically.
-
-+ `eigen_onecomp_depot` calls `pmx_advan_eigen_onecomp_depot()` a linear eigensystem solver specialized
-to a one compartment model with a depot compartment. The eigensystem matrix does not have to be set, it is set automatically.
-
-+ `eigen_twocomp_depot` calls `pmx_advan_eigen_twocomp_depot()` a linear eigensystem solver specialized
-to a two compartment model with a depot compartment. The eigensystem matrix does not have to be set, it is set automatically.
-
 
 # src/profile.c
 
