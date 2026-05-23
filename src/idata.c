@@ -94,8 +94,6 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 			.yhatvar = &yhatvar[i],
 			.pred = &pred[i],
 			.predictvars = (PREDICTVARS*)((char*)predictvars + i * predictvars_size),
-			.icovsample = 0,
-			.icovweight = 0,
 			.isimerr = 0,
 
 			.obs_min2ll = 0.,
@@ -148,8 +146,6 @@ void idata_destruct(IDATA* const idata)
     free(firstindivid->predictvars);
     
     /* these pointers are only non-zero if idata_alloc_... functions were called */
-    free(firstindivid->icovsample);
-    free(firstindivid->icovweight);
     free(firstindivid->isimerr);
 
     /* now we can safely delete the individ array itself */
@@ -182,42 +178,6 @@ void idata_free_simerr(const IDATA* const idata)
 	forcount(i, nindivid)
 		individ[i].isimerr = 0;
 	free(simerr);
-}
-
-void idata_alloc_icovresample(const IDATA* const idata)
-{
-	let individ = idata->individ;
-	let nindivid = idata->nindivid;
-	let nomega = idata->nomega;
-	if (individ[0].icovsample == 0) {
-		assert(individ[0].icovweight == 0);
-		var icovsample = callocvar(double, nindivid * 2 * nomega * nomega);
-		var icovweight = callocvar(double, nindivid * 2 * nomega);
-
-		forcount(i, nindivid) {
-			individ[i].icovsample = &icovsample[i * 2 * nomega * nomega];
-			individ[i].icovweight = &icovweight[i * 2 * nomega];
-		}
-	} else {
-		forcount(i, nindivid * 2 * nomega * nomega)
-			individ[0].icovsample[i] = 0.;
-		forcount(i, nindivid * 2 * nomega)
-			individ[0].icovweight[i] = 0.;
-	}
-}
-
-void idata_free_icovresample(const IDATA* const idata)
-{
-	let individ = idata->individ;
-	let nindivid = idata->nindivid;
-	var icovsample = individ[0].icovsample;
-	var icovweight = individ[0].icovweight;
-	forcount(i, nindivid) {
-		individ[i].icovsample = 0;
-		individ[i].icovweight = 0;
-	}
-	free(icovsample);
-	free(icovweight);
 }
 
 int idata_ineval(const IDATA* const idata, const bool reset)
@@ -352,65 +312,6 @@ void table_yhat_idata(const char* filename,
 		}
 	}
 
-	fclose(f);
-}
-
-void table_icov_resample_idata(const char* filename,
-							   const IDATA* const idata,
-							   const bool _offset1)
-{
-	assert(filename);
-	assert(idata->individ[0].icovweight != 0);
-
-	var f = idata_results_fopen(filename, OPENPMX_ICOVRESAMPLEFILE, "w");
-	assert(f);
-
-	let nomega = idata->nomega;
-	let indexoffset = _offset1 ? 1 : 0;
-
-	fprintf(f, OPENPMX_SFORMAT, "SUBJECT_NO");
-	fprintf(f, OPENPMX_HEADER_FORMAT, "ID");
-	fprintf(f, OPENPMX_HEADER_FORMAT, "RESAMPLE");
-	fprintf(f, OPENPMX_HEADER_FORMAT, "WEIGHT");
-	forcount(i, nomega) {
-		char temp[128];
-		sprintf(temp, "ETA(%i)", i + indexoffset);
-		fprintf(f, OPENPMX_HEADER_FORMAT, temp);
-	}
-	fprintf(f, "\n");
-
-	forcount(k, idata->nindivid) {
-		let individ = &idata->individ[k];
-		let id = individ->ID;
-		let icovweight = individ->icovweight;
-		let icovsample = individ->icovsample;
-
-		let eta = individ->eta;
-		fprintf(f, OPENPMX_IFORMAT, k + 1);
-		fprintf(f, OPENPMX_TABLE_FORMAT, id);
-		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-		forcount(j, nomega) {
-			let v = eta[j];
-			fprintf(f, OPENPMX_TABLE_FORMAT, v);
-		}
-		fprintf(f, "\n");
-
-		forcount(i, 2 * nomega) {
-			let wgt = icovweight[i];
-			if (wgt > 0.) {
-				fprintf(f, OPENPMX_IFORMAT, k + 1);
-				fprintf(f, OPENPMX_TABLE_FORMAT, id);
-				fprintf(f, OPENPMX_TABLE_FORMAT, i + 1.);
-				fprintf(f, OPENPMX_TABLE_FORMAT, wgt);
-				forcount(j, nomega) {
-					let v = icovsample[i * nomega + j];
-					fprintf(f, OPENPMX_TABLE_FORMAT, v);
-				}
-				fprintf(f, "\n");
-			}
-		}
-	}
 	fclose(f);
 }
 

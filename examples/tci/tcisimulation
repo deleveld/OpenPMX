@@ -1,0 +1,193 @@
+set -eu
+
+# inform user if we fail prematurely
+COMPLETION_MESSAGE="WARNING: The script ${0} failed somewhere! The results may not be reliable!!!"
+
+TEMP=$(mktemp -d)
+function cleanup {
+	rm -rf "${TEMP}"
+	echo ${COMPLETION_MESSAGE}
+}
+trap cleanup EXIT
+
+OUTPUTFILE=${0}
+
+NUMGROUP=1000
+
+echo ... make NONMEM data file
+R --vanilla --slave <<-RSCRIPT
+
+	nhanes <- read.table("nhanes/nhanes.txt", sep="", header=TRUE)
+
+	# higher time resolution in the first part
+	tmax1 <- 10.
+	tstep1 <- 10. / 60.
+	tmax2 <- 10.
+	tstep2 <- 10.
+	tmax3 <- 61.
+	time <- c(seq(from=0, to=tmax1-tstep1, by=tstep1),
+			  seq(from=tmax2, to=tmax3, by=tstep2))
+	nrecords <- length(time)
+
+	# number of individuals in each group
+	ngroup <- ${NUMGROUP}
+	nchild <- 0
+	nadult <- ngroup
+	nelderly <- 0
+	nobese <- 0
+	nids <- nchild + nadult + nelderly + nobese
+
+	length(unique(nhanes\$ID))
+	nrecordsall <- nrecords * nids - 1
+
+	# preallocate all data
+	alldata <- data.frame(id=integer(nrecordsall),
+			   time=numeric(nrecordsall),
+			   dv=numeric(nrecordsall),
+			   amt=numeric(nrecordsall),
+			   evid=integer(nrecordsall),
+			   age=numeric(nrecordsall),
+			   wgt=numeric(nrecordsall),
+			   hgt=numeric(nrecordsall),
+			   m1f2=integer(nrecordsall),
+			   pma=numeric(nrecordsall),
+			   tech=integer(nrecordsall),
+			   stringsAsFactors=FALSE)
+	j <- 0
+
+	make_simulation_data <- function(alldata, j, n, agelow, agehigh)
+	{
+		for (id in unique(sampgroup\$ID)) {
+			iposthoc <- sampgroup[sampgroup\$ID == id, ]
+
+			id <- iposthoc\$ID
+			age <- iposthoc\$age
+			wgt <- iposthoc\$wgt
+			hgt <- iposthoc\$hgt
+			m1f2 <- iposthoc\$m1f2
+			pma <- age + 40./52.
+			tech <- 2
+
+			data <- data.frame(id=id,
+							   time=time,
+							   dv=numeric(nrecords),
+							   amt=numeric(nrecords),
+							   evid=integer(nrecords),
+							   age=rep(age, nrecords),
+							   wgt=rep(wgt, nrecords),
+							   hgt=rep(hgt, nrecords),
+							   m1f2=rep(m1f2, nrecords),
+							   pma=rep(pma, nrecords),
+							   tech=rep(tech, nrecords),
+							   stringsAsFactors=FALSE)
+			data\$dv <- 1
+			data\$evid <- 0
+			data\$amt <- 0
+
+			print(head(data, n=10))
+
+			alldata[j:(j+nrecords-1), ] <- data
+			j <- j + nrecords
+		}
+		return (alldata)
+	}
+	subgroup <- nhanes[nhanes\$age >= 2 & nhanes\$age < 100 & nhanes\$bmi < 30, ]
+	sampgroup <- subgroup[sample(nrow(subgroup), nadult), ]
+	print(sampgroup)
+	write.table(sampgroup, file="sampgroup.csv", row.names=FALSE, quote=FALSE)
+	alldata <- make_simulation_data(alldata, j, sampgroup)
+	j <- j + nrecords * nadult
+
+	write.table(alldata, file="tcisimulationdata.csv", row.names=FALSE, quote=FALSE)
+
+RSCRIPT
+
+echo ... make OPENPMX control file
+cat <<-CONTROLFILE >tcisimulation.gr
+	\$DATA("tcisimulationdata.csv")
+		amt = 0.;
+	\$ADVAN(threecomp)
+	\$IMODEL(V1, V2, V3, CL, Q2, Q3, E50, TOTAMT)
+		PROPOFOL_ELEVELD model = pmx_model_propofol_eleveld(
+			&(PROPOFOL_ELEVELD_COVARIATES) {
+				.age = age,
+				.weight = wgt,
+				.height = hgt,
+				.female = (m1f2 == 2) ? true : false,
+				.opiates = true,
+			});
+		V1 = model.V1;
+		V2 = model.V2;
+		V3 = model.V3;
+		CL = model.CL;
+		Q2 = model.Q2;
+		Q3 = model.Q3;
+		E50 = model.E50;
+
+		TCIINIT(.k10 = model.k10,
+				.k12 = model.k12,
+				.k21 = model.k21,
+				.k13 = model.k13,
+				.k31 = model.k31,
+				.ke0 = model.KE0,
+				.vc = V1,
+				.target_effect = true);
+
+		TOTAMT = TCITARGET(E50);
+	\$PREDICT(IPRED)
+		IPRED = A(1)/V1;
+		Y = IPRED*(1 + ERR(1));
+	\$MAIN 
+		predict();
+		table("ID TIME AGE WGT HGT M1F2 IPRED TOTAMT E50");
+CONTROLFILE
+
+echo ... do OPENPMX simulation
+	../../openpmx tcisimulation.gr
+	
+R --vanilla --slave <<-RSCRIPT
+
+	data <- read.table("tcisimulation.gr.table.1.txt", sep="", header=TRUE)
+	print(head(data, n=30))
+
+	# after induction, get dose in mg/kg
+	induction <- data[data\$TIME == 1, ]
+	induction\$DOSEMGKG <- induction\$TOTAMT / induction\$WGT
+	
+	print(induction)
+	
+	postscript(file="$TEMP/tcisimulation.ps", horizontal=TRUE)
+	par(mfrow=c(2, 3))
+	
+	x <- induction\$AGE
+	y <- induction\$DOSEMGKG
+	plot(x=x, y=y, type='n', xlim=c(0,max(x)), ylim=c(0,max(y)), xlab="Age (years)", ylab="Induction dose (mg/kg)")
+	points(x=x, y=y, pch=".")
+	grid()
+	
+	x <- data\$TIME
+	y <- data\$IPRED
+	plot(x=x, y=y, type='n', xlim=c(0,max(x)), ylim=c(0,max(y)), xlab="Time (min)", ylab="Plasma conc")
+	for (id in unique(data\$ID)) {
+		idata <- data\$ID == id
+		
+		x <- data[idata, "TIME"]
+		y <- data[idata, "IPRED"]
+		lines(x=x, y=y, col="grey")
+	}
+	grid()
+
+	
+	
+	
+	dev.off()
+RSCRIPT
+
+echo ... making PDF 
+gs -sDEVICE=pdfwrite -sOutputFile=${OUTPUTFILE}.pdf -dBATCH -dQUIET -dNOPAUSE -dAutoRotatePages=/None ${TEMP}/tcisimulation.ps
+rm -f ${TEMP}/tcisimulation.ps
+
+# tell the user it worked when we exit
+COMPLETION_MESSAGE=""
+rm -rf ${TEMP}
+

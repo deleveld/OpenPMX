@@ -260,8 +260,6 @@ typedef struct {
 	double step_refine;
 	double step_final;
 	int maxeval;
-
-	bool icov_resample;
 } STAGE1CONFIG;
 
 void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const evalconfig);

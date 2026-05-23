@@ -39,8 +39,6 @@ typedef struct {
 	double* const yhatvar;
 	double* const pred;
 	PREDICTVARS* const predictvars;
-	double* icovsample;
-	double* icovweight;
 	double* isimerr;	/* only for simulation */
 
 	/* objective function */
@@ -97,9 +95,6 @@ void idata_set_eta(IDATA* const idata, const double* eta);
 
 double* idata_alloc_simerr(const IDATA* const idata);
 void idata_free_simerr(const IDATA* const idata);
-
-void idata_alloc_icovresample(const IDATA* const idata);
-void idata_free_icovresample(const IDATA* const idata);
 
 void table_phi_idata(const char* filename,
 					 const IDATA* const idata,

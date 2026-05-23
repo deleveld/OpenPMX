@@ -1,0 +1,36 @@
+$DATA("tcisimulationdata.csv")
+amt = 0.;
+$ADVAN(threecomp)
+$IMODEL(V1, V2, V3, CL, Q2, Q3, E50, TOTAMT)
+PROPOFOL_ELEVELD model = pmx_model_propofol_eleveld(
+&(PROPOFOL_ELEVELD_COVARIATES) {
+.age = age,
+.weight = wgt,
+.height = hgt,
+.female = (m1f2 == 2) ? true : false,
+.opiates = true,
+});
+V1 = model.V1;
+V2 = model.V2;
+V3 = model.V3;
+CL = model.CL;
+Q2 = model.Q2;
+Q3 = model.Q3;
+E50 = model.E50;
+
+TCIINIT(.k10 = model.k10,
+.k12 = model.k12,
+.k21 = model.k21,
+.k13 = model.k13,
+.k31 = model.k31,
+.ke0 = model.KE0,
+.vc = V1,
+.target_effect = true);
+
+TOTAMT = TCITARGET(E50);
+$PREDICT(IPRED)
+IPRED = A(1)/V1;
+Y = IPRED*(1 + ERR(1));
+$MAIN 
+predict();
+table("ID TIME AGE WGT HGT M1F2 IPRED TOTAMT E50");

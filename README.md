@@ -95,11 +95,20 @@ In directory `examples/warfarin` contains data obtained from [here](http://clinp
 The PK-PD analysis example is:
 - `../../openpmx warfarin.gr`
 
+### Target-controlled-infusion (TCI) dosing
+In directory `examples/tci` contains an example simulation of TCI infusion
+simulations. 
+
+The `./tcisimulation` script reproduces Figure 5 of Eleveld DJ, Colin P, Absalom AR, Struys MM. Pharmacokinetic–pharmacodynamic model for propofol for broad application in anaesthesia and sedation. British journal of anaesthesia. 2018 May 1;120(5):942-59.
+but over a population from the [NHANES](https://wwwn.cdc.gov/nchs/nhanes/) data. The script requires R and Ghostscript.
+
 # Contributors
 - Your name (yourname@email.com) Very important thing elegantly coded.
-- Jona Joachim (jona@joachim.cc) Contributed the code in `src/advan/ministan` which is a modernized version of Stanpump. 
-This is used in code for a TCI dosing controller. See the functions `pmx_advan_tci*`.
-- Erik Olofsen () contributed documentation for the control file.
+- Jona Joachim (jona@joachim.cc) Contributed the code in `src/advan/ministan` which is 
+a modernized version of [Stanpump](https://opentci.org/code/stanpump). 
+This is used in code for a TCI dosing controller. See the functions `pmx_advan_tci*` and 
+`examples/tci`.
+- Erik Olofsen (e.olofsen@weggetjes.nl) contributed documentation for the control file.
 - Jona Joachim (jona@joachim.cc) Contributed the eigensystem advancer `$ADVAN(eigen)`
 	which uses eigendecomposition to obtain exact, analytical solutions for any linear
 	compartmental model. It can replace both the analytical ADVANs and
