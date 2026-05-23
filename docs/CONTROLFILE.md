@@ -261,7 +261,7 @@ $IMODEL(V1, V2, V3, CL, Q2, Q3)
 
 ### Target-controlled-infusion (TCI) dose controller
 
-Dosing can be driven by a TCI controller. Within the `$IMODEL(...)` can `TCINIT(...)`
+Dosing can be driven by a TCI controller. Within the `$IMODEL(...)` call `TCINIT(...)`
 with a `TCICONFIG` object containing the controller options. The first call does setup
 for the controller. Subsequent calls return immediately. The initial target is
 0 so no dosing is given.
@@ -270,10 +270,12 @@ If it is computationally expensive to initialze the controller then `TCISTARTED(
 is available which returns if the controller has been started or not. This allows
 the call to `TCIINIT()`, and the constrcution of the `TCICONFIG` object to be skipped.
 
-Calling 'TCITARGET()' sets the target for the TCI controller. This function passes
+Calling `TCITARGET()` sets the target for the TCI controller. This function passes
 doses to the advancer. Setting a negative target turns off the TCI controller. The
 function return the cumulative dose given so far since initialisation of the controller.
- 
+
+Doses given by the TCI controller are independent of any in the data records
+`AMT` and `RATE` coloumns.
 
 Some models for the TCI controller are available in `openpmx_model.h`.
 
