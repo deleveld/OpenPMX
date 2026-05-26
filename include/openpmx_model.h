@@ -104,6 +104,22 @@ typedef struct {
 SUFENTANIL_GEPTS pmx_model_sufentanil_gepts(void);
 
 /*---------------------------------------------------------------------*/
+typedef struct {
+	const double age;		/* years */
+	const double weight;	/* kg */
+	const double height;	/* cm */
+	const bool female;
+	const bool opiates;
+} REMIMAZOLAM_ELEVELD_COVARIATES;
+
+typedef struct {
+	const double V1, V2, V3, CL, Q2, Q3, KE0, E50;
+	const double k10, k12, k21, k13, k31;
+} REMIMAZOLAM_ELEVELD;
+
+REMIMAZOLAM_ELEVELD pmx_model_remimazolam_eleveld(REMIMAZOLAM_ELEVELD_COVARIATES* config);
+
+/*---------------------------------------------------------------------*/
 
 #ifdef __cplusplus
 }

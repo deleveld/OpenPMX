@@ -277,8 +277,6 @@ function return the cumulative dose given so far since initialisation of the con
 Doses given by the TCI controller are independent of any in the data records
 `AMT` and `RATE` coloumns.
 
-Some models for the TCI controller are available in `openpmx_model.h`.
-
 ```c
 PROPOFOL_ELEVELD model = pmx_model_propofol_eleveld(&(PROPOFOL_ELEVELD_COVARIATES) {
 	.age = age,
@@ -297,6 +295,52 @@ TCIINIT(.k10 = model.k10,
 		.target_effect = true);
 TOTAMT = TCITARGET(modelE50);
 ```
+### TCI models available
+
+Some models for the TCI controller are available in `openpmx_model.h`.
+
+#### `pmx_model_propofol_schnider();`
+	
+Schnider T, Minto C, Gambus P, Andresen C, Goodale D, Shafer S, Youngs E:
+The influence of method of administration and covariates on the pharmacokinetics
+of propofol in adult volunteers. Anesthesiology 1998; 88:1170–82 PMID: 9605675
+
+#### `pmx_model_propofol_eleveld();`
+
+Eleveld DJ, Colin P, Absalom AR, Struys MM. Pharmacokinetic–pharmacodynamic
+model for propofol for broad application in anaesthesia and sedation.
+British journal of anaesthesia. 2018 May 1;120(5):942-59.
+
+#### `pmx_model_remifentanil_eleveld();`
+
+Eleveld DJ, Proost JH, Vereecke H, Absalom AR, Olofsen E, Vuyk J,
+Struys MM. An allometric model of remifentanil pharmacokinetics and
+pharmacodynamics. Anesthesiology. 2017 Jun 1;126(6):1005-18.
+
+#### `pmx_model_remifentanil_minto();`
+
+Minto CF, Schnider TW, Egan TD, Youngs E, Lemmens HJ, Gambus PL,
+Billard V, Hoke JF, Moore KH, Hermann DJ, Muir KT. Influence of age
+and gender on the pharmacokinetics and pharmacodynamics of
+remifentanil: I. Model development. Anesthesiology. 1997 Jan 1;86(1):10-23.
+
+Minto CF, Schnider TW, Shafer SL. Pharmacokinetics and pharmacodynamics
+of remifentanil: II. Model application. Anesthesiology. 1997 Jan
+1;86(1):24-33.
+
+#### `pmx_model_sufentanil_gepts();`
+
+Gepts E, Shafer SL, Camu F, Stanski DR, Woestenborghs R, Van Peer A,
+Heykants JJ. Linearity of pharmacokinetics and model estimation of
+sufentanil. Anesthesiology. 1995 Dec 1;83(6):1194-204. 
+
+#### `pmx_model_remimazolam_eleveld();`
+
+Eleveld DJ, Colin PJ, Van den Berg JP, Koomen JV, Stoehr T, Struys MM. 
+Development and analysis of a remimazolam pharmacokinetics and 
+pharmacodynamics model with proposed dosing and concentrations for 
+anaesthesia and sedation. British Journal of Anaesthesia. 
+2025 Jul 1;135(1):206-17. 
 
 ---
 

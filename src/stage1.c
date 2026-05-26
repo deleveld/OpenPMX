@@ -15,6 +15,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file does the inner (stage 1, conditional, posthoc) estimation.
+
+/// All of the functions in this file only touch individual data so they
+/// can be called in parallel, i.e. individual can be processed in seperate
+/// threads.
+
 #include <string.h>
 #include <assert.h>
 #include <float.h>
@@ -120,6 +126,8 @@ static bool estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 //	let npt_min = n+2;				/* minimum */
 //	let npt_max = (n+1)*(n+2)/2;	/* maximum */
 
+/// If all of the eta values are zero then an initial estimation run is done
+/// with step sizes from step_initial to step_refine. 
 	let wsize = (npt+5)*(npt+n)+3*n*(n+5)/2 + 10; 	/* a little bit extra room to be sure */
 	var w = mallocvar(double, wsize);
 	if (all_eta_zero) {
@@ -136,6 +144,8 @@ static bool estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 		}
 	}
 
+/// After this a refinement estimation run is done with step sizes from
+/// step_refine to step_final. 
 	/* regular refinement optimization */
 	/* we dont need to realloc because the previous memory in w is enough */
 	rhobeg = stage1->step_refine;
@@ -177,8 +187,13 @@ static void write_icov_from_reduced(double* icov,
 	}
 }
 
-/* calculate individual variance covariance matrix
- * yhatvar must be non-zero for all observations and zero for non-observations */
+/// After minimization the individual covariance matrix is calculated
+/// using the derivative of predictions with respect to eta i.e.
+/// the jacobian. This is the third term in the objective function.
+/// The approach does take into account the changes in V for different
+/// eta values, so it properly handles eta-sigma interaction.
+
+/* calculate individual variance covariance matrix */
 static double stage1_individcov(const int nreta,
 								const double reta[static nreta],
 								const STAGE1_PARAMS* const params,
@@ -191,11 +206,6 @@ static double stage1_individcov(const int nreta,
 	let popparam = &ievaluate_args->popparam;
 	let gradient_step = params->stage1->gradient_step;
 	double* eval_msec = params->eval_msec;
-
-	/* for now accumulate the inverse in reducedcov */
-	var reducedcov = gsl_matrix_alloc(nreta, nreta);
-	let omegainverse = gsl_matrix_const_view_array(nonzero->inversedata, nreta, nreta);
-	gsl_matrix_memcpy(reducedcov, &omegainverse.matrix);
 
 	assert(nreta > 0);
 	assert(nrecord > 0);
@@ -223,7 +233,10 @@ static double stage1_individcov(const int nreta,
 		if (omega_var != 0.)
 			step = sqrt(omega_var);
 		step = fmax(step, gradient_step);
-		/* TODO: this still needs to be verified that it is optimal compared to just using gradient_step */
+		/* TODO: this still needs to be verified that it is optimal compared
+		 * to just using gradient_step, or even along the eigenvectors
+		 * of icov. In that case we can get the objective function at the
+		 * critical points basically for free. */
 
 		/* step eta forward */
 		let above = v + step;
@@ -273,6 +286,11 @@ static double stage1_individcov(const int nreta,
 	free(yhatvar_plus_h);
 	free(f_minus_h);
 	free(yhatvar_minus_h);
+
+	/* for now accumulate the inverse in reducedcov */
+	var reducedcov = gsl_matrix_alloc(nreta, nreta);
+	let omegainverse = gsl_matrix_const_view_array(nonzero->inversedata, nreta, nreta);
+	gsl_matrix_memcpy(reducedcov, &omegainverse.matrix);
 
 	/* we made J such that tJ*J is tGi*invVi*Gi in Term 5 from Bae and Yim */
 	/* multiply and accumulate omega inverse, all in one command */
@@ -417,7 +435,7 @@ void stage1_thread(INDIVID* const individ,
 	 * did in the evaluate above */
 	
 	/* on first run, do it more than once to stabilize step sizes */
-	let niter = all_eta_zero ? 10 : 1;
+	let niter = all_eta_zero ? 4 : 1;
 	forcount(i, niter) {
 
 		/* regular icov calcualtion via first derivatives. This adds the
@@ -429,10 +447,6 @@ void stage1_thread(INDIVID* const individ,
 												reta,
 												&stage1_params,
 												icov);
-//		if (!gsl_finite(individ->icov_lndet)) {
-//			warning(0, "ID %f lndet is not finite\n", individ->ID);
-//			individ->icov_lndet = 100.;
-//		}
 
 		/* if icov does not change, we can stop now */
 		if (fabs(last_icov_lndet - individ->icov_lndet) < 0.01)

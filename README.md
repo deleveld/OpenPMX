@@ -106,7 +106,7 @@ but over a population from the [NHANES](https://wwwn.cdc.gov/nchs/nhanes/) data.
 - Your name (yourname@email.com) Very important thing elegantly coded.
 - Jona Joachim (jona@joachim.cc) Contributed the code in `src/advan/ministan` which is 
 a modernized version of [Stanpump](https://opentci.org/code/stanpump). 
-This is used in code for a TCI dosing controller. See the functions `pmx_advan_tci*` and 
+This is used in code for a TCI dosing controller. See the functions `pmx_advan_tci_*` and 
 `examples/tci`.
 - Erik Olofsen (e.olofsen@weggetjes.nl) contributed documentation for the control file.
 - Jona Joachim (jona@joachim.cc) Contributed the eigensystem advancer `$ADVAN(eigen)`

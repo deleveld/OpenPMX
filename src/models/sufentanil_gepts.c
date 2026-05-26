@@ -17,7 +17,7 @@
 
 /// This file implements the Gepts sufentanil model
 ///
-///	Gepts E, Shafer SL, Camu F, Stanski DR, Woestenborghs R, Van Peer A,
+/// Gepts E, Shafer SL, Camu F, Stanski DR, Woestenborghs R, Van Peer A,
 /// Heykants JJ. Linearity of pharmacokinetics and model estimation of
 /// sufentanil. Anesthesiology. 1995 Dec 1;83(6):1194-204. 
 ///

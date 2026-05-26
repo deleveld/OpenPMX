@@ -6,8 +6,8 @@ int find_peak(Config *cfg, int current_time, double rate, double temp1e,
   double earlier;
   double later;
 
-  int delta_seconds = cfg->delta_seconds;
-  double *e_udf = cfg->e_udf;
+  const int delta_seconds = cfg->delta_seconds;
+  const double *e_udf = cfg->e_udf;
 
   /* set up initial values */
   current =

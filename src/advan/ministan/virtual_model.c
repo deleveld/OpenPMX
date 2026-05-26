@@ -8,7 +8,7 @@ double virtual_model(Config *cfg, double vm1, double vm2, double vm3,
 
   int peak_time = cfg->peak_time;
   double *eff_df = cfg->eff_df;
-  double *lambda = cfg->lambda;
+  const double *lambda = cfg->lambda;
 
   if (flag && t > peak_time + 1) {
     print_error("Time error in virtual_model");

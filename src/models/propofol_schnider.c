@@ -17,9 +17,9 @@
 
 /// This file implements the Schnider propofol model.
 ///
-///	Schnider T, Minto C, Gambus P, Andresen C, Goodale D, Shafer S, Youngs E:
-///	The influence of method of administration and covariates on the pharmacokinetics
-///	of propofol in adult volunteers. Anesthesiology 1998; 88:1170–82 PMID: 9605675
+/// Schnider T, Minto C, Gambus P, Andresen C, Goodale D, Shafer S, Youngs E:
+/// The influence of method of administration and covariates on the pharmacokinetics
+/// of propofol in adult volunteers. Anesthesiology 1998; 88:1170–82 PMID: 9605675
 ///
 
 #include "openpmx_model.h"

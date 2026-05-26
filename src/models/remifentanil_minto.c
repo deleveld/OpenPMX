@@ -22,7 +22,6 @@
 /// and gender on the pharmacokinetics and pharmacodynamics of
 /// remifentanil: I. Model development. Anesthesiology. 1997 Jan 1;86(1):10-23.
 ///
-/// And:
 /// Minto CF, Schnider TW, Shafer SL. Pharmacokinetics and pharmacodynamics
 /// of remifentanil: II. Model application. Anesthesiology. 1997 Jan
 /// 1;86(1):24-33.

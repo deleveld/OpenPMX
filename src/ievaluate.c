@@ -124,7 +124,6 @@ typedef struct {
 
 	/* will be cast to IMODEL */
 	double _imodel[OPENPMX_IMODEL_MAX]				__attribute__((aligned(32)));
-
 } ADVAN_MODEL_MEMORY;
 
 /* functions for Bae and Yim objective function Term 1 and Term 2 */
