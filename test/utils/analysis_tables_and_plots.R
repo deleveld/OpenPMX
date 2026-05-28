@@ -42,7 +42,11 @@
 	mdifabspe <- data.frame()
 	correlation <- data.frame()
 
-	setup_par()
+	n_params <- 0
+	n_params_openpmx <- 0
+	n_params_nonmem <- 0
+
+	par(mfrow=c(3, 4), mar=c(2,2,2,0), oma=c(0,0,1,1), cex=1.)
 	for (i in trueparams) {
 		paramname <- i["tabname"]
 		trueval <- as.numeric(i["trueval"])
@@ -102,10 +106,15 @@
 		}
 		calc_medrerr <- function(est1, est2, trueval)
 		{
-			est1 <- abs(est1 - trueval) / trueval * 100
-			est2 <- abs(est2 - trueval) / trueval * 100
+			est1 <- abs((est1 - trueval) / trueval) * 100
+			est2 <- abs((est2 - trueval) / trueval) * 100
 
-			ret <- quantile(est1 - est2, 0.5)
+			v <- est1 - est2
+			ret <- median(v)
+			w <- wilcox.test(v, alternative="two.sided")
+			pval <- w[["p.value"]]
+			if (is.na(pval) || pval > 0.05 || abs(ret) < 0.1) 
+				ret <- 0
 			ret
 		}
 		calc_perf <- function(est, trueval)
@@ -186,55 +195,81 @@
 			if (min(xlim) < 0)
 				xlim[1] <- 0
 		}
-		
-		d0 <- density(tallv, na.rm=TRUE)
-		plot(d0, type="n", yaxt="n", xlab=NA, ylab=NA, xlim=(xlim), ylim=c(0,1.4), log=log, main=NA, xaxs=xaxs, yaxs="i")
-		mtext("Density", side=2, line=0.5, cex=par()$cex)
 
-		for (i in 1:nmethods) {
-			d <- allmethods[[i]]
-			data <- d[["data"]]
-			col <- d[["col"]]
-			lw <- d[["lw"]]
-			v <- data[[paramname]]
-			if (logv == TRUE)
-				v <- exp(v)	
-			d1 <- density(v, na.rm=TRUE)
-			lines(x=(d1$x), y=d1$y/max(d1$y), col=col, lw=lw)
+		ppp <- mdifabspe["OpenPMX", displayname]
+		n_params <- n_params + 1
+		if (ppp != 0) {
+			d0 <- density(tallv, na.rm=TRUE)
+			plot(d0, type="n", yaxt="n", xlab=NA, ylab=NA, xlim=(xlim), ylim=c(0,1.8), log=log, main=NA, xaxs=xaxs, yaxs="i")
+			mtext("Density", side=2, line=0.5, cex=par()$cex)
+			
+			if (ppp < 0.) {
+				rect(par("usr")[1], par("usr")[3], par("usr")[2], par("usr")[4], col = "lightgreen")
+				n_params_openpmx <- n_params_openpmx + 1
+			}
+			if (ppp > 0.) {
+				rect(par("usr")[1], par("usr")[3], par("usr")[2], par("usr")[4], col = "lightgrey")
+				n_params_nonmem <- n_params_nonmem + 1
+			}
+
+			for (i in 1:nmethods) {
+				d <- allmethods[[i]]
+				data <- d[["data"]]
+				col <- d[["col"]]
+				lw <- d[["lw"]]
+				v <- data[[paramname]]
+				if (logv == TRUE)
+					v <- exp(v)	
+				d1 <- density(v, na.rm=TRUE)
+				lines(x=(d1$x), y=d1$y/max(d1$y), col=col, lw=lw)
+			}
+			lines(x=(c(trueval,trueval)), y=c(0,1), col="black", lw=2)
+
+			grid()
+			box()
+			
+	#		ttt <- sprintf("%s %s", displayname, units)
+			title(ttt, line=0.5, cex=par()$cex)
+
+			allname <- NA
+			allcol <- NA
+			alllw <- NA
+			for (i in 1:nmethods) {
+				d <- allmethods[[i]]
+				name <- d[["name"]]
+				namerow <- sprintf("%s (%.1f%% %.1f%%)", name, bias[name, displayname], rmse[name, displayname]) 
+				col <- d[["col"]]
+				lw <- d[["lw"]]
+				allname <- c(allname, namerow)
+				allcol <- c(allcol, col)
+				alllw <- c(alllw, lw)
+			}
+			allname <- allname[!is.na(allname)]
+			allcol <- allcol[!is.na(allcol)]
+			alllw <- alllw[!is.na(alllw)]
+
+			# for significant loss 
+			if (ppp != 0) {
+				allname <- c(allname, sprintf("loss %.1f%%", ppp))
+				allcol <- c(allcol, NA)
+				alllw <- c(alllw, NA)
+			}
+
+			legend("topleft",
+				legend=allname,
+				col=allcol,
+				lw=alllw,
+				bty="n", cex=par()$cex*0.8)
 		}
-		lines(x=(c(trueval,trueval)), y=c(0,1), col="black", lw=2)
-
-		grid()
-		box()
-		
-#		ttt <- sprintf("%s %s", displayname, units)
-		title(ttt, line=0.5, cex=par()$cex)
-
-		allname <- NA
-		allcol <- NA
-		alllw <- NA
-		for (i in 1:nmethods) {
-			d <- allmethods[[i]]
-			name <- d[["name"]]
-			namerow <- sprintf("%s (bias %.1f%% rmse %.1f%%)", name, bias[name, displayname], rmse[name, displayname]) 
-			col <- d[["col"]]
-			lw <- d[["lw"]]
-			allname <- c(allname, namerow)
-			allcol <- c(allcol, col)
-			alllw <- c(alllw, lw)
-		}
-		allname <- allname[!is.na(allname)]
-		allcol <- allcol[!is.na(allcol)]
-		alllw <- alllw[!is.na(alllw)]
-
-		legend("topleft",
-			legend=allname,
-			col=allcol,
-			lw=alllw,
-			bty="n", cex=par()$cex*0.85)
 	}
-###	title("Distribution of parameter estimates", outer=TRUE)
-	
+	plot(1, type = "n", xlab = "", ylab = "", axes = FALSE)
+	text(1, 1, sprintf("%s parameters compared\nFor %i OpenPMX better\nFor %i NONMEM better\nFor %i no difference",
+						n_params, n_params_openpmx, n_params_nonmem, n_params - n_params_openpmx - n_params_nonmem),
+		cex=1.2)
+
+	if (exists("main_title"))
+		title(main_title, outer=TRUE, cex.main=1.7)
+
 	print("bias")
 	print(bias)
 

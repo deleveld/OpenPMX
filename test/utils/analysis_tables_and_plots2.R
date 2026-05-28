@@ -49,7 +49,7 @@
 				better <- basename
 			}
 
-			perftable[displayname, "delta"] <- abs(m)
+			perftable[displayname, "delta"] <- m
 			perftable[displayname, "pval"] <- pval
 			perftable[displayname, "better"] <- better
 			perftable <- perftable[order(perftable[["pval"]]), ]
@@ -81,6 +81,7 @@
 		}
 		perftable
 	}
+	
 	if (exists("gronmem") && exists("nonmem")) {
 		setup_par()
 		t <- "OpenPMX vs nonmem"
@@ -88,6 +89,7 @@
 ###		title(paste0("Distribution of RSE ", t), outer=TRUE)
 		print(t)
 		print(d)
+		write.csv(d, file=sprintf("%s_openpmx_vs_nonmem.csv", basename(getwd())))
 	}
 	if (exists("OpenPMX") && exists("nonmemlaplace")) {
 		setup_par()

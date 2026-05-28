@@ -67,8 +67,9 @@ openpmx()
 	cat >control.${DATASET}.gr <<-CONTROLFILE
 	\$DATA("simdata/data.${DATASET}.txt")
 	${OPENPMX_MODEL_INITIAL}
-	openpmx.nthread = ${NUMBERNODES};
-	estimate(.nsig=5.);
+//	openpmx.nthread = ${NUMBERNODES};
+//	estimate(.nsig=5.);
+	estimate();
 CONTROLFILE
 	cat control.${DATASET}.gr
 	start=$(date +%s%3N)
@@ -96,7 +97,7 @@ validate()
 	cat >control.${DATASET}.gr <<-CONTROLFILE
 	\$DATA("simdata/data.${DATASET}.txt")
 	${OPENPMX_MODEL_INITIAL}
-	openpmx.nthread = ${NUMBERNODES};
+//	openpmx.nthread = ${NUMBERNODES};
 	estimate(.nsig=5.);
 CONTROLFILE
 	cat control.${DATASET}.gr

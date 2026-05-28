@@ -76,7 +76,7 @@ static inline void add_infusion(ADVANINFUSION *arr, int *size, const ADVANINFUSI
 {
 	arr[*size] = *newinf;
     (*size)++;
-    assert(*size <= OPENPMX_SIMULINFUSION_MAX);
+    assert(*size < OPENPMX_SIMULINFUSION_MAX);
 }
 
 static inline void remove_infusion(ADVANINFUSION *arr, int *size, int index)

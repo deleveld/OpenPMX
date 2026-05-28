@@ -160,13 +160,29 @@ static bool estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 	return all_eta_zero;
 }
 
+static void write_icov_from_reduced(double* icov, 
+									const NONZERO* const nonzero,
+									const gsl_matrix* const reducedcov,
+									const int nomega)
+{
+	let nreta = reducedcov->size1;
+	let rowcol = nonzero->rowcol;
+	forcount(i, nreta) {
+		forcount(j, nreta) {
+			let row = rowcol[i];
+			let col = rowcol[j];
+			let v = gsl_matrix_get(reducedcov, i, j);
+			icov[row * nomega + col] = v;
+		}
+	}
+}
+
 /* calculate individual variance covariance matrix
  * yhatvar must be non-zero for all observations and zero for non-observations */
-static void stage1_reducedicov(gsl_matrix * const reducedicov,
-							   const int nreta,
-							   const double reta[static nreta],
-							   const STAGE1_PARAMS* const params,
-							   const double* icov)
+static double stage1_individcov(const int nreta,
+								const double reta[static nreta],
+								const STAGE1_PARAMS* const params,
+								double* icov)
 {
 	double* testeta = params->testeta;
 	let nonzero = params->nonzero;
@@ -175,10 +191,6 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 	let popparam = &ievaluate_args->popparam;
 	let gradient_step = params->stage1->gradient_step;
 	double* eval_msec = params->eval_msec;
-
-	let omegainverse_data = nonzero->inversedata;
-	let omegainverse = gsl_matrix_const_view_array(omegainverse_data, nreta, nreta);
-	gsl_matrix_memcpy(reducedicov, &omegainverse.matrix);
 
 	assert(nreta > 0);
 	assert(nrecord > 0);
@@ -206,7 +218,10 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 		if (omega_var != 0.)
 			step = sqrt(omega_var);
 		step = fmax(step, gradient_step);
-		/* TODO: this still needs to be verified that it is optimal compared to just using gradient_step */
+		/* TODO: this still needs to be verified that it is optimal compared
+		 * to just using gradient_step, or even along the eigenvectors
+		 * of icov. In that case we can get the objective function at the
+		 * critical points basically for free. */
 
 		/* step eta forward */
 		let above = v + step;
@@ -252,154 +267,42 @@ static void stage1_reducedicov(gsl_matrix * const reducedicov,
 			ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
 		}
 	}
-	/* we made J such that tJ*J is tGi*invVi*Gi in Term 5 from Bae and Yim */
-	/* multiply and accumulate omega inverse, all in one command */
-	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1., J, J, 1., reducedicov);
-
 	free(f_plus_h);
 	free(yhatvar_plus_h);
 	free(f_minus_h);
 	free(yhatvar_minus_h);
+
+	/* for now accumulate the inverse in reducedcov */
+	var reducedcov = gsl_matrix_alloc(nreta, nreta);
+	let omegainverse = gsl_matrix_const_view_array(nonzero->inversedata, nreta, nreta);
+	gsl_matrix_memcpy(reducedcov, &omegainverse.matrix);
+
+	/* we made J such that tJ*J is tGi*invVi*Gi in Term 5 from Bae and Yim */
+	/* multiply and accumulate omega inverse, all in one command */
+	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1., J, J, 1., reducedcov);
 	gsl_matrix_free(J);
-}
 
-/* Here we refine the covariance matrix by taking samples at the
- * "sigma" points (1 SD from center) and estimating ln(det(icov))
- * via the Akaike weights. Maybe we could also use the cholesky
- * points, but then the specific points used will depend on the ordering
- * of the etas and that is not desirable for an optimization method */
-static double stage1_icov_resample(const gsl_matrix * const reducedicov,
-								   double* icovweight,
-								   double* icovsample,
-								   const int nreta,
-								   const double reta[static nreta],
-								   const double base_iobjfn,
-								   const STAGE1_PARAMS* const stage1_params)
-{
-	/* eigenvalue decomposition */
-	var ework = gsl_matrix_alloc(nreta, nreta);
-	var eval = gsl_vector_alloc(nreta);
-	var evec = gsl_matrix_alloc(nreta, nreta);
-	var w = gsl_eigen_symmv_alloc(nreta);
-	gsl_matrix_memcpy(ework, reducedicov);
-	gsl_eigen_symmv(ework, eval, evec, w);
-
-	/* There will be 2*nreta samples and weights and the allocated memory
-	 * will allow 2*nomega. The unused ones will be denoted by zero weights
-	 * and zero sample etas */
-	let nomega = stage1_params->ievaluate_args.popparam.nomega;
-	memset(icovweight, 0, 2 * nomega * sizeof(double));
-	memset(icovsample, 0, 2 * nomega * nomega * sizeof(double));
-
-	/* make sure we can evaluate at a test point without changing the
-	 * predictions of the individual */
-	double testreta[OPENPMX_OMEGA_MAX] = { };
-	let stage1 = stage1_params->stage1;
-	forcount(i, nreta) {
-		/* magnitude of step is the square root of eigenvalue */
-		var stepsize = sqrt(gsl_vector_get(eval, i));
-		if (stepsize < stage1->gradient_step)
-			stepsize = stage1->gradient_step;
-
-		/* sample on the positive direction of the eigenvectors and correct for sampling weight */
-		forcount(j, nreta) {
-			let v = gsl_matrix_get(evec, j, i); /* eigevnectors are coloumns */
-			testreta[j] = reta[j] + stepsize * v;
+	/* we have added the contribution of the population omega inverse with
+	   the contribution from each individual to get the individual covariance,
+	   well, the inverse of it. Now we have to invert to get the actual
+	   individual covariance matrix */
+	let oldhandler = gsl_set_error_handler_off();
+	if (gsl_linalg_cholesky_decomp1(reducedcov) != GSL_SUCCESS) {
+		forcount(i, nreta) {
+			let val = gsl_matrix_get(reducedcov, i, i);
+			gsl_matrix_set(reducedcov, i, i, val + 1e-6); 
 		}
-		var etaval_iobjfn = stage1_evaluate_individual_iobjfn(nreta, testreta, (void*)stage1_params);
-		var delta = etaval_iobjfn - base_iobjfn;
-		var lik = exp(-0.5*delta);
-		let w1 = lik / exp(-0.5*1.);
-			
-		/* save the eta used in the individual */
-		icovweight[i * 2] = w1;
-		forcount(k, nomega)
-			icovsample[(i * 2) * nomega + k] = stage1_params->testeta[k];
-
-		/* sample on the negative direction of the eigenvectors and correct for sampling weight */
-		forcount(j, nreta) {
-			let v = gsl_matrix_get(evec, j, i); /* eigevnectors are coloumns */
-			testreta[j] = reta[j] - stepsize * v;
-		}
-		etaval_iobjfn = stage1_evaluate_individual_iobjfn(nreta, testreta, (void*)stage1_params);
-		delta = etaval_iobjfn - base_iobjfn;
-		lik = exp(-0.5*delta);
-		let w2 = lik / exp(-0.5*1.);
-
-		/* save the eta used in the individual */
-		icovweight[i * 2 + 1] = w2;
-		forcount(k, nomega)
-			icovsample[(i * 2 + 1) * nomega + k] = stage1_params->testeta[k];
+		gsl_linalg_cholesky_decomp1(reducedcov);
 	}
-	
-	/* should we do weighted covariance calculation of the sampled points?
-	 * NO because the lndet_icov does not match the sampling matrix!
-	 * It should be in the documentation that this is the symmetric matrix
-	 * used for sampling and not the one that determined log(det) */
-	/* For now we just keep the sampling icov in the same place */
-/*	forcount(j, nreta) {
-		forcount(k, j + 1) {
-			var s = 0.;
-			forcount(i, nreta * 2) {
-				let xbarj = reta[j];
-				let xbark = reta[k];
-				let xij = gsl_matrix_get(retavals, i, j);
-				let xik = gsl_matrix_get(retavals, i, k);
-				let wi = icovweight[i] * 0.5;
-				s += wi * (xij - xbarj) * (xik - xbark);
-			}
-			gsl_matrix_set(reducedicov, j, k, s);
-			gsl_matrix_set(reducedicov, k, j, s);
-		}
-	} */
-	
-	/* we have to average the weights on the eigenvectors
-	 * and take advantage of the fact that determinant of a matrix is
-	 * the product of its eigenvectors, in this case, scaled eigenvectors,
-	 * with two of them (forward and backward) for each dimension.
-	 * Here we take advantage of log(a*b) = log(a) + log(b) which is
-	 * probably more accurate. Does this mean that sampling from icov is
-	 * not the same as sampling from the individual because our determinant
-	 * is asymmetric? I think this does mean the assumption of normal
-	 * distribution is relaxed with respect to the minimum objective
-	 * function that we will minimize to */
-	var sumlogeval = 0.;
-	forcount(i, nreta) {
-		let w1 = icovweight[i * 2];
-		let w2 = icovweight[i * 2 + 1];
-		let eivar = gsl_vector_get(eval, i);
-//		let eisd = sqrt(eivar);
-//		sumlogeval += log(eisd * w1) + log(eisd * w2); /* weighting via SD */
+	gsl_set_error_handler(oldhandler);
+	let lndet = matrix_lndet_from_cholesky(reducedcov);
+	gsl_linalg_cholesky_invert(reducedcov);
 
-		/* average eigenvaue */
-		let avg_eivar = (eivar * w1 + eivar * w2) / (w1 + w2);
-		sumlogeval += log(avg_eivar);
-	}
-	let icov_lndet = -1. * sumlogeval; /* we get lndet from inverse, so we have -1 here */
+	/* update icov now */
+	write_icov_from_reduced(icov, nonzero, reducedcov, nomega);
+	gsl_matrix_free(reducedcov);
 
-	gsl_eigen_symmv_free(w);
-	gsl_vector_free(eval);
-	gsl_matrix_free(evec);
-	gsl_matrix_free(ework);
-
-	return icov_lndet;
-}
-
-static void write_icov_from_reduced(double* icov, 
-									const NONZERO* const nonzero,
-									const gsl_matrix* const reducedicov,
-									const int nomega)
-{
-	let nreta = reducedicov->size1;
-	let rowcol = nonzero->rowcol;
-	forcount(i, nreta) {
-		forcount(j, nreta) {
-			let row = rowcol[i];
-			let col = rowcol[j];
-			let v = gsl_matrix_get(reducedicov, i, j);
-			icov[row * nomega + col] = v;
-		}
-	}
+	return lndet;
 }
 
 /* NOTE: this function must be thread safe on the level of an individual */
@@ -512,73 +415,28 @@ void stage1_thread(INDIVID* const individ,
 		return;
 
 	/* compute inverse covariance of best fit */
-	/* fill in the total individual covariance matrix from the reduced one */
-	/* This needs the individual YHATVAR to be calculated */
-	var reducedicov = gsl_matrix_alloc(nreta, nreta);
+	/* fill in the total individual covariance matrix */
+	/* This needs the individual YHATVAR to be calculated whcih we
+	 * did in the evaluate above */
 	
 	/* on first run, do it more than once to stabilize step sizes */
-	let niter = all_eta_zero ? 10 : 1;
+	let niter = all_eta_zero ? 4 : 1;
 	forcount(i, niter) {
-		let last_icov_lndet = individ->icov_lndet;
 
 		/* regular icov calcualtion via first derivatives. This adds the
 		 * contribution of the population omega inverse with the
-		 * contribution from each individual to get the individual
-		 * covariance, well, the inverse of it. */
-		stage1_reducedicov(reducedicov,
-						   nreta,
-						   reta,
-						   &stage1_params,
-						   icov);
-		
-		/* we have added the contribution of the population omega inverse with
-		   the contribution from each individual to get the individual covariance,
-		   well, the inverse of it. Now we have to invert to get the actual
-		   individual covariance matrix */
-		/* This could possibly be safer with another decomposition method?
-		   maybe it does not matter */
-		gsl_linalg_cholesky_decomp1(reducedicov);
-		individ->icov_lndet = matrix_lndet_from_cholesky(reducedicov);
+		 * contribution from each individual to get the inverse individual
+		 * covariance and then inverts that and writes icov back */
+		let last_icov_lndet = individ->icov_lndet;
+		individ->icov_lndet = stage1_individcov(nreta,
+												reta,
+												&stage1_params,
+												icov);
 
-		if (!gsl_finite(individ->icov_lndet)) {
-			warning(0, "ID %f lndet is not finite\n", individ->ID);
-			individ->icov_lndet = 100.;
-		}
-		gsl_linalg_cholesky_invert(reducedicov);
-
-		/* We use icov for determining the step size when doing the icov
-		 * calculation via gradients in stage1_reducedicov so we cant
-		 * skip this and have to do it within the loop */
-		write_icov_from_reduced(icov, nonzero, reducedicov, nomega);
-		
 		/* if icov does not change, we can stop now */
 		if (fabs(last_icov_lndet - individ->icov_lndet) < 0.01)
 			break;
 	}
-
-	/* Here we refine the covariance matrix by taking samples at the
-	 * inflection points (1 SD from center) and doing a weighted covariance
-	 * matrix estimation. */
-	if (options->estimate.stage1.icov_resample) {
-		let base_iobjfn = obs_min2ll + obs_lndet + individ->eta_min2ll;
-		let icov_resample_lndet = stage1_icov_resample(reducedicov,
-													   individ->icovweight,
-													   individ->icovsample,
-													   nreta,
-													   reta,
-													   base_iobjfn,
-													   &stage1_params);
-		if (gsl_finite(icov_resample_lndet))
-			individ->icov_lndet = icov_resample_lndet;
-		else
-			warning(0, "icov resample lndet is not finite, ignoring\n");
-	}
-
-	/* We use icov for determining the step size when doing the icov calculation
-	   via gradients in stage1_reducedicov so we cant skip this */
-	write_icov_from_reduced(icov, nonzero, reducedicov, nomega);
-
-	gsl_matrix_free(reducedicov);
 
 	individ->ineval += stage1_ineval;
 	timespec_duration(&t1, &individ->stage1_msec);

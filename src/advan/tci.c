@@ -22,7 +22,7 @@
 #include "advan/advan.h"
 #include "utils/c22.h"
 
-/* include the ministan sorce directly */ 
+/* include the ministan source directly */ 
 #include "advan/ministan/common.h"
 #include "advan/ministan/cube.c"
 #include "advan/ministan/udfs.c"
@@ -87,6 +87,7 @@ void pmx_advan_tci_init(const ADVANSTATE* advanstate, const TCICONFIG* const tci
 		.last_tciconfig = *tciconfig,
 	};
 	cfg_init(&tcicfg.cfg);
+	
 	tcicontrol = mallocvar(TCICONTROL, 1);
 	memcpy(tcicontrol, &tcicfg, sizeof(TCICONTROL));
 	
@@ -98,7 +99,7 @@ static inline void add_infusion(ADVANINFUSION *arr, int *size, const ADVANINFUSI
 {
 	arr[*size] = *newinf;
     (*size)++;
-    assert(*size <= OPENPMX_SIMULINFUSION_MAX);
+    assert(*size < OPENPMX_SIMULINFUSION_MAX);
 }
 
 double pmx_advan_tci_target(const ADVANSTATE* advanstate, const double target)

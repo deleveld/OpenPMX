@@ -196,6 +196,7 @@ SOURCEFILES="pmxstate.c options.c ievaluate.c predict.c stage1.c
 			 models/remifentanil_eleveld.c
 			 models/remifentanil_minto.c
 			 models/sufentanil_gepts.c
+			 models/remimazolam_eleveld.c
 			 utils/vector.c utils/various.c
 			 utils/getdelim.c utils/errctx.c
 			 bobyqa/bobyqa.c"

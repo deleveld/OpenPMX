@@ -138,13 +138,11 @@ $ADVAN(method)
 ### Content 
 
 The block content is a C language designated initializer, thus comma separated  
-key-value pairs:
-
-### Advancer options
+key-value pairs. These define the options of the advancer:
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `.firstonly` | `bool` | `false` | Call `$IMODEL` code only for the first observation per individual |
+| `.firstonly` | `bool` | `false` | Call `$IMODEL` code only for the first ecord per individual |
 | `.predictall` | `bool` | `false` | Compute predictions for all records, not just observations |
 | `.nstate` | `int` | — | Number of state variables (required for `diffeqn_*` or `eigen_*` advancers) |
 | `.args.diffeqn.abstol` | `double` | 1e-9 | Absolute tolerance for ODE solver |
@@ -223,8 +221,8 @@ Parameter names become fields of the `IMODEL` struct. Names may be comma- or spa
 
 ### Content
 
-C code executed once for every record (or optionally on for the first record) before prediction. 
-All of the model parameters should be initialized.
+C code executed once for every record (or optionally on for the first record) 
+while advancing over the records of an individual. All of the model parameters should be initialized.
 
 Withing the function the following are available read-only:
 
@@ -259,6 +257,45 @@ $IMODEL(V1, V2, V3, CL, Q2, Q3)
 	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4);
 	Q2 = THETA(5) * pow(SIZE, 0.75) * exp(ETA(5));
 	Q3 = THETA(6) * pow(SIZE, 0.75) * exp(ETA(6));
+```
+
+### Target-controlled-infusion (TCI) dose controller
+
+Dosing can be driven by a TCI controller. Within the `$IMODEL(...)` call `TCINIT(...)`
+with a `TCICONFIG` object containing the controller options. The first call does setup
+for the controller. Subsequent calls return immediately. The initial target is
+0 so no dosing is given.
+
+If it is computationally expensive to initialze the controller then `TCISTARTED()`
+is available which returns if the controller has been started or not. This allows
+the call to `TCIINIT()`, and the constrcution of the `TCICONFIG` object to be skipped.
+
+Calling `TCITARGET()` sets the target for the TCI controller. This function passes
+doses to the advancer. Setting a negative target turns off the TCI controller. The
+function return the cumulative dose given so far since initialisation of the controller.
+
+Doses given by the TCI controller are independent of any in the data records
+`AMT` and `RATE` coloumns.
+
+Some models for the TCI controller are available in `openpmx_model.h`.
+
+```c
+PROPOFOL_ELEVELD model = pmx_model_propofol_eleveld(&(PROPOFOL_ELEVELD_COVARIATES) {
+	.age = age,
+	.weight = wgt,
+	.height = hgt,
+	.female = (m1f2 == 2) ? true : false,
+	.opiates = true,
+});
+TCIINIT(.k10 = model.k10,
+		.k12 = model.k12,
+		.k21 = model.k21,
+		.k13 = model.k13,
+		.k31 = model.k31,
+		.ke0 = model.KE0,
+		.vc = V1,
+		.target_effect = true);
+TOTAMT = TCITARGET(modelE50);
 ```
 
 ---

@@ -472,10 +472,6 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 	memset(firstindivid->istate, 0, ndata * idata->nstate * sizeof(double));
 
 	idata_free_simerr(idata);
-	if (params->options->estimate.stage1.icov_resample)
-		idata_alloc_icovresample(idata);
-	else
-		idata_free_icovresample(idata);
 
 	/* first run so we can set objective function and yhat. */
 	test_initial_objfn(params);
@@ -675,8 +671,6 @@ static void estimate_popmodel(const char* filename,
 			let ineval = idata_ineval(idata, false);
 			extfile_trailer(params.extstream, popmodel, timestamp, ineval);
 		}
-		if (options->estimate.stage1.icov_resample)
-			table_icov_resample_idata(filename, idata, _offset1);
 	}
 	
 	/* cleanup */
