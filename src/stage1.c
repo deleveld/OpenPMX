@@ -15,6 +15,12 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file does the inner (stage 1, conditional, posthoc) estimation.
+
+/// All of the functions in this file only touch individual data so they
+/// can be called in parallel, i.e. individual can be processed in seperate
+/// threads.
+
 #include <string.h>
 #include <assert.h>
 #include <float.h>
@@ -120,6 +126,8 @@ static bool estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 //	let npt_min = n+2;				/* minimum */
 //	let npt_max = (n+1)*(n+2)/2;	/* maximum */
 
+/// If all of the eta values are zero then an initial estimation run is done
+/// with step sizes from step_initial to step_refine. 
 	let wsize = (npt+5)*(npt+n)+3*n*(n+5)/2 + 10; 	/* a little bit extra room to be sure */
 	var w = mallocvar(double, wsize);
 	if (all_eta_zero) {
@@ -136,6 +144,8 @@ static bool estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 		}
 	}
 
+/// After this a refinement estimation run is done with step sizes from
+/// step_refine to step_final. 
 	/* regular refinement optimization */
 	/* we dont need to realloc because the previous memory in w is enough */
 	rhobeg = stage1->step_refine;
@@ -177,8 +187,13 @@ static void write_icov_from_reduced(double* icov,
 	}
 }
 
-/* calculate individual variance covariance matrix
- * yhatvar must be non-zero for all observations and zero for non-observations */
+/// After minimization the individual covariance matrix is calculated
+/// using the derivative of predictions with respect to eta i.e.
+/// the jacobian. This is the third term in the objective function.
+/// The approach does take into account the changes in V for different
+/// eta values, so it properly handles eta-sigma interaction.
+
+/* calculate individual variance covariance matrix */
 static double stage1_individcov(const int nreta,
 								const double reta[static nreta],
 								const STAGE1_PARAMS* const params,

@@ -148,6 +148,7 @@ echo ... do OPENPMX simulation
 R --vanilla --slave <<-RSCRIPT
 
 	data <- read.table("tcisimulation.gr.table.1.txt", sep="", header=TRUE)
+
 	data\$DOSEMGKG <- data\$TOTAMT / data\$WGT
 	print(head(data, n=30))
 
@@ -185,7 +186,6 @@ R --vanilla --slave <<-RSCRIPT
 
 	dev.off()
 RSCRIPT
-
 
 echo ... making PDF 
 gs -sDEVICE=pdfwrite -sOutputFile=${OUTPUTFILE}.pdf -dBATCH -dQUIET -dNOPAUSE -dAutoRotatePages=/None ${TEMP}/tcisimulation.ps

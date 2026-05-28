@@ -15,6 +15,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/// This file implements at Target-Controlled-Infusion dose controller.
+
 #include <string.h>
 #include <values.h>
 #include <assert.h>
@@ -22,6 +24,8 @@
 #include "advan/advan.h"
 #include "utils/c22.h"
 
+/// Jona Joachim (jona@joachim.cc) Contributed the code in `src/advan/ministan` which is 
+/// a modernized version of [Stanpump](https://opentci.org/code/stanpump).
 /* include the ministan source directly */ 
 #include "advan/ministan/common.h"
 #include "advan/ministan/cube.c"
@@ -34,6 +38,7 @@
 
 typedef struct TCICONTROL {
 	Config cfg;
+	const double peak_time;
 	const int cmt_0;	/* 0-based compartment */
 	double next_time;	/* in TIME units */
 	double totamt; 		/* cumulative dose */
@@ -81,6 +86,7 @@ void pmx_advan_tci_init(const ADVANSTATE* advanstate, const TCICONFIG* const tci
 			.target_effect = tciconfig->target_effect,
 			.delta_seconds = 10,
 		},
+		/* .peak_time set after cfg made */
 		.cmt_0 = cmt_0,
 		.next_time = DBL_MAX,
 		.totamt = 0.,
