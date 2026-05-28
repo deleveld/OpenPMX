@@ -37,7 +37,7 @@ extern "C" {
 
 #define OPENPMX_VERSION_MAJOR			0
 #define OPENPMX_VERSION_MINOR			1
-#define OPENPMX_VERSION_RELEASE			5
+#define OPENPMX_VERSION_RELEASE			6
 
 #define OPENPMX_THETA_MAX				64
 #define OPENPMX_OMEGABLOCKSIZE_MAX		64
@@ -174,6 +174,7 @@ ADVANFUNCS* pmx_advan_diffeqn_test(const DATACONFIG* const dataconfig, const ADV
 typedef struct {
 	const double k10, k12, k13, k21, k31, ke0;	/* in minutes */
 	const double vc;
+	const double max_rate;
 	const bool target_effect;
 	const int cmt;
 } TCICONFIG;
@@ -181,6 +182,8 @@ typedef struct {
 bool pmx_advan_tci_started(const ADVANSTATE* advanstate);
 void pmx_advan_tci_init(const ADVANSTATE* advanstate, const TCICONFIG* const tciconfig);
 double pmx_advan_tci_target(const ADVANSTATE* advanstate, const double target);
+double pmx_advan_tci_plasma_conc(const ADVANSTATE* advanstate);
+double pmx_advan_tci_effect_conc(const ADVANSTATE* advanstate);
 
 /*---------------------------------------------------------------------*/
 /* OPENPMX */

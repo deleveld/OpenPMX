@@ -38,6 +38,7 @@
 
 typedef struct TCICONTROL {
 	Config cfg;
+	const double max_rate;
 	const double peak_time;
 	const int cmt_0;	/* 0-based compartment */
 	double next_time;	/* in TIME units */
@@ -88,6 +89,7 @@ void pmx_advan_tci_init(const ADVANSTATE* advanstate, const TCICONFIG* const tci
 		},
 		/* .peak_time set after cfg made */
 		.cmt_0 = cmt_0,
+		.max_rate = tciconfig->max_rate,
 		.next_time = DBL_MAX,
 		.totamt = 0.,
 		.last_tciconfig = *tciconfig,
@@ -112,7 +114,7 @@ double pmx_advan_tci_target(const ADVANSTATE* advanstate, const double target)
 {
 	var tcicontrol = advanstate->advan->tcicontrol;
 	if (!tcicontrol) {
-		fprintf(stderr, "fatal: tci target but tci not initialized\n");
+		fprintf(stderr, "fatal: %s: tci not initialized\n", __func__);
 		exit(EXIT_FAILURE);
 	}
 
@@ -131,7 +133,13 @@ double pmx_advan_tci_target(const ADVANSTATE* advanstate, const double target)
 		
 	/* Use stanpump to calculate the rate */
 	var cfg = &tcicontrol->cfg;
-	let rate_s = calculate_rate(cfg, target);
+	var rate_s = calculate_rate(cfg, target);
+
+	/* apply maximum rate */
+	if (tcicontrol->max_rate > 0.)
+		rate_s = fmin(rate_s, tcicontrol->max_rate);
+
+	/* use the right rate */
 	advance_rate(cfg, rate_s);
 
 	let delta_seconds = tcicontrol->cfg.delta_seconds;
@@ -160,6 +168,26 @@ double pmx_advan_tci_target(const ADVANSTATE* advanstate, const double target)
 	pmx_advan_inittime(advanstate, next_time);
 
 	return tcicontrol->totamt;
+}
+
+double pmx_advan_tci_plasma_conc(const ADVANSTATE* advanstate)
+{
+	var tcicontrol = advanstate->advan->tcicontrol;
+	if (!tcicontrol) {
+		fprintf(stderr, "fatal: %s: tci not initialized\n", __func__);
+		exit(EXIT_FAILURE);
+	}
+	return tcicontrol->cfg.plasma_conc;
+}
+
+double pmx_advan_tci_effect_conc(const ADVANSTATE* advanstate)
+{
+	var tcicontrol = advanstate->advan->tcicontrol;
+	if (!tcicontrol) {
+		fprintf(stderr, "fatal: %s: tci not initialized\n", __func__);
+		exit(EXIT_FAILURE);
+	}
+	return tcicontrol->cfg.effect_conc;
 }
 
 

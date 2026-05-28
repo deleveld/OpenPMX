@@ -131,6 +131,7 @@ cat <<-CONTROLFILE >tcisimulation.gr
 				.k31 = model.k31,
 				.ke0 = model.KE0,
 				.vc = V1,
+				.max_rate = 1.,
 				.target_effect = true);
 
 		TOTAMT = TCITARGET(E50);
@@ -148,7 +149,6 @@ echo ... do OPENPMX simulation
 R --vanilla --slave <<-RSCRIPT
 
 	data <- read.table("tcisimulation.gr.table.1.txt", sep="", header=TRUE)
-
 	data\$DOSEMGKG <- data\$TOTAMT / data\$WGT
 	print(head(data, n=30))
 
@@ -186,6 +186,7 @@ R --vanilla --slave <<-RSCRIPT
 
 	dev.off()
 RSCRIPT
+
 
 echo ... making PDF 
 gs -sDEVICE=pdfwrite -sOutputFile=${OUTPUTFILE}.pdf -dBATCH -dQUIET -dNOPAUSE -dAutoRotatePages=/None ${TEMP}/tcisimulation.ps
