@@ -101,7 +101,11 @@ ADVANFUNCS* pmx_advan_onecomp(const DATACONFIG* const dataconfig, const ADVANCON
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
-	assert(advanconfig->nstate == 0 || advanconfig->nstate == 1);
+
+	var nstate = advanconfig->nstate;
+	if (nstate == 0)
+		nstate = 1;
+	assert(nstate >= 1);
 
 	let retinit = (ADVANTABLE_ONECOMP) {
 		.advanfuncs = {
@@ -115,7 +119,7 @@ ADVANFUNCS* pmx_advan_onecomp(const DATACONFIG* const dataconfig, const ADVANCON
 
 			.advanconfig = advanconfig,
 			.recordinfo = recordinfo_init(dataconfig),
-			.nstate = 1,
+			.nstate = nstate,
 		},
 		.offsetV1 = structinfo_find_offset("V1", &advanconfig->imodelfields),
 		.offsetCL = structinfo_find_offset("CL", &advanconfig->imodelfields),

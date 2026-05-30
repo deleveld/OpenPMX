@@ -537,7 +537,7 @@ ADVANFUNCS* pmx_advan_eigen_threecomp(const DATACONFIG* const dataconfig,
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
-	assert(advanconfig->nstate == 0 || advanconfig->nstate == 3);
+	assert(advanconfig->nstate == 0 || advanconfig->nstate < 3);
 
 	let retinit = (ADVANFUNCS_EIGEN_THREECOMP) {
 		.eigen = {
@@ -552,7 +552,7 @@ ADVANFUNCS* pmx_advan_eigen_threecomp(const DATACONFIG* const dataconfig,
 
 				.advanconfig = advanconfig,
 				.recordinfo = recordinfo_init(dataconfig),
-				.nstate = 3, /* dont allow user to set */
+				.nstate = advanconfig->nstate,
 			},
 		},
 		.offsetV1 = structinfo_find_offset("V1", &advanconfig->imodelfields),
@@ -660,7 +660,7 @@ ADVANFUNCS* pmx_advan_eigen_twocomp(const DATACONFIG* const dataconfig,
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
-	assert(advanconfig->nstate == 0 || advanconfig->nstate == 2);
+	assert(advanconfig->nstate == 0 || advanconfig->nstate < 2);
 
 	let retinit = (ADVANFUNCS_EIGEN_TWOCOMP) {
 		.eigen = {
@@ -675,7 +675,7 @@ ADVANFUNCS* pmx_advan_eigen_twocomp(const DATACONFIG* const dataconfig,
 
 				.advanconfig = advanconfig,
 				.recordinfo = recordinfo_init(dataconfig),
-				.nstate = 2, /* dont allow user to set */
+				.nstate = advanconfig->nstate,
 			},
 		},
 		.offsetV1 = structinfo_find_offset("V1", &advanconfig->imodelfields),
@@ -775,7 +775,7 @@ ADVANFUNCS* pmx_advan_eigen_onecomp_depot(const DATACONFIG* const dataconfig,
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
-	assert(advanconfig->nstate == 0 || advanconfig->nstate == 2);
+	assert(advanconfig->nstate == 0 || advanconfig->nstate < 2);
 
 	let retinit = (ADVANFUNCS_EIGEN_ONECOMP_DEPOT) {
 		.eigen = {
@@ -790,7 +790,7 @@ ADVANFUNCS* pmx_advan_eigen_onecomp_depot(const DATACONFIG* const dataconfig,
 
 				.advanconfig = advanconfig,
 				.recordinfo = recordinfo_init(dataconfig),
-				.nstate = 2, /* dont allow user to set */
+				.nstate = advanconfig->nstate, /* dont allow user to set */
 			},
 		},
 		.offsetV = structinfo_find_offset("V", &advanconfig->imodelfields),
@@ -896,7 +896,7 @@ ADVANFUNCS* pmx_advan_eigen_twocomp_depot(const DATACONFIG* const dataconfig,
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
-	assert(advanconfig->nstate == 0 || advanconfig->nstate == 3);
+	assert(advanconfig->nstate == 0 || advanconfig->nstate < 3);
 
 	let retinit = (ADVANFUNCS_EIGEN_TWOCOMP_DEPOT) {
 		.eigen = {
@@ -911,7 +911,7 @@ ADVANFUNCS* pmx_advan_eigen_twocomp_depot(const DATACONFIG* const dataconfig,
 
 				.advanconfig = advanconfig,
 				.recordinfo = recordinfo_init(dataconfig),
-				.nstate = 3, /* dont allow user to set */
+				.nstate = advanconfig->nstate, /* dont allow user to set */
 			},
 		},
 		.offsetV1 = structinfo_find_offset("V1", &advanconfig->imodelfields),

@@ -70,7 +70,9 @@ ADVANFUNCS* pmx_advan_pred(const DATACONFIG* const dataconfig, const ADVANCONFIG
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
-	assert(advanconfig->nstate == 0);
+
+	var nstate = advanconfig->nstate;
+	assert(advanconfig->nstate >= 0);
 
 	let retinit = (ADVANFUNCS) {
 		.advan_size = sizeof(ADVANCER_PRED),
@@ -83,7 +85,7 @@ ADVANFUNCS* pmx_advan_pred(const DATACONFIG* const dataconfig, const ADVANCONFIG
 
 		.advanconfig = advanconfig,
 		.recordinfo = recordinfo_init(dataconfig),
-		.nstate = 0,
+		.nstate = nstate,
 	};
 
 	/* make binary copy so init can have const members */

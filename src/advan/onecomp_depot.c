@@ -121,7 +121,11 @@ ADVANFUNCS* pmx_advan_onecomp_depot(const DATACONFIG* const dataconfig, const AD
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
-	assert(advanconfig->nstate == 0 || advanconfig->nstate == 2);
+
+	var nstate = advanconfig->nstate;
+	if (nstate == 0)
+		nstate = 2;
+	assert(nstate >= 2);
 
 	let retinit = (ADVANFUNCS_ONECOMP_DEPOT) {
 		.advanfuncs = {
@@ -135,7 +139,7 @@ ADVANFUNCS* pmx_advan_onecomp_depot(const DATACONFIG* const dataconfig, const AD
 
 			.advanconfig = advanconfig,
 			.recordinfo = recordinfo_init(dataconfig),
-			.nstate = 2,
+			.nstate = nstate,
 		},
 		.offsetV = structinfo_find_offset("V", &advanconfig->imodelfields),
 		.offsetCL = structinfo_find_offset("CL", &advanconfig->imodelfields),

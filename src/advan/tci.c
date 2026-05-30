@@ -43,6 +43,7 @@ typedef struct TCICONTROL {
 	const int cmt_0;	/* 0-based compartment */
 	double next_time;	/* in TIME units */
 	double totamt; 		/* cumulative dose */
+	ADVANINFUSION last_infusion;
 	const TCICONFIG last_tciconfig;
 } TCICONTROL;
 
@@ -128,8 +129,17 @@ double pmx_advan_tci_target(const ADVANSTATE* advanstate, const double target)
 
 	/* we only have to do something when the previous infusion has stopped */
 	let now = advanstate->advan->time;
-	if (tcicontrol->next_time > now && tcicontrol->next_time != DBL_MAX)
-		return totamt;
+	var next_time = tcicontrol->next_time;
+	let last = &tcicontrol->last_infusion;
+	if (next_time > now && next_time != DBL_MAX) {
+		let elapsed = now - last->start;
+		return tcicontrol->totamt + last->rate * elapsed;
+	}
+
+	/* the previous infusion has completed, accumulate its full amount */
+	if (next_time != DBL_MAX)
+		tcicontrol->totamt += last->amt;
+	tcicontrol->last_infusion = (ADVANINFUSION){ };
 		
 	/* Use stanpump to calculate the rate */
 	var cfg = &tcicontrol->cfg;
@@ -142,25 +152,28 @@ double pmx_advan_tci_target(const ADVANSTATE* advanstate, const double target)
 	/* use the right rate */
 	advance_rate(cfg, rate_s);
 
+	/* the infusion should be just shorter than the period so the stop
+	 * and summing happens before the next record. If its exactly the
+	 * same time then they could be processed in the wrong order to
+	 * totamt to be right when putting it into a table */
 	let delta_seconds = tcicontrol->cfg.delta_seconds;
-	let duration = delta_seconds / 60.;
-	let next_time = now + duration;
-	
+	let duration = delta_seconds / 60. - 1e-6;
+
 	/* apply the rate as an infusion, starting now */
+	next_time = now + duration;
 	if (rate_s != 0.) {
 		let amt = rate_s * delta_seconds;
 		let rate = amt / duration;
 		let advan = advanstate->advan;
-		add_infusion(advan->infusions,
-					&advan->ninfusions,
-					&(ADVANINFUSION) {
-						.cmt = tcicontrol->cmt_0,
-						.amt = amt,
-						.rate = rate,
-						.start = now,
-						.end = next_time,
-					});
-		tcicontrol->totamt += amt;
+		let inf = (ADVANINFUSION) {
+			.cmt = tcicontrol->cmt_0,
+			.amt = amt,
+			.rate = rate,
+			.start = now,
+			.end = next_time,
+		};
+		add_infusion(advan->infusions, &advan->ninfusions, &inf);
+		tcicontrol->last_infusion = inf;
 	}
 
 	/* come back later to continue the TCI and recalculate the rate */

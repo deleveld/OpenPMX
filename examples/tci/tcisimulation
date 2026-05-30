@@ -107,7 +107,7 @@ cat <<-CONTROLFILE >tcisimulation.gr
 	\$DATA("tcisimulationdata.csv")
 		amt = 0.;
 	\$ADVAN(threecomp)
-	\$IMODEL(V1, V2, V3, CL, Q2, Q3, E50, TOTAMT)
+	\$IMODEL(V1, V2, V3, CL, Q2, Q3, E50, TOTAMT, PLASMA, EFFECT)
 		PROPOFOL_ELEVELD model = pmx_model_propofol_eleveld(
 			&(PROPOFOL_ELEVELD_COVARIATES) {
 				.age = age,
@@ -135,12 +135,14 @@ cat <<-CONTROLFILE >tcisimulation.gr
 				.target_effect = true);
 
 		TOTAMT = TCITARGET(E50);
+		PLASMA = pmx_advan_tci_plasma_conc(_advanstate);
+		EFFECT = pmx_advan_tci_effect_conc(_advanstate);
 	\$PREDICT(IPRED)
 		IPRED = A(1)/V1;
 		Y = IPRED*(1 + ERR(1));
 	\$MAIN 
 		predict();
-		table("ID TIME AGE WGT HGT M1F2 IPRED TOTAMT E50");
+		table("ID TIME AGE WGT HGT M1F2 IPRED TOTAMT E50 PLASMA EFFECT");
 CONTROLFILE
 
 echo ... do OPENPMX simulation
@@ -150,7 +152,7 @@ R --vanilla --slave <<-RSCRIPT
 
 	data <- read.table("tcisimulation.gr.table.1.txt", sep="", header=TRUE)
 	data\$DOSEMGKG <- data\$TOTAMT / data\$WGT
-	print(head(data, n=30))
+	print(head(data, n=40))
 
 	# after induction, get dose in mg/kg
 

@@ -132,7 +132,11 @@ ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCON
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
-	assert(advanconfig->nstate == 0 || advanconfig->nstate == 2);
+
+	var nstate = advanconfig->nstate;
+	if (nstate == 0)
+		nstate = 2;
+	assert(nstate >= 2);
 
 	let retinit = (ADVANFUNCS_TWOCOMP) {
 		.advanfuncs = {
@@ -146,7 +150,7 @@ ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCON
 
 			.advanconfig = advanconfig,
 			.recordinfo = recordinfo_init(dataconfig),
-			.nstate = 2,
+			.nstate = nstate,
 		},
 		.offsetV1 = structinfo_find_offset("V1", &advanconfig->imodelfields),
 		.offsetV2 = structinfo_find_offset("V2", &advanconfig->imodelfields),

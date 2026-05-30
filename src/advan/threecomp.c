@@ -265,7 +265,11 @@ ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANC
 {
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
-	assert(advanconfig->nstate == 0 || advanconfig->nstate == 3);
+
+	var nstate = advanconfig->nstate;
+	if (nstate == 0)
+		nstate = 3;
+	assert(nstate >= 3);
 
 	let retinit = (ADVANFUNCS_THREECOMP) {
 		.advanfuncs = {
@@ -279,7 +283,7 @@ ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANC
 
 			.advanconfig = advanconfig,
 			.recordinfo = recordinfo_init(dataconfig),
-			.nstate = 3,
+			.nstate = nstate,
 		},
 		.offsetV1 = structinfo_find_offset("V1", &advanconfig->imodelfields),
 		.offsetV2 = structinfo_find_offset("V2", &advanconfig->imodelfields),
