@@ -79,6 +79,9 @@ typedef struct ADVAN {
 	ADVANINFUSION infusions[OPENPMX_SIMULINFUSION_MAX];
 	int ninfusions;
 
+	double inittime[OPENPMX_INITTIME_MAX];
+	int ninittime;
+
 	int initcount;
 
 	/* only for eigensystem advancer */

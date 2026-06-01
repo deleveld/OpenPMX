@@ -127,12 +127,15 @@ double pmx_advan_tci_target(const ADVANSTATE* advanstate, const double target)
 		return totamt;
 	}
 
+	let delta_seconds = tcicontrol->cfg.delta_seconds;
+	let duration = delta_seconds / 60.;
+
 	/* we only have to do something when the previous infusion has stopped */
 	let now = advanstate->advan->time;
 	var next_time = tcicontrol->next_time;
 	let last = &tcicontrol->last_infusion;
 	if (next_time > now && next_time != DBL_MAX) {
-		let elapsed = now - last->start;
+		let elapsed = fmin(now - last->start, duration);
 		return tcicontrol->totamt + last->rate * elapsed;
 	}
 
@@ -152,15 +155,12 @@ double pmx_advan_tci_target(const ADVANSTATE* advanstate, const double target)
 	/* use the right rate */
 	advance_rate(cfg, rate_s);
 
-	/* the infusion should be just shorter than the period so the stop
-	 * and summing happens before the next record. If its exactly the
-	 * same time then they could be processed in the wrong order to
-	 * totamt to be right when putting it into a table */
-	let delta_seconds = tcicontrol->cfg.delta_seconds;
-	let duration = delta_seconds / 60. - 1e-6;
-
 	/* apply the rate as an infusion, starting now */
-	next_time = now + duration;
+	/* make infusion a tiny bit faster to ensure correct ordering
+	 * TODO: This should probably be made more elegant. Im not sure if
+	 * we would otherwise have to then sort the infusions, or
+	 * prefer to handle certian infusions before records etc */
+	next_time = now + duration - 1e-12;
 	if (rate_s != 0.) {
 		let amt = rate_s * delta_seconds;
 		let rate = amt / duration;

@@ -12,7 +12,7 @@ trap cleanup EXIT
 
 OUTPUTFILE=${0}
 
-NUMGROUP=1000
+NUMGROUP=100
 
 echo ... make NONMEM data file
 R --vanilla --slave <<-RSCRIPT

@@ -79,7 +79,20 @@ static inline void add_infusion(ADVANINFUSION *arr, int *size, const ADVANINFUSI
     assert(*size < OPENPMX_SIMULINFUSION_MAX);
 }
 
-static inline void remove_infusion(ADVANINFUSION *arr, int *size, int index)
+static inline void remove_infusion(ADVANINFUSION *arr, int *size, const int index)
+{
+	arr[index] = arr[*size - 1];
+	(*size)--;
+}
+
+static inline void add_inittime(double *arr, int *size, const double newtime)
+{
+	arr[*size] = newtime;
+    (*size)++;
+    assert(*size < OPENPMX_INITTIME_MAX);
+}
+
+static inline void remove_inittime(double *arr, int *size, const int index)
 {
 	arr[index] = arr[*size - 1];
 	(*size)--;
@@ -118,6 +131,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 				memset(state, 0, nstate * sizeof(double));
 			advan->time = final_time;
 			advan->ninfusions = 0;
+			advan->ninittime = 0;
 			
 			/* reset any TCI controller if its there */
 			if (advan->tcicontrol) 
@@ -180,12 +194,19 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		let currenttime = advan->time;
 
 		/* remove doses in the past, or infusions that have just now
-		 * stopped */
+		 * stopped, or inittimes in the past */
 		for (int i=0; i<advan->ninfusions; i++) {
 			let v = &advan->infusions[i];
 			if ((v->end < currenttime) ||	
 				(v->end <= currenttime && v->rate > 0.)) {
 				remove_infusion(advan->infusions, &advan->ninfusions, i);
+				--i;
+			}
+		}
+		/* remove past inittimes, this should nver happen actually */
+		for (int i=0; i<advan->ninittime; i++) {
+			if (advan->inittime[i] < currenttime) {
+				remove_inittime(advan->inittime, &advan->ninittime, i);
 				--i;
 			}
 		}
@@ -197,7 +218,8 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 /// + A bolus dose is given
 /// + If `pmx_advan_inittime()` has been called, which is `INITTIME()` in 
 /// openpmxtran
-		/* find the first place we have to stop at going to the next record */
+		/* find the first place we have to stop at going to the next record
+		 * first look to the start or stop of dose */
 		double intervalstop = final_time;
 		for (int i=0; i<advan->ninfusions; i++) {
 			let v = &advan->infusions[i];
@@ -206,6 +228,20 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			if (v->start > currenttime && v->start < intervalstop)
 				intervalstop = v->start;
 		}
+		/* next find out if we have to call init and remove if we
+		 * actually will call init */
+		int initindex = -1;
+		bool need_init_now = false;
+		for (int i=0; i<advan->ninittime; i++) {
+			let v = advan->inittime[i];
+			if (v <= intervalstop) {
+				intervalstop = v;
+				need_init_now = true;
+				initindex = i;
+			}
+		}
+		if (initindex != -1)
+			remove_inittime(advan->inittime, &advan->ninittime, initindex);
 
 		/* do we advance time at all */
 		if (intervalstop > currenttime) {
@@ -229,21 +265,16 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 
 		/* are any bolus needed to be given right now */
 		/* we take them off the infusion list so they wont be seen again */
-		/* a fake bolus with cmt == -1 means an extra call to init */
 		bool need_reset_now = false;
-		bool need_init_now = false;
 		for (int i=0; i<advan->ninfusions; i++) {
 			let v = &advan->infusions[i];
 			if (v->start == currenttime && v->rate == 0.) {
 				assert(v->start == v->end);
+				assert(v->cmt >= 0);
 				let record_cmt = v->cmt;
-				if (v->cmt == -1) {		/* This means call init again */
-					need_init_now = true;
-				} else {
-					let record_amt = v->amt;
-					var bioavail = advan->bioavail[record_cmt];
-					state[record_cmt] += record_amt * bioavail;
-				}
+				let record_amt = v->amt;
+				var bioavail = advan->bioavail[record_cmt];
+				state[record_cmt] += record_amt * bioavail;
 				remove_infusion(advan->infusions, &advan->ninfusions, i);
 				--i;
 				need_reset_now = true;
@@ -270,7 +301,7 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	/* keep going till we have the state equal to the required record time */
 	} while (advan->time < final_time);
 
-	/* return the state useful for calling predict */
+	/* return the state which will be passed on to predict function */
 	return (PREDICTSTATE) {
 		.statetime = advan->time,
 		.state = state,
@@ -279,8 +310,9 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 	};
 }
 
-/* We dont have to worry that this function might be called outside of
+/* We dont have to worry that these functions might be called outside of
  * init function because the ADVANSTATE is only available there */
+ 
 void pmx_advan_amtlag(const ADVANSTATE* advanstate,
 					  const int cmt,
 					  const double t)
@@ -299,8 +331,6 @@ void pmx_advan_amtlag(const ADVANSTATE* advanstate,
 	advan->amtlag[cmt] = t;
 }
 
-/* We dont have to worry that this function might be called outside of
- * init function because the ADVANSTATE is only available there */
 void pmx_advan_bioaval(const ADVANSTATE* advanstate,
 					   const int cmt,
 					   const double f)
@@ -316,8 +346,6 @@ void pmx_advan_bioaval(const ADVANSTATE* advanstate,
 	advan->bioavail[cmt] = f;
 }
 
-/* We dont have to worry that this function might be called outside of
- * init function because the ADVANSTATE is only available there */
 bool pmx_advan_inittime(const ADVANSTATE* advanstate, const double t)
 {
 	var advan = advanstate->advan;
@@ -328,28 +356,16 @@ bool pmx_advan_inittime(const ADVANSTATE* advanstate, const double t)
 	if (t <= advan->time)
 		return false;
 
-	/* its kind of not clear whether we should or shouldnt ignore the
-	 * extra inittime if another kind of event occurs at the intended
-	 * time, for example an infusion. We should probably ignore them
-	 * and condense the records. */
 	bool found_already = false;
-	forcount(i, advan->ninfusions) {
-		let v = &advan->infusions[i];
-		if (v->start == t)
+	forcount(i, advan->ninittime) {
+		let v = advan->inittime[i];
+		if (v == t)
 			found_already = true;
 	}
 
-	if (!found_already) {
-		add_infusion(advan->infusions,
-					&advan->ninfusions,
-					&(ADVANINFUSION) {
-						.cmt = -1,
-						.amt = 0.,
-						.rate = 0.,
-						.start = t,
-						.end = t
-					});
-	}
+	if (!found_already) 
+		add_inittime(advan->inittime, &advan->ninittime, t);
+		
 	return !found_already;
 }
 

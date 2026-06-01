@@ -112,10 +112,11 @@ void pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate, const double* sysmat);
 typedef struct ADVANFUNCS ADVANFUNCS;
 typedef struct ADVANCONFIG ADVANCONFIG;
 typedef struct ADVANCONFIG {
-	
+
 	/* init function */
 	void (*init)(IMODEL* const imodel, 
 				 ADVANSTATE* advanstate);
+				 
 	/* predict function */
 	double (*predict)(const IMODEL* const imodel,
 					  const PREDICTSTATE* const predictstate,
@@ -135,8 +136,8 @@ typedef struct ADVANCONFIG {
 					const double T);
 
 	/* usually set by user in control file */
-	const int firstonly;
-	const int predictall;
+	const bool firstonly;
+	const bool predictall;
 	const int nstate;
 
 	union {
