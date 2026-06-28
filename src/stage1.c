@@ -213,6 +213,8 @@ static double stage1_individcov(const int nreta,
 	var f_minus_h = mallocvar(double, nrecord);
 	var yhatvar_plus_h = mallocvar(double, nrecord);
 	var yhatvar_minus_h = mallocvar(double, nrecord);
+	var logp_plus_h = mallocvar(double, nrecord);
+	var logp_minus_h = mallocvar(double, nrecord);
 	var J = gsl_matrix_alloc(params->nobs, nreta);
 	let nomega = popparam->nomega;
 	assert(gradient_step != 0.);
@@ -248,8 +250,10 @@ static double stage1_individcov(const int nreta,
 							0,				/* dont save imodel */
 							0,				/* dont save predictvars */
 							0,				/* dont save state */
-							f_plus_h, yhatvar_plus_h,	/* we need output */
-							0, 0);			/* dont need to calculate objfn */
+							f_plus_h,		/* we need output */
+							yhatvar_plus_h,
+							logp_plus_h,
+							0, 0, 0);		/* dont need to calculate objfn */
 		timespec_duration(&t3, eval_msec);
 		*(params->ineval) += 1;
 
@@ -262,8 +266,10 @@ static double stage1_individcov(const int nreta,
 							0,				/* dont save imodel */
 							0,				/* dont save predictvars */
 							0,				/* dont save state */
-							f_minus_h, yhatvar_minus_h,	/* we need output */
-							0, 0);			/* dont need to calculate objfn */
+							f_minus_h,		/* we need output */
+							yhatvar_minus_h,
+							logp_minus_h,
+							0, 0, 0);		/* dont need to calculate objfn */
 		timespec_duration(&t3, eval_msec);
 		*(params->ineval) += 1;
 
@@ -272,10 +278,17 @@ static double stage1_individcov(const int nreta,
 		const RECORD* ptr = record;
 		forcount(k, nrecord) {
 			if (RECORDINFO_EVID(recordinfo, ptr) == 0) {
-				let dv = RECORDINFO_DV(recordinfo, ptr);
-				let upper = (f_plus_h[k] - dv) / sqrt(yhatvar_plus_h[k]);
-				let lower = (f_minus_h[k] - dv) / sqrt(yhatvar_minus_h[k]);
-				let deriv = (upper - lower) / (above - below);
+				var deriv = 0.;
+				if (yhatvar_plus_h[k] != 0. && yhatvar_minus_h[k] != 0.) {
+					let dv = RECORDINFO_DV(recordinfo, ptr);
+					let upper = (f_plus_h[k] - dv) / sqrt(yhatvar_plus_h[k]);
+					let lower = (f_minus_h[k] - dv) / sqrt(yhatvar_minus_h[k]);
+					deriv = (upper - lower) / (above - below);
+				} else {
+					let upper = logp_plus_h[k];
+					let lower = logp_minus_h[k];
+					deriv = (upper - lower) / (above - below);
+				}
 				gsl_matrix_set(J, iobs, j, deriv);
 				++iobs;
 			}
@@ -283,9 +296,11 @@ static double stage1_individcov(const int nreta,
 		}
 	}
 	free(f_plus_h);
-	free(yhatvar_plus_h);
 	free(f_minus_h);
+	free(yhatvar_plus_h);
 	free(yhatvar_minus_h);
+	free(logp_plus_h);
+	free(logp_minus_h);
 
 	/* for now accumulate the inverse in reducedcov */
 	var reducedcov = gsl_matrix_alloc(nreta, nreta);
@@ -411,18 +426,17 @@ void stage1_thread(INDIVID* const individ,
 	   but we do need yhatvar for the calculation of the covariance second term */
 	struct timespec t3;
 	clock_gettime(CLOCK_MONOTONIC, &t3);
-	double obs_min2ll = 0.;
-	double obs_lndet = 0.;
 	individual_evaluate(&stage1_params.ievaluate_args,
 						individ->imodel,
 						individ->predictvars,
 						individ->istate,
 						individ->yhat,
 						individ->yhatvar,
-						&obs_lndet, &obs_min2ll);
+						0, 						/* dont need logp */
+						&individ->obs_lndet,
+						&individ->obs_min2ll,
+						&individ->obs_logp);
 	timespec_duration(&t3, &individ->eval_msec);
-	individ->obs_min2ll = obs_min2ll;
-	individ->obs_lndet = obs_lndet;
 	++stage1_ineval;
 
 	/* we cant do covariance matrix if we have no etas or observations */

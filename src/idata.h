@@ -44,6 +44,7 @@ typedef struct {
 	/* objective function */
 	double obs_min2ll;
 	double obs_lndet;
+	double obs_logp;
 	double eta_min2ll;
 	double icov_lndet;
 	double iobjfn;

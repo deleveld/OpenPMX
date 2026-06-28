@@ -173,7 +173,11 @@ ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const A
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
 	assert(advanconfig->diffeqn);
-	assert(advanconfig->nstate);
+
+	var nstate = advanconfig->nstate;
+	int err = advan_ensure(nstate >= 1, __func__, "nstate should be >= 1");
+	if (err)
+		return 0;
 
 	var retinit = (ADVANFUNCS_LIBGSL) {
 		.advanfuncs = {
@@ -187,7 +191,7 @@ ADVANFUNCS* pmx_advan_diffeqn_libgsl(const DATACONFIG* const dataconfig, const A
 
 			.advanconfig = advanconfig,
 			.recordinfo = recordinfo_init(dataconfig),
-			.nstate = advanconfig->nstate,
+			.nstate = nstate,
 		},
 		.diffeqn = advanconfig->diffeqn,
 	};

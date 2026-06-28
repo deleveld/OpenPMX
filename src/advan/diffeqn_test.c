@@ -166,7 +166,11 @@ ADVANFUNCS* pmx_advan_diffeqn_test(const DATACONFIG* const dataconfig, const ADV
 	assert(advanconfig->init);
 	assert(advanconfig->predict);
 	assert(advanconfig->diffeqn);
-	assert(advanconfig->nstate);
+	
+	var nstate = advanconfig->nstate;
+	int err = advan_ensure(nstate >= 1, __func__, "nstate should be >= 1");
+	if (err)
+		return 0;
 
 	let retinit = (ADVANTABLE_TESTRK4) {
 		.advanfuncs = {
@@ -180,7 +184,7 @@ ADVANFUNCS* pmx_advan_diffeqn_test(const DATACONFIG* const dataconfig, const ADV
 
 			.advanconfig = advanconfig,
 			.recordinfo = recordinfo_init(dataconfig),
-			.nstate = advanconfig->nstate,
+			.nstate = nstate,
 		},
 		.diffeqn = advanconfig->diffeqn,
 	};

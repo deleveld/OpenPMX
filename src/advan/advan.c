@@ -412,11 +412,10 @@ double record_variable(const char* name, const POPPARAM* const popparam, const R
 }
 */
 
-void advan_ensure(const int flag, const char* fname, const char* message)
+int advan_ensure(const int flag, const char* fname, const char* message)
 {
-	if (!flag) {
+	if (!flag) 
 		printf("fatal: %s: %s\n", fname, message);
-		exit(EXIT_FAILURE);
-	}
+	return !flag;
 }
 

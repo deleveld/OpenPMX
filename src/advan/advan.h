@@ -107,7 +107,7 @@ typedef struct ADVANCER_DIFFEQN_CALLBACK_ARGS {
 } ADVANCER_DIFFEQN_CALLBACK_ARGS;
 
 /* utility function */
-void advan_ensure(const int flag, const char* fname, const char* message);
+int advan_ensure(const int flag, const char* fname, const char* message);
 
 #ifdef __cplusplus
 }

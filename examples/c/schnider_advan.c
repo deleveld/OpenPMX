@@ -95,7 +95,7 @@ static void imodel_diffeqn(double _dadt[],
 #undef DADT
 }
 
-static double imodel_predict(const IMODEL* const _imodel,
+static PREDRES imodel_predict(const IMODEL* const _imodel,
 							 const PREDICTSTATE* const _predictstate,
 							 const double* const _err,
 							 PREDICTVARS* _predparams)
@@ -114,7 +114,7 @@ static double imodel_predict(const IMODEL* const _imodel,
 
 	_predparams->IPRED = IPRED;
 
-	return Y;
+	return (PREDRES) { .Y = Y };
 }
 
 #define ARRAYSIZE(a) (sizeof(a)/sizeof(a[0]))
@@ -224,7 +224,7 @@ int main(void)
 		let predictstate = advan_advance(advan, &imodel, ptr, 0);
 		let yhat = predict(&imodel, &predictstate, errarray, &predictvars);
 		
-		printf("%f %f %f %f %f A1=%f A2=%f A3=%f\n", ptr->ID, ptr->TIME, ptr->DV, yhat, predictvars.IPRED,
+		printf("%f %f %f %f %f A1=%f A2=%f A3=%f\n", ptr->ID, ptr->TIME, ptr->DV, yhat.Y, predictvars.IPRED,
 													predictstate.state[0],
 													predictstate.state[1],
 													predictstate.state[2]);

@@ -54,8 +54,10 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 						 double* const istate,
 						 double* const YHAT,
 						 double* const YHATVAR,
+						 double* const LOGP,
 						 double* const obs_lndet,
-						 double* const obs_min2ll);
+						 double* const obs_min2ll,
+						 double* const obs_logp);
 void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args);
 void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 						 IMODEL* const imodel_saved,

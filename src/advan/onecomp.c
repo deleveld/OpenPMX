@@ -105,7 +105,9 @@ ADVANFUNCS* pmx_advan_onecomp(const DATACONFIG* const dataconfig, const ADVANCON
 	var nstate = advanconfig->nstate;
 	if (nstate == 0)
 		nstate = 1;
-	assert(nstate >= 1);
+	int err = advan_ensure(nstate >= 1, __func__, "nstate should be >= 1");
+	if (err)
+		return 0;
 
 	let retinit = (ADVANTABLE_ONECOMP) {
 		.advanfuncs = {
@@ -124,8 +126,10 @@ ADVANFUNCS* pmx_advan_onecomp(const DATACONFIG* const dataconfig, const ADVANCON
 		.offsetV1 = structinfo_find_offset("V1", &advanconfig->imodelfields),
 		.offsetCL = structinfo_find_offset("CL", &advanconfig->imodelfields),
 	};
-	advan_ensure(retinit.offsetV1 >= 0, __func__, "could not find V1");
-	advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
+	err |= advan_ensure(retinit.offsetV1 >= 0, __func__, "could not find V1");
+	err |= advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
+	if (err)
+		return 0;
 
 	ADVANTABLE_ONECOMP* ret = malloc(sizeof(ADVANTABLE_ONECOMP));
 	assert(ret);

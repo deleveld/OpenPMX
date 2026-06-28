@@ -1,0 +1,30 @@
+$DATA("data_blq.csv")
+$ADVAN(threecomp)
+$IMODEL(V1, V2, V3, CL, Q2, Q3, SIZE)
+	SIZE = WT/70.;
+	V1 = THETA(1) * SIZE * exp(ETA(1));
+	V2 = THETA(2) * SIZE * exp(ETA(2));
+	V3 = THETA(3) * SIZE * exp(ETA(3));
+	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4));
+	Q2 = THETA(5) * pow(SIZE, 0.75) * exp(ETA(5));
+	Q3 = THETA(6) * pow(SIZE, 0.75) * exp(ETA(6));
+$PREDICT(IPRED, W)
+	IPRED = A(1)/V1;
+	W = sqrt(pow(IPRED * THETA(7), 2) + 1E-4);
+	if (ISBLQ == 0.) {
+		Y = IPRED + W * ERR(1);
+	} else {
+		loglik = loglik_llq(BLQVAL, IPRED, W);
+	}
+$THETA
+	{ 0.1, 6, 25, ESTIMATE},
+	{ 1, 20, 125, ESTIMATE},
+	{ 25, 200, 500, ESTIMATE},
+	{ 0.1,  2, 6, ESTIMATE},
+	{ 0.1, 1, 3, ESTIMATE},
+	{ 0.1, 1, 3, ESTIMATE},
+	{ 0.01, 0.22, 1, ESTIMATE },
+$OMEGA(0.1, 0.1, -0, 0.1, 0.1, -0)
+$SIGMA(-1.)
+$MAIN
+	estimate();

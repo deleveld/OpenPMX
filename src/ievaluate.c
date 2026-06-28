@@ -41,11 +41,11 @@ typedef typeof(((ADVANCONFIG){0}).predict) IMODEL_PREDICT;
 /* NOTE: these functions must be thread safe on the level of an individual */
 
 __attribute__ ((hot))
-static inline double evaluate_yhat(const IMODEL* const imodel,
-								   const PREDICTSTATE* const predictstate,
-								   const IMODEL_PREDICT predict,
-								   const double errarray[static OPENPMX_SIGMA_MAX],
-								   PREDICTVARS* predictvars)
+static inline PREDRES evaluate_yhat(const IMODEL* const imodel,
+									const PREDICTSTATE* const predictstate,
+									const IMODEL_PREDICT predict,
+									const double errarray[static OPENPMX_SIGMA_MAX],
+									PREDICTVARS* predictvars)
 {
 //	memset(predictvars, 0, OPENPMX_PREDICTVARS_MAX * sizeof(double));
 		
@@ -97,7 +97,7 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
              * The deriv formula is ((ya1 - ya2) / 2g)^2 * sigma.
              * Since g = sqrt(sigma), then (2g)^2 = 4 * sigma.
              * The formula simplifies to: (ya1 - ya2)^2 / 4. */
-			let diff = ya1 - ya2;
+			let diff = ya1.Y - ya2.Y;
 
 /*			yhatvar += (diff * diff) */
 			yhatvar += (diff * diff); /* / 4.; move multiplication out of loop */
@@ -109,10 +109,11 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
 
 /* For how this is used see PAGE poster:
  * A comparison of methods for handling of data below the limit of quantification in NONMEM VI */
-#include <gsl/gsl_cdf.h>
-static inline double phi(const double x)
+#include <gsl/gsl_sf_erf.h>
+double loglik_llq(const double llq, const double pred, const double sigmaSD)
 {
-	return gsl_cdf_ugaussian_P(x);
+    double z = (llq - pred) / sigmaSD;
+    return gsl_sf_log_erfc(-z / M_SQRT2) - M_LN2;
 }
 
 /* alignment should help with access speed, may allow SIMD instructions */
@@ -150,33 +151,32 @@ double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 	let predict = advanconfig->predict;
 	let recordinfo = &advanfuncs->recordinfo;
 	let recordsize = recordinfo->dataconfig->recordfields.size;
-	let no_dvlow_present = recordinfo->offsetDVLOW == -1;
 	var obs_min2ll = 0.; /* separate sums to avoid loss of precision if magnitudes differ strongly */
 	var obs_lndet = 0.;
+	var obs_logp = 0.;
 	const RECORD* ptr = record;
 	forcount(i, nrecord) {
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
 		if (RECORDINFO_EVID(recordinfo, ptr) == 0) {
 			let yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
-			let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 
-			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
-			if (dvlow == 0.) {
+			/* continious observations */
+			if (!isnan(yhat.Y)) {
+				let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
 				let dv = RECORDINFO_DV(recordinfo, ptr);
-				let err = dv - yhat;
+				let err = dv - yhat.Y;
 				obs_min2ll += (err * err) / yhatvar;
 				obs_lndet += log(yhatvar);
-			} else {
-				let err = dvlow - yhat;
-				obs_min2ll += -2. * log(phi(err / sqrt(yhatvar)));
-				/* obs_lndet += 0.; This term does not take part I think. FIXME */
-			}
+			
+			/* discrete observations are given as log-likelihood */
+			} else 
+				obs_logp += -2. * yhat.loglik;
 		}
 		ptr = RECORD_INDEX(ptr, recordsize, 1);	
 	}
 	advanfuncs->destruct(advan);
 
-	return obs_min2ll + obs_lndet;
+	return obs_min2ll + obs_lndet + obs_logp;
 }
 
 /* This is a core function evaluating an individual by advancing over
@@ -192,8 +192,10 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 						 double* const istate,
 						 double* const YHAT,
 						 double* const YHATVAR,
+						 double* const LOGP,
 						 double* const ret_obs_lndet,
-						 double* const ret_obs_min2ll)
+						 double* const ret_obs_min2ll,
+						 double* const ret_obs_logp)
 {
 	let advanfuncs = ievaluate_args->advanfuncs;
 	let record = ievaluate_args->record;
@@ -214,11 +216,11 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	let predictall = advanconfig->predictall;
 	let nstate = advanfuncs->nstate;
 	let recordinfo = &advanfuncs->recordinfo;
-	let no_dvlow_present = recordinfo->offsetDVLOW == -1;
 	let imodel_size = advanconfig->imodelfields.size;
 	let predictvars_size = advanconfig->predictfields.size;
-	var obs_min2ll = 0.;
 	var obs_lndet = 0.;
+	var obs_min2ll = 0.;
+	var obs_logp = 0.;
 	const RECORD* ptr = record;
 	forcount(i, nrecord) {
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
@@ -227,11 +229,15 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 			memset(predictvars, 0, predictvars_size);
 			
 		let evid = RECORDINFO_EVID(recordinfo, ptr);
-		var yhat = 0.;
-		if (evid == 0 || predictall)
-			yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
+		let yhat = (evid == 0 || predictall) ? 
+					evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars) : 
+					(PREDRES){ 0 };
 		if (YHAT)
-			YHAT[i] = yhat;
+			YHAT[i] = yhat.Y;
+		if (YHATVAR)
+			YHATVAR[i] = 0.;
+		if (LOGP)
+			LOGP[i] = 0.;
 
 		/* save imodel, predictvars and state */
 		if (imodel_saved) {
@@ -246,35 +252,38 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 		}
 		
 		/* objective function only for observations */
+		/* yhatvar must be set to zero for non-observations since these
+		 * will be used to calculate the individual covariance matrix */
 		if (evid == 0) {
-			let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
-			if (YHATVAR)
-				YHATVAR[i] = yhatvar;
+			/* continious observations */
+			if (!isnan(yhat.Y)) {
+				let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
+				if (YHATVAR)
+					YHATVAR[i] = yhatvar;
 
-			let dv = RECORDINFO_DV(recordinfo, ptr);
-			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
-			if (dvlow == 0.) {
-				let err = dv - yhat;
+				let dv = RECORDINFO_DV(recordinfo, ptr);
+				let err = dv - yhat.Y;
 				obs_min2ll += (err * err) / yhatvar;
 				obs_lndet += log(yhatvar);
+				
+			/* discrete observations are given as log-likelihood */
 			} else {
-				let err = dvlow - yhat;
-				obs_min2ll += -2. * log(phi(err / sqrt(yhatvar)));
+				let logp = -2. * yhat.loglik;
+				if (LOGP)
+					LOGP[i] = logp;
+				obs_logp += logp;
 			}
-		} else {
-			/* yhatvar must be set to zero for non-observations since these
-			 * will be used to calculate the individual covariance matrix */
-			if (YHATVAR)
-				YHATVAR[i] = 0.;
 		}
 		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
 	}
 	advanfuncs->destruct(advan);
 
-	if (ret_obs_min2ll)
-		*ret_obs_min2ll = obs_min2ll;
 	if (ret_obs_lndet) 
 		*ret_obs_lndet = obs_lndet;
+	if (ret_obs_min2ll)
+		*ret_obs_min2ll = obs_min2ll;
+	if (ret_obs_logp) 
+		*ret_obs_logp = obs_logp;
 }
 
 static bool check_state(const double* const a, const int n, FILE* logstream, const bool _offset1)
@@ -336,7 +345,6 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	let predict = advanconfig->predict;
 	let predictall = advanconfig->predictall;
 	let recordinfo = &advanfuncs->recordinfo;
-	let no_dvlow_present = recordinfo->offsetDVLOW == -1;
 	const RECORD* ptr = record;
 	let id = RECORDINFO_ID(recordinfo, ptr);
 	/// + Non-integer ID is probably an error.
@@ -426,13 +434,6 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 				warning(logstream, "non-zero DV (%f) for non-observation: ID %f time %f record %i\n", dv, id, time, i + record_offset);
 		}
 
-		/* dvlow implies observation */
-		if (evid != 0) {
-			let dvlow = no_dvlow_present ? 0. : RECORDINFO_DVLOW(recordinfo, ptr);
-			if (dvlow != 0.) 
-				fatal(logstream, "DVLOW (%f) present for non-observation: ID %f record %i\n", dvlow, id, i + record_offset);
-		}
-
 		if (check_state(advan->state, advanfuncs->nstate, logstream, _offset1)) 
 			fatal(logstream, "non-finite state before advance: ID %f time %f record %i\n", id, time, i + record_offset);
 
@@ -446,33 +447,47 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 			fatal(logstream, "non-finite state after advance: ID %f time %f record %i\n", id, time, i + record_offset);
 
 		/* predictions should be finite */
-		var yhat = 0.;
 		if (evid == 0 || predictall) {
-			yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
-			if (!gsl_finite(yhat)) {
+			let yhat = evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars);
+			if (!isnan(yhat.Y)) {
+				if (yhat.loglik != 0.)
+					fatal(logstream, "if Y is set, loglik should be zero: ID %f time %f record %i\n", id, time, i + record_offset);
+			} else {
+//				if (yhat.loglik < 0.)
+//					fatal(logstream, "if loglik is non-zero, Y should be NAN (%f %f): ID %f time %f record %i\n", yhat.Y, yhat.loglik, id, time, i + record_offset);
+			}
+
+			if (!gsl_finite(yhat.Y) && yhat.loglik == 0.) {
 				if (!obs_yhat_nonfinite_warning) {
-					warning(logstream, "at least one YHAT non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
+					warning(logstream, "at least one YHAT non-finite with loglik=0: ID %f time %f record %i\n", id, time, i + record_offset);
 					obs_yhat_nonfinite_warning = true;
 				}
 			}
-		}
 
-		/* observations */
-		if (evid == 0) {
+			/* observations */
+			if (evid == 0) {
 
-			/* prediction variance of observations should be finite and positive */
-			let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
-			if (!gsl_finite(yhatvar))
-				if (!obs_yhatvar_nonfinite_warning) {
-					warning(logstream, "at least one YHATVAR non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
-					obs_yhatvar_nonfinite_warning = true;
-			}
+				/* prediction variance of observations should be finite and positive */
+				if (!isnan(yhat.Y)) {
+					let yhatvar = evaluate_yhatvar(imodel, &predictstate, predict, advanmem.errarray, predictvars);
+					if (!gsl_finite(yhatvar))
+						if (!obs_yhatvar_nonfinite_warning) {
+							warning(logstream, "at least one YHATVAR non-finite: ID %f time %f record %i\n", id, time, i + record_offset);
+							obs_yhatvar_nonfinite_warning = true;
+					}
 
-			/* predictions with zero error are an error */
-			if (evid == 0 && yhatvar == 0.) {
-				if (!obs_yhatvar_zero_warning) {
-					warning(logstream, "at least one YHATVAR zero (%f): ID %f time %f record %i\n", yhatvar, id, time, i + record_offset);
-					obs_yhatvar_zero_warning = true;
+					/* predictions with zero error are an error */
+					if (evid == 0 && yhatvar == 0.) {
+						if (!obs_yhatvar_zero_warning) {
+							warning(logstream, "at least one YHATVAR zero (%f): ID %f time %f record %i\n", yhatvar, id, time, i + record_offset);
+							obs_yhatvar_zero_warning = true;
+						}
+					}
+					
+				/* discrete observations are given as log-likelihood for >0 is invalid */
+				} else {
+					if (yhat.loglik > 0.) 
+						fatal(logstream, "predicted log-likelihood (%f) invalid (>0.): ID %f time %f record %i\n", yhat.Y, id, time, i + record_offset);
 				}
 			}
 		}
@@ -516,20 +531,20 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 		/* do prediction *without* the random error, put into yhat */
 		/* yhat contains the prediction (*without* noise) */
 		/* we dont to all predictions, otherwise it will be non-zero for infusions */
-		var yhat = 0.;
-		if (RECORDINFO_EVID(recordinfo, ptr) == 0)
-			yhat = evaluate_yhat(imodel, &advanstate, predict, advanmem.errarray, predictvars);
-		individ_yhat[i] = yhat;
+		let yhat = (RECORDINFO_EVID(recordinfo, ptr) == 0) ? 
+					evaluate_yhat(imodel, &advanstate, predict, advanmem.errarray, predictvars) :
+					(PREDRES) { 0 };
+		individ_yhat[i] = yhat.Y;
 		individ_yhatvar[i] = 0.;
 
 		/* do prediction with the random error, put into pred */
 		/* pred contains the prediction (*with* noise) */
 		/* point to residual error with non-zero err values */
 		let errarray = &isimerr[i * nsigma];
-		var pred = 0.;
-		if (RECORDINFO_EVID(recordinfo, ptr) == 0)
-			pred = evaluate_yhat(imodel, &advanstate, predict, errarray, predictvars);
-		individ_pred[i] = pred;
+		let pred = (RECORDINFO_EVID(recordinfo, ptr) == 0) ?
+					evaluate_yhat(imodel, &advanstate, predict, errarray, predictvars) :
+					(PREDRES){ 0 };
+		individ_pred[i] = pred.Y;
 
 		/* save imodel, predictvars and state */
 		let imodel_size = advanconfig->imodelfields.size;

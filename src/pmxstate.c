@@ -30,6 +30,9 @@
 static PMXSTATE* pmxstate_alloc(const OPENPMX* const pmx)
 {
 	let advanfuncs = advanfuncs_alloc(&pmx->data, &pmx->advan);
+	if (!advanfuncs) 
+		fatal(0, "%s: could not allocate advanfuncs\n", __func__);
+		
 	ERRCTX errctx = { 0 };
 	let popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)

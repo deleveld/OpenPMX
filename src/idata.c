@@ -98,6 +98,7 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 
 			.obs_min2ll = 0.,
 			.obs_lndet = 0.,
+			.obs_logp = 0.,
 			.eta_min2ll = 0.,
 			.icov_lndet = 0.,
 			.iobjfn = DBL_MAX,
@@ -330,6 +331,7 @@ double idata_objfn(const IDATA* const idata,
 	 * magnitude which helps with accuracy */
 	double objfn1 = 0.;
 	double objfn2 = 0.;
+	double objfn2_5 = 0.;
 	double objfn3 = 0.;
 	double objfn4 = 0.;
 	double objfn5 = 0.;
@@ -338,12 +340,14 @@ double idata_objfn(const IDATA* const idata,
 
 		let term1 = individ->obs_lndet;		/* first term */
 		let term2 = individ->obs_min2ll;	/* second term */
+		let term2_5 = individ->obs_logp;	/* alternate first+second term */
 		let term3 = individ->eta_min2ll;	/* third term */
 		var term4 = omega_nonzero_lndet;	/* fourth term */
  		let term5 = individ->icov_lndet;	/* fifth term */
 		if (individ->nobs == 0) {
 			assert(term1 == 0.);
 			assert(term2 == 0.);
+			assert(term2_5 == 0.);
 			assert(term3 == 0.);
 			term4 = 0.;				/* population term does not count if no observations in the individual */
 			assert(term5 == 0.);
@@ -351,20 +355,22 @@ double idata_objfn(const IDATA* const idata,
 
 //		assert(gsl_finite(term1) == 1);
 //		assert(gsl_finite(term2) == 1);
+//		assert(gsl_finite(term2_5) == 1);
 //		assert(gsl_finite(term3) == 1);
 //		assert(gsl_finite(term4) == 1);
 //		assert(gsl_finite(term5) == 1);
 
-		let iobjfn = term1 + term2 + term3 + term4 + term5;
+		let iobjfn = term1 + term2 + term2_5 + term3 + term4 + term5;
 		individ->iobjfn = iobjfn;
 
 		objfn1 += term1;
 		objfn2 += term2;
+		objfn2_5 += term2_5;
 		objfn3 += term3;
 		objfn4 += term4;
 		objfn5 += term5;
 	}
-	let objfn = objfn1 + objfn2 + objfn3 + objfn4 + objfn5;
+	let objfn = objfn1 + objfn2 + objfn2_5 + objfn3 + objfn4 + objfn5;
 //	assert(gsl_finite(objfn) == 1);
 	return objfn;
 }

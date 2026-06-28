@@ -269,7 +269,9 @@ ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANC
 	var nstate = advanconfig->nstate;
 	if (nstate == 0)
 		nstate = 3;
-	assert(nstate >= 3);
+	int err = advan_ensure(nstate >= 3, __func__, "nstate should be >= 3");
+	if (err)
+		return 0;
 
 	let retinit = (ADVANFUNCS_THREECOMP) {
 		.advanfuncs = {
@@ -292,12 +294,15 @@ ADVANFUNCS* pmx_advan_threecomp(const DATACONFIG* const dataconfig, const ADVANC
 		.offsetQ2 = structinfo_find_offset("Q2", &advanconfig->imodelfields),
 		.offsetQ3 = structinfo_find_offset("Q3", &advanconfig->imodelfields),
 	};
-	advan_ensure(retinit.offsetV1 >= 0, __func__, "could not find V1");
-	advan_ensure(retinit.offsetV2 >= 0, __func__, "could not find V2");
-	advan_ensure(retinit.offsetV3 >= 0, __func__, "could not find V3");
-	advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
-	advan_ensure(retinit.offsetQ2 >= 0, __func__, "could not find Q2");
-	advan_ensure(retinit.offsetQ3 >= 0, __func__, "could not find Q3");
+	
+	err |= advan_ensure(retinit.offsetV1 >= 0, __func__, "could not find V1");
+	err |= advan_ensure(retinit.offsetV2 >= 0, __func__, "could not find V2");
+	err |= advan_ensure(retinit.offsetV3 >= 0, __func__, "could not find V3");
+	err |= advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
+	err |= advan_ensure(retinit.offsetQ2 >= 0, __func__, "could not find Q2");
+	err |= advan_ensure(retinit.offsetQ3 >= 0, __func__, "could not find Q3");
+	if (err)
+		return 0;
 
 	/* make binary copy so init can have const members */
 	ADVANFUNCS_THREECOMP* ret = malloc(sizeof(ADVANFUNCS_THREECOMP));

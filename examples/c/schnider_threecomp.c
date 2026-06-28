@@ -1329,7 +1329,7 @@ static void imodel_diffeqn(double _dadt[],
 #undef DADT
 }
 
-static double imodel_predict(const IMODEL* const _imodel,
+static PREDRES imodel_predict(const IMODEL* const _imodel,
 							 const PREDICTSTATE* const _predictstate,
 							 const double* const _err,
 							 PREDICTVARS* _predparams)
@@ -1403,7 +1403,7 @@ static double imodel_predict(const IMODEL* const _imodel,
 	/* set PREDICTVARS fields */
 	_predparams->IPRED = IPRED;
 
-	return Y;
+	return (PREDRES) { .Y = Y };
 }
 
 static bool openpmxtran_data_preprocess_callback(RECORD* _record)

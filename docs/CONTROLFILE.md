@@ -242,10 +242,9 @@ Special macros available in the body:
 |---|---|
 | `ALAG(cmt, t)` | Set absorption lag time for doses to compartment `cmt` |
 | `BIOAVAIL(cmt, f)` | Set dose bioavailability fraction for compartment `cmt` |
-| `A_0(cmt, v)` | Initialize compartment `cmt` to value `v` at time zero |
+| `A_0(cmt, v)` | Initialize compartment `cmt` to value `v` at time of first record |
 | `SYSMAT(...)` | Define the system matrix for `eigen` advans (row-major) |
 | `INITTIME(t)` | Set model start time |
-| `INITCOUNT` | Number of times initialization has been called for this individual |
 
 #### $IMODEL definition for a three-compartment mammilary model
 ```c

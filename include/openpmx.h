@@ -109,6 +109,13 @@ bool pmx_advan_inittime(const ADVANSTATE* advanstate, const double t);
 void pmx_advan_state_init(const ADVANSTATE* advanstate, const int cmt, const double v);
 void pmx_advan_eigen_sysmat(const ADVANSTATE* advanstate, const double* sysmat);
 
+typedef struct {
+	const double Y;
+	const double loglik;
+} PREDRES;
+
+double loglik_llq(const double llq, const double pred, const double sigmaSD);
+
 typedef struct ADVANFUNCS ADVANFUNCS;
 typedef struct ADVANCONFIG ADVANCONFIG;
 typedef struct ADVANCONFIG {
@@ -118,10 +125,10 @@ typedef struct ADVANCONFIG {
 				 ADVANSTATE* advanstate);
 				 
 	/* predict function */
-	double (*predict)(const IMODEL* const imodel,
-					  const PREDICTSTATE* const predictstate,
-					  const double* const err,
-					  PREDICTVARS* predparams);
+	PREDRES (*predict)(const IMODEL* const imodel,
+					   const PREDICTSTATE* const predictstate,
+					   const double* const err,
+					   PREDICTVARS* predparams);
 
 	const STRUCTINFO imodelfields;
 	const STRUCTINFO predictfields;

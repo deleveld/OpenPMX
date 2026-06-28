@@ -136,7 +136,9 @@ ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCON
 	var nstate = advanconfig->nstate;
 	if (nstate == 0)
 		nstate = 2;
-	assert(nstate >= 2);
+	int err = advan_ensure(nstate >= 2, __func__, "nstate should be >= 2");
+	if (err)
+		return 0;
 
 	let retinit = (ADVANFUNCS_TWOCOMP) {
 		.advanfuncs = {
@@ -157,10 +159,13 @@ ADVANFUNCS* pmx_advan_twocomp(const DATACONFIG* const dataconfig, const ADVANCON
 		.offsetCL = structinfo_find_offset("CL", &advanconfig->imodelfields),
 		.offsetQ2 = structinfo_find_offset("Q2", &advanconfig->imodelfields),
 	};
-	advan_ensure(retinit.offsetV1 >= 0, __func__, "could not find V1");
-	advan_ensure(retinit.offsetV2 >= 0, __func__, "could not find V2");
-	advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
-	advan_ensure(retinit.offsetQ2 >= 0, __func__, "could not find Q2");
+	
+	err |= advan_ensure(retinit.offsetV1 >= 0, __func__, "could not find V1");
+	err |= advan_ensure(retinit.offsetV2 >= 0, __func__, "could not find V2");
+	err |= advan_ensure(retinit.offsetCL >= 0, __func__, "could not find CL");
+	err |= advan_ensure(retinit.offsetQ2 >= 0, __func__, "could not find Q2");
+	if (err)
+		return 0;
 
 	ADVANFUNCS_TWOCOMP* ret = malloc(sizeof(ADVANFUNCS_TWOCOMP));
 	assert(ret);

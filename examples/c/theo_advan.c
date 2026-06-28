@@ -36,7 +36,7 @@ typedef struct PREDICTVARS {
 	double IPRED;
 } PREDICTVARS;
 
-static double imodel_predict(const IMODEL* const _imodel,
+static PREDRES imodel_predict(const IMODEL* const _imodel,
 							 const PREDICTSTATE* const _predictstate,
 							 const double* const err,
 							 PREDICTVARS* _predparams)
@@ -54,7 +54,9 @@ static double imodel_predict(const IMODEL* const _imodel,
     const double IPRED = DOSE / V * KA / (KA - K) * (exp(-K * TIME)-exp(-KA * TIME));
     _predparams->IPRED = IPRED;
     
-    return IPRED * (1 + err[0]) + err[1];
+	return (PREDRES) { 
+		.Y = IPRED * (1 + err[0]) + err[1],
+	};
 }
 
 #define ARRAYSIZE(a) (sizeof(a)/sizeof(a[0]))
@@ -146,7 +148,7 @@ int main(void)
 		let predictstate = advan_advance(advan, &imodel, ptr, &popparam);
 		let yhat = predict(&imodel, &predictstate, errarray, &predictvars);
 		
-		printf("%f %f %f %f %f\n", ptr->ID, ptr->TIME, ptr->DV, yhat, predictvars.IPRED);
+		printf("%f %f %f %f %f\n", ptr->ID, ptr->TIME, ptr->DV, yhat.Y, predictvars.IPRED);
 	}
 	advanfuncs->destruct(advan);
 	free(advan);

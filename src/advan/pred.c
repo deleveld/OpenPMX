@@ -72,7 +72,9 @@ ADVANFUNCS* pmx_advan_pred(const DATACONFIG* const dataconfig, const ADVANCONFIG
 	assert(advanconfig->predict);
 
 	var nstate = advanconfig->nstate;
-	assert(advanconfig->nstate >= 0);
+	int err = advan_ensure(nstate >= 0, __func__, "nstate should be >= 0");
+	if (err)
+		return 0;
 
 	let retinit = (ADVANFUNCS) {
 		.advan_size = sizeof(ADVANCER_PRED),

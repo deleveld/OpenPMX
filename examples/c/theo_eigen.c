@@ -47,7 +47,7 @@ typedef struct PREDICTVARS {
 	/* nothing */
 } PREDICTVARS;
 
-static double imodel_predict(const IMODEL* const _imodel,
+static PREDRES imodel_predict(const IMODEL* const _imodel,
 							 const PREDICTSTATE* const _predictstate,
 							 const double* const err,
 							 PREDICTVARS* _predparams)
@@ -58,7 +58,9 @@ static double imodel_predict(const IMODEL* const _imodel,
 	const double A2 = _predictstate->state[1]; /* C-offset */
     const double IPRED = A2/V;
     
-    return IPRED * (1 + err[0]) + err[1];
+	return (PREDRES) { 
+		.Y = IPRED * (1 + err[0]) + err[1],
+	};
 }
 
 #define ARRAYSIZE(a) (sizeof(a)/sizeof(a[0]))
