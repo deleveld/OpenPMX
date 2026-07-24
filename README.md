@@ -22,9 +22,8 @@ Douglas Eleveld
 
 OpenPMX is a collection of numerical routines for estimation and simulation of mixed-effect pharmacokinetic and pharmacodynamic models.
 
-This repository contains the work-in-progress (WIP) development version and could concievably be broken.
-
 If you just want to use the latest stable version then you should look at the [Releases](https://github.com/deleveld/OpenPMX/releases).
+This repository contains the work-in-progress (WIP) development version and could concievably be broken. 
 
 ### Features
 
@@ -32,9 +31,16 @@ If you just want to use the latest stable version then you should look at the [R
 - Code and simulate/estimate models using text files and C allows scripting and integration with other tools
 - Analytic models for common comparmental models, ODE solver for complex models, eigensystem solver for linear models of any topology.
 - Utilize multi-core CPUs via [OpenMP](https://www.openmp.org/) or [pthreads](https://man7.org/linux/man-pages/man7/pthreads.7.html)
-- Estimation speed comparable with NONMEM 
+- Estimation speed comparable with NONMEM
+- Support for continuous, BLQ, and discrete observations 
 - Limited project scope and complexity, focused on simulation and estimation
 - Few dependencies: [gcc](https://gcc.gnu.org/), [GSL](https://www.gnu.org/software/gsl/)
+
+### Presentations
+
+- [PAGE meeing 2026](https://www.page-meeting.org/2026-dubrovnik-croatia/) as a Software Demonstration. The [abstract](www.page-meeting.org/?abstract=12029) and [poster](https://www.page-meeting.org/wp-content/uploads/pdf_abstracts/2026/2b14a953362545e2be8705f012440673.pdf) are available.
+
+### License
 
 OpenPMX is free software, you can redistribute it and/or modify it under the terms of the GNU General Public License.
 Unlike the licenses of proprietary pharmacometric software the license of OpenPMX does not restrict scientific cooperation. It allows you to share your programs freely with others.
