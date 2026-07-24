@@ -38,7 +38,7 @@ This repository contains the work-in-progress (WIP) development version and coul
 
 ### Presentations
 
-- [PAGE meeing 2026](https://www.page-meeting.org/2026-dubrovnik-croatia/) as a Software Demonstration. The [abstract](www.page-meeting.org/?abstract=12029) and [poster](https://www.page-meeting.org/wp-content/uploads/pdf_abstracts/2026/2b14a953362545e2be8705f012440673.pdf) are available.
+- [PAGE meeing 2026](https://www.page-meeting.org/2026-dubrovnik-croatia/) as a Software Demonstration. The [abstract](https://www.page-meeting.org/?abstract=12029) and [poster](https://www.page-meeting.org/wp-content/uploads/pdf_abstracts/2026/2b14a953362545e2be8705f012440673.pdf) are available.
 
 ### License
 
