@@ -40,8 +40,8 @@ typedef struct {
 } ENCODE;
 
 ENCODE encode_init(const POPMODEL* const popmodel);
-void encode_offset(ENCODE* const encode, const POPMODEL* popmodel);
-void encode_update(ENCODE* encode, const double* x);
+void encode_transform(ENCODE* const encode, const POPMODEL* popmodel);
+void encode_untransform(ENCODE* encode, const double* x);
 
 #ifdef __cplusplus
 }

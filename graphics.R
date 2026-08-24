@@ -111,12 +111,14 @@ if (file.exists(yhatfile)) {
 profiles <- NA
 profilelist <- list.files(pattern=paste0(filename, ".profile.*.iter"))
 for (profile in profilelist) {
+#	cat(sprintf("read in %s\n", profile))
 	data <- read.table(profile, header=TRUE, na.strings = "")
 	if (is.data.frame(profiles))
 		profiles <- rbind(profiles, data)
 	else 
 		profiles <- data
 }
+
 
 pdf(pdffile)
 
@@ -254,7 +256,7 @@ if (is.data.frame(cov) && is.data.frame(phi)) {
 		for (ename in names(phi)) {
 			x <- cov[[cname]]
 			y <- phi[[ename]]
-
+			
 			iseta <- FALSE
 			if (length(grep("ETA", ename)) != 0)
 				iseta <- TRUE

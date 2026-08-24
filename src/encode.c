@@ -157,39 +157,11 @@ static double theta_untransform(const double f, const double lower, const double
 
 /* scale the matrix to have the same diagonal as the reference
  * If ref is NULL then assume identity matrix */
-static void scale_to_match_diagonal(gsl_matrix* matrix, const gsl_matrix* ref)
-{
-	let n = matrix->size1;
-
-	double scaledata[OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX];
-	var scale = gsl_matrix_view_array(scaledata, n, n);
-	gsl_matrix_set_zero(&scale.matrix);
-
-	forcount(i, n) {
-		var s = 1.;
-		if (ref)
-			s = gsl_matrix_get(ref, i, i);
-		var v = gsl_matrix_get(matrix, i, i);
-		double x;
-		if (v == 0)
-			x = 0.;
-		else
-			x = sqrt(s/v);
-		gsl_matrix_set(&scale.matrix, i, i, x);
-	}
-
-	/* correct scale as S*omega*ST */
-	double tempdata[OPENPMX_OMEGA_MAX * OPENPMX_OMEGA_MAX];
-	var temp = gsl_matrix_view_array(tempdata, n, n);
-	gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1., &scale.matrix, matrix, 0., &temp.matrix);
-	gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1., &temp.matrix, &scale.matrix, 0., matrix);
-}
-
-/// Calling encode_offset() makes such that a zero-initialized vector 
+/// Calling encode_transform() makes such that a zero-initialized vector 
 /// will reproduce the given POPMODEL. 
 
 /* encode the popmodel, setting the offsets */
-void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
+void encode_transform(ENCODE* const encode, const POPMODEL* const popmodel)
 {
 	encode->popmodel = *popmodel;
 
@@ -202,8 +174,7 @@ void encode_offset(ENCODE* const encode, const POPMODEL* const popmodel)
 	var offset = encode->offset;
 	encode->has_offsets = true;
 	
-/// Different transformations are possible to address theta bounds but 
-/// the default is to use tanh/atanh.
+/// Different transformations are possible to address theta bounds. 
 	var n = 0;
 	let etheta = popmodel->theta;
 	let ntheta = popmodel->ntheta;
@@ -350,7 +321,7 @@ static void popmodel_omega_update(POPMODEL* const popmodel,
 
 #define UPDATE_SCALE 1.
 
-void encode_update(ENCODE* encode, const double* x)
+void encode_untransform(ENCODE* encode, const double* x)
 {
 	assert(encode->has_offsets == true);
 

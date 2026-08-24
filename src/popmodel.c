@@ -479,18 +479,16 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 	
 	/* info about theta */
 	let ntheta = popmodel->ntheta;
-	info(f2, "THETA(%i)\n", ntheta);
+	info(f2, "THETA:%i\n", ntheta);
 	forcount(i, ntheta) {
 		let v = popmodel->theta[i];
 		let f = popmodel->thetaestim[i];
-		info(f2, OPENPMX_FFORMAT "%s\n", 
-			v, 
-			f == FIXED ? "*" : "");
+		info(f2, OPENPMX_FFORMAT "%s\n", v, f == FIXED ? "*" : "");
 	}
 
 	/* info about omega matrix */
 	let nomega = popmodel->nomega;
-	info(f2, "OMEGA(%i)\n", nomega);
+	info(f2, "OMEGA:%i\n", nomega);
 	forcount(i, nomega) {
 		forcount(j, i+1) {
 			let v = popmodel->omega[i][j];
@@ -502,11 +500,11 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 
 	/* info about sigma */
 	let nsigma = popmodel->nsigma;
-	info(f2, "SIGMA(%i)\n", nsigma);
+	info(f2, "SIGMA:%i\n", nsigma);
 	forcount(i, nsigma) {
 		let v = popmodel->sigma[i];
 		let f = popmodel->sigmafixed[i];
-		info(f2, OPENPMX_FFORMAT " %s\n", v, f ? "*" : "");
+		info(f2, OPENPMX_FFORMAT "%s\n", v, f ? "*" : "");
 	}
 }
 

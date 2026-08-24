@@ -192,6 +192,7 @@ void pmx_advan_tci_init(const ADVANSTATE* advanstate, const TCICONFIG* const tci
 double pmx_advan_tci_target(const ADVANSTATE* advanstate, const double target);
 double pmx_advan_tci_plasma_conc(const ADVANSTATE* advanstate);
 double pmx_advan_tci_effect_conc(const ADVANSTATE* advanstate);
+double pmx_advan_tci_peak_time(const ADVANSTATE* advanstate);
 
 /*---------------------------------------------------------------------*/
 /* OPENPMX */
@@ -338,6 +339,17 @@ typedef struct {
 } PROFILECONFIG;
 
 OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args);
+
+/*---------------------------------------------------------------------*/
+/* covariance */
+/*---------------------------------------------------------------------*/
+typedef struct {
+	double alpha;
+	double step_size;
+	STAGE1CONFIG stage1;
+} COVARIANCECONFIG;
+
+void pmx_covariance(OPENPMX* const pmx, COVARIANCECONFIG* const args);
 
 /*---------------------------------------------------------------------*/
 

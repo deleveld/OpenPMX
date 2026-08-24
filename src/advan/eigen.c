@@ -203,7 +203,7 @@ static void eigen_decompose(ADVANCER_EIGEN* self,
 
 	/* Sort by ascending absolute value (smallest magnitude first).
 	 * This gives a consistent ordering for the modes. */
-	gsl_eigen_nonsymmv_sort(eval, evec, GSL_EIGEN_SORT_ABS_ASC);
+	gsl_eigen_nonsymmv_sort(eval, evec, GSL_EIGEN_SORT_ABS_ASC); 
 
 	/* 3. Extract real eigenvalues and eigenvectors */
 	forcount(i, n) {

@@ -145,13 +145,13 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 	let params = (STAGE2_PARAMS*) data;
 	let idata = params->idata;
 	assert(_xlength == params->test.nparam);
-	encode_update(&params->test, _x);
+	encode_untransform(&params->test, _x);
 
 	/* do the actual test, this sets the objfn */
 	let advanfuncs = params->advanfuncs;
 	let options = params->options;
 	let popmodel = &params->test.popmodel;
-	idata_set_eta(idata, params->best.eta);
+	idata_etas_set(idata, params->best.eta);
 	encode_evaluate(&params->test, idata, advanfuncs, options);
 
 	/* update best imodel and inform the user if we improve */
@@ -235,7 +235,7 @@ static double iteration_nsig(const POPMODEL* const old_popmodel,
 static double converged_nsig(const POPMODEL* const popmodel, const double rhoend)
 {
 	var encoder = encode_init(popmodel);
-	encode_offset(&encoder, popmodel);
+	encode_transform(&encoder, popmodel);
 	
 	var nsig = DBL_MAX;
 	double x[encoder.nparam];
@@ -243,12 +243,12 @@ static double converged_nsig(const POPMODEL* const popmodel, const double rhoend
 
 	forcount(i, encoder.nparam) {
 		x[i] = rhoend;
-		encode_update(&encoder, x);
+		encode_untransform(&encoder, x);
 		let n1 = iteration_nsig(popmodel, &encoder.popmodel);
 		nsig = fmin(n1, nsig);
 
 		x[i] = -rhoend;
-		encode_update(&encoder, x);
+		encode_untransform(&encoder, x);
 		let n2 = iteration_nsig(popmodel, &encoder.popmodel);
 		nsig = fmin(n2, nsig);
 
@@ -256,33 +256,6 @@ static double converged_nsig(const POPMODEL* const popmodel, const double rhoend
 	}
 	return nsig;
 }
-
-/*
-static void print_converged_nsig(const POPMODEL* const popmodel, const double rhoend)
-{
-	var encoder = encode_init(popmodel);
-	encode_offset(&encoder, popmodel);
-	
-	var nsig = DBL_MAX;
-	double x[encoder.nparam];
-	memset(x, 0, sizeof(x));
-
-	forcount(i, encoder.nparam) {
-		x[i] = rhoend;
-		encode_update(&encoder, x);
-		let n1 = iteration_nsig(popmodel, &encoder.popmodel);
-		nsig = fmin(n1, nsig);
-
-		x[i] = -rhoend;
-		encode_update(&encoder, x);
-		let n2 = iteration_nsig(popmodel, &encoder.popmodel);
-		nsig = fmin(n2, nsig);
-
-		printf("param %i nsig (%f,%f)\n", i, n1, n2); 
-
-		x[i] = 0.;
-	}
-} */
 
 static bool focei(STAGE2_PARAMS* const params)
 {
@@ -361,7 +334,7 @@ static bool focei(STAGE2_PARAMS* const params)
 
 			/* set the encoder offsets and get ready to estimate again */
 			let last_best = *best;
-			encode_offset(&params->test, best);
+			encode_transform(&params->test, best);
 			forcount(i, n)
 				initial[i] = 0.;
 
@@ -441,7 +414,7 @@ static void test_initial_objfn(STAGE2_PARAMS* params)
 	let options = params->options;
 	let popmodel = &params->test.popmodel;
 
-	idata_set_eta(idata, params->best.eta);
+	idata_etas_set(idata, params->best.eta);
 
 	/* very first evaluation */
 	encode_evaluate(&params->test, idata, advanfuncs, options);
@@ -452,7 +425,7 @@ static void test_initial_objfn(STAGE2_PARAMS* params)
 		 popmodel->result.neval,
 		 popmodel->result.objfn);
 	if (!isfinite(popmodel->result.objfn))
-		fatal(params->outstream, "objective function not finite\n");
+		warning(params->outstream, "objective function not finite\n");
 	
 	/*save the popmodel shouldnt actually have been changed */
 	save_besteta(params);
@@ -479,7 +452,7 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 	/* make sure best has the objfn of what we just stabilized */
 	var best = params->best.model;
 	*best = params->test.popmodel;
-	encode_offset(&params->test, best); /* this probably does nothing */
+	encode_transform(&params->test, best); /* this probably does nothing */
 
 	/* call the underlying advan to optimize and find the best imodel */
 	let maxeval = options->estimate.maxeval;
@@ -490,7 +463,7 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* params)
 			best->result.type = OBJFN_FINAL;
 
 		/* at end we encode the best so far */
-		encode_offset(&params->test, best);
+		encode_transform(&params->test, best);
 	}
 }
 
@@ -591,7 +564,7 @@ static STAGE2_PARAMS stage2_params_init(const char* filename,
 	*params.best.model = params.test.popmodel;
 
 	/* make sure 0 values reproduce the current model */
-	encode_offset(&params.test, params.best.model);
+	encode_transform(&params.test, params.best.model);
 
 	return params;
 }

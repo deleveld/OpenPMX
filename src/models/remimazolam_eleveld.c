@@ -48,8 +48,12 @@ REMIMAZOLAM_ELEVELD pmx_model_remimazolam_eleveld(REMIMAZOLAM_ELEVELD_COVARIATES
 	const double CL = CSIZ * 1.11977 * exp(KSCL + KOCL);
 	const double Q2 = pow(VSIZ, 0.75) * 1.45260;
 	const double Q3 = pow(V3 / 18.6411, 0.75) * 0.297838;
-	const double KE0 = 0.298269;
+	// MOAAS
 	const double E50 = 0.182 * exp(-7.63/1000. * (AGE - 35.));
+	const double KE0 = 0.298269;
+	// BIS
+//	const double E50 = 0.982 * exp(-16.4/1000. * (AGE - 35.));
+//	const double KE0 = 0.145 * exp(-10.6/1000. * (AGE - 35.));
 
 	return (REMIMAZOLAM_ELEVELD) {
 		.V1 = V1,

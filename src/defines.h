@@ -29,6 +29,7 @@ extern "C" {
 #define OPENPMX_PHIFILE 				".phi"
 #define OPENPMX_YHATFILE 				".yhat"
 #define OPENPMX_TABLEFILE				".txt"
+#define OPENPMX_COVFILE					".cov"
 
 #define OPENPMX_SFORMAT 				" %12s"
 #define OPENPMX_IFORMAT 				" %12i"

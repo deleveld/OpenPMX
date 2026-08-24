@@ -194,7 +194,15 @@ int idata_ineval(const IDATA* const idata, const bool reset)
 	return ineval;
 }
 
-void idata_set_eta(IDATA* const idata, const double* eta)
+double* idata_etas_copy_alloc(IDATA* const idata)
+{
+	var ret = mallocvar(double, idata->nindivid * idata->nomega);
+	var firstindivid = &idata->individ[0];
+	memcpy(ret, firstindivid->eta, idata->nindivid * idata->nomega * sizeof(double));
+	return ret;
+}
+
+void idata_etas_set(IDATA* const idata, const double* eta)
 {
 	assert(eta);
 	var firstindivid = &idata->individ[0];

@@ -172,7 +172,7 @@ static void pmx_profile_evaluate_helper(OPENPMX* const ret,
 	if (source->state) {
 		assert(ret->state->idata.nindivid == source->state->idata.nindivid);
 		assert(ret->state->idata.nomega == source->state->idata.nomega);
-		idata_set_eta(&ret->state->idata, source->state->idata.individ[0].eta);
+		idata_etas_set(&ret->state->idata, source->state->idata.individ[0].eta);
 	}
 
 	/* figure out the file name, if source has none, we should have none as well */

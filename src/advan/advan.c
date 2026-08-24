@@ -186,6 +186,13 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		}
 	}
 	
+/// Advancing is done in "steps" to the earliest of:
+///
+/// + The next RECORD time is achieved
+/// + A previous infusion starts or stopped
+/// + A bolus dose is given
+/// + If `pmx_advan_inittime()` has been called, which is `INITTIME()` in 
+/// openpmxtran
 	/* advance through time and handle infusions and doses when they start
 	 * or stop up until the time of the current record */
 	assert(advan->time <= final_time);
@@ -211,13 +218,6 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			}
 		}
 
-/// Advancing is done in "steps" to the earliest of:
-///
-/// + The next RECORD time is achieved
-/// + A previous infusion starts or stopped
-/// + A bolus dose is given
-/// + If `pmx_advan_inittime()` has been called, which is `INITTIME()` in 
-/// openpmxtran
 		/* find the first place we have to stop at going to the next record
 		 * first look to the start or stop of dose */
 		double intervalstop = final_time;

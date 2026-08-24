@@ -110,8 +110,7 @@ static void idata_resample_eta(IDATA* const idata,
 	 * (i.e. corrected) one */
 	var omegainfo = omegainfo_init(popmodel->nomega, popmodel->omega, popmodel->omegafixed);
 
-/// Upon simulation the individualized values (ETA and objective 
-/// function components) are set to zero.
+/// Upon simulation the individualized values the objective function components are set to zero.
 	let nomega = idata->nomega;
 	forcount(i, idata->nindivid) {
 		let individ = &idata->individ[i];
@@ -137,6 +136,8 @@ static void idata_resample_eta(IDATA* const idata,
 	/* we have to make cholesky here for resampling */
 	var cholesky = gsl_matrix_view_array(omegainfo.nonzero.choleskydata, n, n);
 
+/// Upon simulation the individualized eta values are randomly selected from 
+/// from the distribution of the omega matrix.
 	/* resample eta matrix */
 	var v = gsl_vector_alloc(n);
 	var s = gsl_vector_alloc(n);
@@ -218,13 +219,7 @@ void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig)
 	if (simconfig)
 		options.simulate = simconfig_default(simconfig);
 
-	/* allocate random number generator */
-	if (!pstate->rng) {
-		var seed = options.simulate.seed;
-		pstate->rng = gsl_rng_alloc(gsl_rng_mt19937);
-		gsl_rng_set(pstate->rng, seed);
-	}
-	assert(pstate->rng);
+	pmx_ensure_state_rng(pmx, &options);
 
 	idata_resample_eta(&pstate->idata, &popmodel, pstate->rng);
 	idata_resample_err(&pstate->idata, &popmodel, pstate->rng);

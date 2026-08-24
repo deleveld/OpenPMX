@@ -120,4 +120,33 @@ double sample_min2ll_from_inverse(const double* const data,
 	return sum; */
 }
 
+void scale_to_match_diagonal(gsl_matrix* matrix, const gsl_matrix* ref)
+{
+	let n = matrix->size1;
+
+	var scale = gsl_matrix_alloc(n, n);
+	gsl_matrix_set_zero(scale);
+
+	forcount(i, n) {
+		var s = 1.;
+		if (ref)
+			s = gsl_matrix_get(ref, i, i);
+		var v = gsl_matrix_get(matrix, i, i);
+		double x;
+		if (v == 0)
+			x = 0.;
+		else
+			x = sqrt(s/v);
+		gsl_matrix_set(scale, i, i, x);
+	}
+
+	/* correct scale as S*omega*ST */
+	var temp = gsl_matrix_alloc(n, n);
+	gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1., scale, matrix, 0., temp);
+	gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1., temp, scale, 0., matrix);
+
+	gsl_matrix_free(temp);
+	gsl_matrix_free(scale);
+}
+
 

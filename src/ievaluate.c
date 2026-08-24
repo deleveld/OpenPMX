@@ -90,7 +90,6 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
 /*			This is the way I used to do this: 
 			var deriv = (ya1 - ya2) / (above - below);
 			yhatvar += (deriv*deriv) * sigma[j]; */
-
 			/* Gemini suggests this */
 			/* OPTIMIZATION 3: Pre-calculate the denominator component.
              * (above - below) = (g - (-g)) = 2g.
@@ -99,12 +98,14 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
              * The formula simplifies to: (ya1 - ya2)^2 / 4. */
 			let diff = ya1.Y - ya2.Y;
 
-/*			yhatvar += (diff * diff) */
-			yhatvar += (diff * diff); /* / 4.; move multiplication out of loop */
+			/* move multiplication out of loop
+			yhatvar += (diff * diff) / 4.;  */
+			yhatvar += (diff * diff);
 		}
 	}
-/*	return yhatvar; */
-	return yhatvar * 0.25; /* move multiplication out of loop */;
+/* move multiplication out of loop
+	return yhatvar; */
+	return yhatvar * 0.25; 
 }
 
 /* For how this is used see PAGE poster:
@@ -112,7 +113,7 @@ static double evaluate_yhatvar(const IMODEL* const imodel,
 #include <gsl/gsl_sf_erf.h>
 double loglik_llq(const double llq, const double pred, const double sigmaSD)
 {
-    double z = (llq - pred) / sigmaSD;
+    let z = (llq - pred) / sigmaSD;
     return gsl_sf_log_erfc(-z / M_SQRT2) - M_LN2;
 }
 

@@ -39,7 +39,6 @@
 typedef struct TCICONTROL {
 	Config cfg;
 	const double max_rate;
-	const double peak_time;
 	const int cmt_0;	/* 0-based compartment */
 	double next_time;	/* in TIME units */
 	double totamt; 		/* cumulative dose */
@@ -201,6 +200,16 @@ double pmx_advan_tci_effect_conc(const ADVANSTATE* advanstate)
 		exit(EXIT_FAILURE);
 	}
 	return tcicontrol->cfg.effect_conc;
+}
+
+double pmx_advan_tci_peak_time(const ADVANSTATE* advanstate)
+{
+	var tcicontrol = advanstate->advan->tcicontrol;
+	if (!tcicontrol) {
+		fprintf(stderr, "fatal: %s: tci not initialized\n", __func__);
+		exit(EXIT_FAILURE);
+	}
+	return tcicontrol->cfg.peak_time;
 }
 
 

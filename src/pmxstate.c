@@ -27,6 +27,8 @@
 #include "print.h"
 #include "pmxstate.h"
 
+#include <gsl/gsl_rng.h>
+
 static PMXSTATE* pmxstate_alloc(const OPENPMX* const pmx)
 {
 	let advanfuncs = advanfuncs_alloc(&pmx->data, &pmx->advan);
@@ -72,6 +74,20 @@ void pmx_ensure_state(OPENPMX* const pmx)
 {
 	if (!pmx->state)
 		pmx->state = pmxstate_alloc(pmx);
+}
+
+void pmx_ensure_state_rng(OPENPMX* const pmx, const OPTIONS* const options)
+{
+	pmx_ensure_state(pmx);
+	var pstate = pmx->state;
+
+	/* allocate random number generator */
+	if (!pstate->rng) {
+		var seed = options->simulate.seed;
+		pstate->rng = gsl_rng_alloc(gsl_rng_mt19937);
+		gsl_rng_set(pstate->rng, seed);
+	}
+	assert(pstate->rng);
 }
 
 void pmx_release_state(OPENPMX* pmx)

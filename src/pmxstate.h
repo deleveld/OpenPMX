@@ -20,6 +20,7 @@
 
 #include "popmodel.h"
 #include "idata.h"
+#include "options.h"
 
 #include <gsl/gsl_rng.h>
 
@@ -43,6 +44,7 @@ void pmx_copy_model(OPENPMX* dest, const OPENPMX* const src);
 void pmx_copy_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel);
 
 void pmx_ensure_state(OPENPMX* const pmx);
+void pmx_ensure_state_rng(OPENPMX* const pmx, const OPTIONS* const options);
 
 #ifdef __cplusplus
 }

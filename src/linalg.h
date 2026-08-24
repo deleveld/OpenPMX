@@ -32,7 +32,8 @@ double sample_min2ll_from_cholesky(const double* const data,
 double sample_min2ll_from_inverse(const double* const data,
 								  const gsl_matrix* const inverse);
 
- 
+void scale_to_match_diagonal(gsl_matrix* matrix, const gsl_matrix* ref);
+
 #ifdef __cplusplus
 }
 #endif
