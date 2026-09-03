@@ -14,6 +14,10 @@
 		allmethods[[i]] <- list(data=validate, 	name="Validate",		col="lightgreen",	lw=5)
 		i <- i + 1
 	}
+	if (exists("gronmem_blq")) {
+		allmethods[[i]] <- list(data=gronmem_blq, 	name="OpenPMX(BLQ)",		col="blue",		lw=1)
+		i <- i + 1
+	}
 
 ########################################################################
 	if (!exists("tab"))
@@ -162,6 +166,12 @@
 			v_ <- v[valid]
 			nm1_ <- nm1[valid]
 
+
+			cat("########\n")
+			print(v_)
+			print(nm1_)
+			print(trueval)
+
 			mdifabspe[name, displayname] <- calc_medrerr(v_, nm1_, trueval)
 
 			correlation[name, displayname] <- cor(v_, nm1_)
@@ -198,7 +208,8 @@
 
 		ppp <- mdifabspe["OpenPMX", displayname]
 		n_params <- n_params + 1
-		if (ppp != 0) {
+###		if (ppp != 0) {
+		if (TRUE) {
 			d0 <- density(tallv, na.rm=TRUE)
 			plot(d0, type="n", yaxt="n", xlab=NA, ylab=NA, xlim=(xlim), ylim=c(0,1.8), log=log, main=NA, xaxs=xaxs, yaxs="i")
 			mtext("Density", side=2, line=0.5, cex=par()$cex)

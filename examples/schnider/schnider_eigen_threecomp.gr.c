@@ -22,6 +22,7 @@
 //#define _GNU_SOURCE
 //#include <fenv.h>
 #include "openpmx.h"
+#include "openpmx_model.h"
 typedef struct RECORD {
 	double ID;
 	double TIME;
@@ -1261,7 +1262,7 @@ static void imodel_diffeqn(double _dadt[],
 #undef A
 #undef DADT
 }
-static double imodel_predict(const IMODEL* const _imodel,
+static PREDRES imodel_predict(const IMODEL* const _imodel,
 							 const PREDICTSTATE* const _current,
 							 const double* const _err,
 							 PREDICTVARS* _predparams)
@@ -1272,6 +1273,7 @@ static double imodel_predict(const IMODEL* const _imodel,
 	(void) _predparams;
 	(void) _popparam;
 	double Y = NAN;
+	double loglik = 0.;
 	/* allow access to RECORD fields */
 	const double ID = _record->ID; (void)ID;
 	const double TIME = _record->TIME; (void)TIME;
@@ -1307,7 +1309,7 @@ static double imodel_predict(const IMODEL* const _imodel,
 #undef EPS
 	/* set PREDICTVARS fields */
 	_predparams->IPRED = IPRED;
-	return Y;
+	return (PREDRES) { .Y = Y, .loglik = loglik };
 }
 static void openpmxtran_data_preprocess_callback(RECORD* _record)
 {
@@ -1411,6 +1413,7 @@ static OPENPMX openpmx = (OPENPMX) {
 #define estimate(...) pmx_estimate(&openpmx, &(ESTIMCONFIG){ __VA_ARGS__ })
 #define evaluate(...) pmx_evaluate(&openpmx, &(STAGE1CONFIG){ __VA_ARGS__ })
 #define simulate(...) pmx_simulate(&openpmx, &(SIMCONFIG){ __VA_ARGS__ })
+#define covariance(...) pmx_covariance(&openpmx, &(COVARIANCECONFIG){ __VA_ARGS__ })
 #define profile(...) pmx_profile(&openpmx, __VA_ARGS__ )
 void predict(void)
 {
