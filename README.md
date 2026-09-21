@@ -41,7 +41,7 @@ This repository contains the work-in-progress (WIP) development version and coul
 ### New features 0.1.7
 - Covariance matrix of estimation via `covariance()` to determine parameter limits.
 	- For a given alpha value, the upper and lower bounds of the estimated `THETA()`, `SIGMA()`, and `OMEGA()` diagonal values are calculated
-	- The default used the Rinv*S*Rinv Sandwitch matrix, alternatively only the S matrix can be used
+	- The default used the Sandwitch matrix (R^-1 * S * R^-1 ) , alternatively only the S matrix can be used
 	- The S matrix is examined to determine non-idenifiable parameters
 - Likelihood profiles via `profile()` to determine parameter limits. Uses bracketing to find the paramater value for a 
   delta objective function to a desired accuracy
