@@ -25,6 +25,7 @@
 #include "idata.h"
 #include "print.h"
 #include "pmxstate.h"
+#include "githash.h"
 #include "advan/advan.h"
 #include "utils/c22.h"
 #include "utils/vector.h"
@@ -404,12 +405,14 @@ static int reload_popparam(OPENPMX* dest, const RELOADCONFIG* const args, POPMOD
 	char filename[PATH_MAX];
 	ERRCTX errctx = { 0 };
 
+	info(0, "OpenPMX %i.%i.%i hash %s\n", OPENPMX_VERSION_MAJOR, OPENPMX_VERSION_MINOR, OPENPMX_VERSION_RELEASE, OPENPMX_GITHASH);
+
 	if (args->filename) 
 		snprintf(filename, sizeof(filename), "%s", args->filename);
 	else if (dest->filename) 
 		snprintf(filename, sizeof(filename), "%s%s", dest->filename, OPENPMX_EXTFILE);
 	else 
-		errctx_add(&errctx, "%s: could not determine filename\n", __func__);
+		errctx_add(&errctx, "could not determine filename\n");
 	if (errctx.len)
 		goto failed;
 
@@ -439,37 +442,37 @@ static int reload_popparam(OPENPMX* dest, const RELOADCONFIG* const args, POPMOD
 
 	if (!args->force) {
 		if (s.ntheta != d.ntheta) {
-			errctx_add(&errctx, "%s: theta count mismatch\n", __func__);
+			errctx_add(&errctx, "theta count mismatch\n");
 			goto failed;
 		}
 		if (s.nblock != d.nblock) {
-			errctx_add(&errctx, "%s: omega block count mismatch\n", __func__);
+			errctx_add(&errctx, "omega block count mismatch\n");
 			goto failed;
 		}
 		if (s.nomega != d.nomega) {
-			errctx_add(&errctx, "%s: omega count mismatch\n", __func__);
+			errctx_add(&errctx, "omega count mismatch\n");
 			goto failed;
 		}
 		if (s.nsigma != d.nsigma) {
-			errctx_add(&errctx, "%s: sigma count mismatch\n", __func__);
+			errctx_add(&errctx, "sigma count mismatch\n");
 			goto failed;
 		}
 
 		forcount(i, s.ntheta) {
 			if (d.lower[i] != s.lower[i] ||
 				d.upper[i] != s.upper[i]) {
-				errctx_add(&errctx, "%s: theta bounds mismatch\n", __func__);
+				errctx_add(&errctx, "theta bounds mismatch\n");
 				goto failed;
 			}
 			if (d.thetaestim[i] != s.thetaestim[i]) {
-				errctx_add(&errctx, "%s: theta type mismatch\n", __func__);
+				errctx_add(&errctx, "theta type mismatch\n");
 				goto failed;
 			}
 
 			if (s.theta[i] <= d.lower[i] ||
 				s.theta[i] >= d.upper[i]) {
 				if (s.thetaestim[i] == ESTIMATE) {
-					errctx_add(&errctx, "%s: estimated theta value outside range\n", __func__);
+					errctx_add(&errctx, "estimated theta value outside range\n");
 					goto failed;
 				}
 			}
@@ -478,7 +481,7 @@ static int reload_popparam(OPENPMX* dest, const RELOADCONFIG* const args, POPMOD
 		forcount(i, s.nomega) {
 			forcount(j, s.nomega) {
 				if (s.omegafixed[i][j] !=  d.omegafixed[i][j]) {
-					errctx_add(&errctx, "%s: omega fixed mismatch\n", __func__);
+					errctx_add(&errctx, "omega fixed mismatch\n");
 					goto failed;
 				}
 			}
@@ -486,18 +489,18 @@ static int reload_popparam(OPENPMX* dest, const RELOADCONFIG* const args, POPMOD
 
 		forcount(i, s.nsigma) {
 			if (s.sigmafixed[i] != d.sigmafixed[i]) {
-				errctx_add(&errctx, "%s: sigma fixed mismatch\n", __func__);
+				errctx_add(&errctx, "sigma fixed mismatch\n");
 				goto failed;
 			}
 		}
 		
 		forcount(i, s.nblock) {
 			if (d.blocktype[i] != s.blocktype[i]) {
-				errctx_add(&errctx, "%s: omega block type mismatch\n", __func__);
+				errctx_add(&errctx, "omega block type mismatch\n");
 				goto failed;
 			}
 			if (d.blockdim[i] != s.blockdim[i]) {
-				errctx_add(&errctx, "%s: omega block ndim mismatch\n", __func__);
+				errctx_add(&errctx, "omega block ndim mismatch\n");
 				goto failed;
 			}
 		}

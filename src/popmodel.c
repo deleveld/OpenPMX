@@ -446,11 +446,12 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runti
 
 static void info_iteration(FILE* f1,
 						   const double runtime_s,
-						   const POPMODEL* popmodel)
+						   const POPMODEL* popmodel,
+						   const char* extra)
 {
 	let _objfn = popmodel->result.objfn;
 	let neval = popmodel->result.neval;
-	info(f1, "time %.3f neval %i objfn %.6f\n", runtime_s, neval, _objfn);
+	info(f1, "time %.3f neval %i objfn %.6f%s\n", runtime_s, neval, _objfn, extra ? extra : "");
 }
 
 void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double timestamp)
@@ -513,12 +514,13 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 							   const int ineval,
 							   const bool details,
 							   FILE* outstream,
-							   FILE* extstream)
+							   FILE* extstream,
+							   const char* extra)
 {
 	if (details)
 		popmodel_information(outstream, popmodel, runtime_s);
 
-	info_iteration(outstream, runtime_s, popmodel);
+	info_iteration(outstream, runtime_s, popmodel, extra);
 
 	if (extstream) 
 		extfile_append(extstream, popmodel, runtime_s, popmodel->result.neval, ineval);

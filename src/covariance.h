@@ -15,38 +15,26 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PMXSTATE_H
-#define PMXSTATE_H
+#ifndef OPENPMX_COVARIANCE_H
+#define OPENPMX_COVARIANCE_H
 
-#include "popmodel.h"
-#include "idata.h"
-#include "options.h"
-#include "covariance.h"
-
-#include <gsl/gsl_rng.h>
+#include "openpmx.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/*--------------------------------------------------------------------*/
+typedef typeof(((COVARIANCECONFIG*)0)->type) COVARIANCETYPE;
 
-typedef struct PMXSTATE {
-	const ADVANFUNCS* const advanfuncs;
-	IDATA idata;
-	int tablecount;
-	gsl_rng* rng;
-	COVARIANCE covariance;
-} PMXSTATE;
 
-OPENPMX pmx_copy(const OPENPMX* const pmx);
-void pmx_copy_popparam(OPENPMX* dest, const OPENPMX* const src);
-void pmx_copy_model(OPENPMX* dest, const OPENPMX* const src);
+typedef struct COVARIANCE {
+	COVARIANCETYPE type;
+	const COVLIMIT* limit;
+	int nlimit;
+	double alpha;
+} COVARIANCE;
 
-void pmx_copy_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel);
-
-void pmx_ensure_state(OPENPMX* const pmx);
-void pmx_ensure_state_rng(OPENPMX* const pmx, const OPTIONS* const options);
+void covariance_free(COVARIANCE* cov);
 
 #ifdef __cplusplus
 }

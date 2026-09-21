@@ -37,7 +37,7 @@ extern "C" {
 
 #define OPENPMX_VERSION_MAJOR			0
 #define OPENPMX_VERSION_MINOR			1
-#define OPENPMX_VERSION_RELEASE			6
+#define OPENPMX_VERSION_RELEASE			7
 
 #define OPENPMX_THETA_MAX				64
 #define OPENPMX_OMEGABLOCKSIZE_MAX		64
@@ -319,19 +319,26 @@ typedef struct {
 void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* const args);
 
 /*---------------------------------------------------------------------*/
+/* parameter identification for profile and covariance */
+/*---------------------------------------------------------------------*/
+typedef struct {
+	enum {
+		PARAM_INVALID = 0,
+		PARAM_THETA,
+		PARAM_OMEGA,
+		PARAM_SIGMA,
+	} type;
+	int index;
+	double value; 
+} PARAMETER;
+
+/*---------------------------------------------------------------------*/
 /* profile */
 /*---------------------------------------------------------------------*/
 typedef struct {
 	const char* name;
 	bool append;
-	enum {
-		PROFILE_INVALID = 0,
-		PROFILE_THETA,
-		PROFILE_OMEGA,
-		PROFILE_SIGMA,
-	} type;
-	int index;
-	double value; 		/* input: bracketing value, output: final value */
+	PARAMETER param;	/* value: bracketing value, output: final value */
 	double dobjfn;		/* input: targeted profile */
 	double dobjfn_tol;
 	int maxeval;		/* input: maximum evaluations */
@@ -344,12 +351,25 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args);
 /* covariance */
 /*---------------------------------------------------------------------*/
 typedef struct {
+	enum {
+		COVARIANCE_SANDWICH = 0,
+		COVARIANCE_S_MATRIX,
+	} type;
 	double alpha;
 	double step_size;
+	bool details;
 	STAGE1CONFIG stage1;
+	int nsample;
 } COVARIANCECONFIG;
 
 void pmx_covariance(OPENPMX* const pmx, COVARIANCECONFIG* const args);
+
+typedef struct {
+	PARAMETER param;
+	double lower;
+	double upper;
+} COVLIMIT;
+COVLIMIT pmx_covariance_limit(OPENPMX* const pmx, const PARAMETER* const param);
 
 /*---------------------------------------------------------------------*/
 

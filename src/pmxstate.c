@@ -66,6 +66,8 @@ static void pmxstate_free(PMXSTATE* pstate)
 
 	if (pstate->rng)
 		gsl_rng_free(pstate->rng);
+		
+	covariance_free(&pstate->covariance);
 
 	free(pstate);
 }

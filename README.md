@@ -29,17 +29,29 @@ This repository contains the work-in-progress (WIP) development version and coul
 
 - First-order conditional estimation with interation (FOCEI) results similar to industry standard [NONMEM](https://www.iconplc.com/solutions/technologies/nonmem)
 - Code and simulate/estimate models using text files and C allows scripting and integration with other tools
-- Analytic models for common comparmental models, ODE solver for complex models, eigensystem solver for linear models of any topology.
+- System advancers for:
+	- Analytic models for common comparmental models
+	- Ordinary-Differential-Equation (ODE) solver for complex models
+	- Eigensystem solver for linear models of any topology
 - Utilize multi-core CPUs via [OpenMP](https://www.openmp.org/) or [pthreads](https://man7.org/linux/man-pages/man7/pthreads.7.html)
 - Estimation speed comparable with NONMEM
-- Support for continuous, BLQ, and discrete observations 
 - Limited project scope and complexity, focused on simulation and estimation
 - Few dependencies: [gcc](https://gcc.gnu.org/), [GSL](https://www.gnu.org/software/gsl/)
+
+### New features 0.1.7
+- Covariance matrix of estimation via `covariance()` to determine parameter limits.
+	- For a given alpha value, the upper and lower bounds of the estimated `THETA()`, `SIGMA()`, and `OMEGA()` diagonal values are calculated
+	- The default used the Rinv*S*Rinv Sandwitch matrix, alternatively only the S matrix can be used
+	- The S matrix is examined to determine non-idenifiable parameters
+- Likelihood profiles via `profile()` to determine parameter limits. Uses bracketing to find the paramater value for a 
+  delta objective function to a desired accuracy
+- Use BLQ estimates in model estimation using the `loglik_llq()` function within the `$PRED()` record
+- Simulate Target-Controlled-Infusion (TCI) dosing on any model
+- Reload population models via `reload()` from previous (even incomplete) estimations
 
 ### Presentations
 
 - [PAGE meeing 2026](https://www.page-meeting.org/2026-dubrovnik-croatia/) as a Software Demonstration. The [abstract](https://www.page-meeting.org/?abstract=12029) and [poster](https://www.page-meeting.org/wp-content/uploads/pdf_abstracts/2026/2b14a953362545e2be8705f012440673.pdf) are available.
-- Paper [OpenPMX Software for Nonlinear Mixed-Effect Models in Pharmacometrics: Precision Compared With NONMEM First-Order Conditional Estimation](https://ascpt.onlinelibrary.wiley.com/doi/10.1002/psp4.70250) published.
 
 ### License
 
@@ -124,22 +136,9 @@ This is used in code for a TCI dosing controller. See the functions `pmx_advan_t
 - Douglas Eleveld (deleveld@dds.nl) Initial codebase. 
 
 # Wish-list / TODO
-- Some code for LLQ has been added via data coloum DVLLQ. IF exists and non-zero then objective function term is added
-	the -2LL that the prediction will be lower than the DV
-- During checkout, calculate paramater gradients to identify paramaters that may be numerically unidentifiable
-- Make estimation of categorical variables possible.
-- Post-estimation evaluation of the objective function in the spirit of NONMEM and $COV. Possibly the gradient can be calculated at the final estimate and the first and second derivatives calculated using splines. It is also possible to transform this back into the scale of the user paramaters?
+- Make example showing how estimation of categorical variables is possible.
 - Calculate NPDE.
-- Add code to generate data for VPCs.
-- Consider using the LDLT decomposition to encode the population model parameters for omega.
-- does icov_resample allow for better performance? Maybe need to re-run at mean of weighted distribution?
-- After first stage1 optimization we could use the covariance matrix and its eigenvalue
-	decomposition to make a preconditioner which could probably improve efficiency and
-	convergence.
-- After the first estimation part we can do a gradient calculation to make a preconditioner
-	to use on subsequent more accurate (smaller rho) estimations. This could improve
-	efficiency.
-- Can Libgsl be replaced by LAPACK? It has a more permissive license.
+- Generate VPCs.
 
 # Philosophy
 - Do one thing and do it well.

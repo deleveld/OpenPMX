@@ -41,7 +41,7 @@ static POPMODEL profile_popmodel_init(const OPENPMX* const source,
 									  ERRCTX* errctx)
 {
 	/* first, basic error checking */
-	if (args->type == PROFILE_INVALID) 
+	if (args->param.type == PARAM_INVALID) 
 		errctx_add(errctx, "%s: profile type invalid\n", __func__);
 	if (args->dobjfn < 0.) 
 		errctx_add(errctx, "%s: dobjfn must be positive\n", __func__);
@@ -55,18 +55,18 @@ static POPMODEL profile_popmodel_init(const OPENPMX* const source,
 		goto failed;
 
 	/* more error checking or profileconfig */
-	var index = args->index - (source->data._offset1 ? 1 : 0);
-	switch (args->type) {
-		case PROFILE_THETA:
+	var index = args->param.index - (source->data._offset1 ? 1 : 0);
+	switch (args->param.type) {
+		case PARAM_THETA:
 			if (index < 0 || index >= popmodel.ntheta) {
-				errctx_add(errctx, "%s: profile theta index (%i) out of bounds", __func__, args->index);
+				errctx_add(errctx, "%s: profile theta index (%i) out of bounds", __func__, args->param.index);
 				goto failed;
 			}
 			break;
 
-		case PROFILE_OMEGA:
+		case PARAM_OMEGA:
 			if (index < 0 || index >= popmodel.nomega) {
-				errctx_add(errctx, "%s: profile omega index (%i) out of bounds", __func__, args->index);
+				errctx_add(errctx, "%s: profile omega index (%i) out of bounds", __func__, args->param.index);
 				goto failed;
 			}
 			if (popmodel.omegafixed[index][index] == OMEGAFIXED_SAME) {
@@ -75,15 +75,15 @@ static POPMODEL profile_popmodel_init(const OPENPMX* const source,
 			}
 			break;
 
-		case PROFILE_SIGMA:
+		case PARAM_SIGMA:
 			if (index < 0 || index >= popmodel.nsigma) {
-				errctx_add(errctx, "%s: profile sigma index (%i) out of bounds", __func__, args->index);
+				errctx_add(errctx, "%s: profile sigma index (%i) out of bounds", __func__, args->param.index);
 				goto failed;
 			}
 			break;
 
 		default:
-			errctx_add(errctx, "%s: profile type (%i) invalid", __func__, args->type);
+			errctx_add(errctx, "%s: profile type (%i) invalid", __func__, args->param.type);
 			goto failed;
 	}
 	return popmodel;
@@ -96,15 +96,15 @@ static double popmodel_left_value(const POPMODEL* const popmodel,
 								 const PROFILECONFIG* const args,
 								 const bool _offset1)
 {
-	var index = args->index - (_offset1 ? 1 : 0);
-	switch (args->type) {
-		case PROFILE_THETA:
+	var index = args->param.index - (_offset1 ? 1 : 0);
+	switch (args->param.type) {
+		case PARAM_THETA:
 			return popmodel->theta[index];
 
-		case PROFILE_OMEGA:
+		case PARAM_OMEGA:
 			return popmodel->omega[index][index];
 
-		case PROFILE_SIGMA:
+		case PARAM_SIGMA:
 			return popmodel->sigma[index];
 
 		default:
@@ -116,20 +116,20 @@ static void popmodel_apply_args(POPMODEL* const popmodel,
 								const PROFILECONFIG* const args,
 								const bool _offset1)
 {
-	var index = args->index - (_offset1 ? 1 : 0);
-	switch (args->type) {
-		case PROFILE_THETA:
-			popmodel->theta[index] = args->value;
+	var index = args->param.index - (_offset1 ? 1 : 0);
+	switch (args->param.type) {
+		case PARAM_THETA:
+			popmodel->theta[index] = args->param.value;
 			popmodel->thetaestim[index] = FIXED;
 			break;
 
-		case PROFILE_OMEGA:
-			popmodel->omega[index][index] = args->value;
+		case PARAM_OMEGA:
+			popmodel->omega[index][index] = args->param.value;
 			popmodel->omegafixed[index][index] = OMEGAFIXED_FIXED;
 			break;
 
-		case PROFILE_SIGMA:
-			popmodel->sigma[index] = args->value;
+		case PARAM_SIGMA:
+			popmodel->sigma[index] = args->param.value;
 			popmodel->sigmafixed[index] = 1;
 			break;
 
@@ -140,14 +140,14 @@ static void popmodel_apply_args(POPMODEL* const popmodel,
 
 static const char* profile_type(const PROFILECONFIG* const args)
 {
-	switch (args->type) {
-		case PROFILE_THETA:
+	switch (args->param.type) {
+		case PARAM_THETA:
 			return "theta";
 
-		case PROFILE_OMEGA:
+		case PARAM_OMEGA:
 			return "omega";
 
-		case PROFILE_SIGMA:
+		case PARAM_SIGMA:
 			return "sigma";
 
 		default:
@@ -172,14 +172,19 @@ static void pmx_profile_evaluate_helper(OPENPMX* const ret,
 	if (source->state) {
 		assert(ret->state->idata.nindivid == source->state->idata.nindivid);
 		assert(ret->state->idata.nomega == source->state->idata.nomega);
-		idata_etas_set(&ret->state->idata, source->state->idata.individ[0].eta);
+
+		/* copy the eta state from source to us */
+		var etas = idata_etas_alloc(&source->state->idata);
+		idata_etas_copy(&etas, &source->state->idata);
+		idata_etas_write(&ret->state->idata, &etas);
+		idata_etas_free(&etas);
 	}
 
 	/* figure out the file name, if source has none, we should have none as well */
 	char filename[PATH_MAX] = "";
 	if (source->filename) {
 		let type = profile_type(args);
-		snprintf(filename, sizeof(filename), "%s.profile.%s.%i.%s", source->filename, type, args->index, name);
+		snprintf(filename, sizeof(filename), "%s.profile.%s.%i.%s", source->filename, type, args->param.index, name);
 		ret->filename = filename;
 	}
 
@@ -191,7 +196,7 @@ static void pmx_profile_evaluate_helper(OPENPMX* const ret,
 static void get_iter_filename(char* filename, const size_t size, const OPENPMX* const source, const PROFILECONFIG* const args, const char* name)
 {
 	let type = profile_type(args);
-	snprintf(filename, size, "%s.profile.%s.%i.%s.iter", source->filename, type, args->index, name);
+	snprintf(filename, size, "%s.profile.%s.%i.%s.iter", source->filename, type, args->param.index, name);
 }
 
 static void write_iter_header(FILE* stream)
@@ -235,7 +240,7 @@ static double root_function(double x, void *_params)
 	 * x-range is [0, 1] then there is no issue with domain */
 	let delta = params->right - params->left;
 	let new_value = params->left + sqrt(x)*delta;
-	args->value = new_value;
+	args->param.value = new_value;
 
 	double objfn; 
 	if (x == 0.) {
@@ -253,11 +258,11 @@ done:
 	if (x != 0. || !params->test_only) {
 		if (!params->test_only)
 			printf("profile test %s %i %s value %g objfn %.6f target %.6f neval %i\n", 
-				   type, args->index, params->name, args->value, objfn, params->objfn_target, params->neval);
+				   type, args->param.index, params->name, args->param.value, objfn, params->objfn_target, params->neval);
 		if (params->stream) {
 			fprintf(params->stream, OPENPMX_SFORMAT OPENPMX_IFORMAT OPENPMX_FFORMAT 
 									OPENPMX_FFORMAT OPENPMX_FFORMAT OPENPMX_IFORMAT "\n",
-									type, args->index, args->value, 
+									type, args->param.index, args->param.value, 
 									objfn, 
 									!params->test_only ? params->objfn_target : 0., 
 									params->neval);
@@ -289,7 +294,7 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 		fatal(0, "%s: %s", __func__, errctx.errmsg);
 
 	let left_value = popmodel_left_value(&popmodel, args, source->data._offset1);
-	let right_value = args->value;
+	let right_value = args->param.value;
 	var name = args->name;
 	if (!name) {
 		name = "right";
@@ -356,16 +361,16 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 		.params = &params,
 	};
 
-	let vlower = fmin(left_value, args->value);
-	let vupper = fmax(left_value, args->value);
+	let vlower = fmin(left_value, args->param.value);
+	let vupper = fmax(left_value, args->param.value);
 	if (!test_only) {
 		printf("profile start %s %i lower %g upper %g\n"
 			   "profile objfn %.6f target %.6f dobjfn %.6f tol %g\n", 
-			   type, args->index, vlower, vupper, 
+			   type, args->param.index, vlower, vupper, 
 			   source->result.objfn, params.objfn_target, args->dobjfn, args->dobjfn_tol);
 	} else {
 		printf("profile test %s %i %s value %g\n", 
-			   type, args->index, name, args->value);
+			   type, args->param.index, name, args->param.value);
 	}
 
 	/* bracket in normalised [0, 1] space. The root_function maps back
@@ -420,17 +425,17 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 	let x = gsl_root_fsolver_root(s);
 	let delta = params.right - params.left;
 	let new_value = params.left + sqrt(x)*delta;
-	args->value = new_value;
+	args->param.value = new_value;
 
 	if (params.converged)
-		printf("profile converged value %g\n", args->value);
+		printf("profile converged value %g\n", args->param.value);
 	else
-		printf("profile failed value %g\n", args->value);
+		printf("profile failed value %g\n", args->param.value);
 
 	if (stream)
 		fprintf(stream, OPENPMX_SFORMAT OPENPMX_IFORMAT OPENPMX_FFORMAT 
 						OPENPMX_FFORMAT OPENPMX_FFORMAT OPENPMX_IFORMAT "\n",
-						type, args->index, args->value, 
+						type, args->param.index, args->param.value, 
 						0., params.objfn_target, 0);
 
 	/* cleanup */

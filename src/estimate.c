@@ -17,13 +17,6 @@
  
 /// This file does the outer (stage 2) estimation.
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <assert.h>
-#include <float.h>
-#include <limits.h>
-
 #include "openpmx.h"
 #include "githash.h"
 #include "omegainfo.h"
@@ -40,6 +33,14 @@
 #include "utils/c22.h"
 #include "utils/various.h"
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <assert.h>
+#include <float.h>
+#include <limits.h>
+#include <unistd.h>
+
 #include "buildflags.h"
 
 /*--------------------------------------------------------------------*/
@@ -53,7 +54,7 @@ typedef struct {
 	const OPTIONS* const options;
 	struct {
 		POPMODEL* model;
-		double* eta;
+		IDATAETAS etas;
 	} best;
 	struct timespec begin;
 	FILE* outstream;
@@ -67,13 +68,6 @@ static double get_timestamp(const STAGE2_PARAMS* const params)
 	return timespec_time_difference(&params->begin, &now) / 1000.;
 }
 
-static inline void save_besteta(const STAGE2_PARAMS* const params)
-{
-	let idata = params->idata;
-	let firstindivid = &idata->individ[0];
-	memcpy(params->best.eta, firstindivid->eta, idata->nindivid * idata->nomega * sizeof(double));
-}
-
 static void print_model_evaluation(const STAGE2_PARAMS* params)
 {
 	let popmodel = &params->test.popmodel;
@@ -83,10 +77,11 @@ static void print_model_evaluation(const STAGE2_PARAMS* params)
 							  idata_ineval(params->idata, false),
 							  options->estimate.details || options->estimate.verbose,
 							  params->outstream,
-							  params->extstream);
+							  params->extstream,
+							  0);
 }
 
-static void update_best_imodel(const STAGE2_PARAMS* const params)
+static void update_best_imodel(STAGE2_PARAMS* const params)
 {
 	let popmodel = &params->test.popmodel;
 	let options = params->options;
@@ -100,7 +95,7 @@ static void update_best_imodel(const STAGE2_PARAMS* const params)
 /// values are saved. They will be used as initial values for subsequent
 /// optimization.
 		*best = *popmodel;
-		save_besteta(params);
+		idata_etas_copy(&params->best.etas, params->idata);
 		print_model = true;
 	}
 
@@ -111,8 +106,10 @@ static void update_best_imodel(const STAGE2_PARAMS* const params)
 	if (options->estimate.verbose)
 		print_model = true;
 	if (print_model) {
-		if (!options->estimate.details && !options->estimate.verbose)
-			printf("\033[F");
+		if (!options->estimate.details && !options->estimate.verbose) {
+			if (isatty(fileno(stdout)))
+				printf("\033[F");
+		}
 		print_model_evaluation(params);
 	}
 }
@@ -120,14 +117,15 @@ static void update_best_imodel(const STAGE2_PARAMS* const params)
 static void encode_evaluate(ENCODE* const test,
 							IDATA* const idata,
 							const ADVANFUNCS* const advanfuncs,
-							const OPTIONS* const options)
-							
+							const OPTIONS* const options,
+							const bool first_eval)
 {
 	var popmodel = &test->popmodel;
 	let omegainfo = &test->omegainfo;
 	let nonzero = &omegainfo->nonzero;
 	var scatteroptions = (SCATTEROPTIONS) {
 		.stage1_order = true,
+		.stage1_evaluate = first_eval,
 	};
 	scatter_threads(idata, advanfuncs, popmodel, nonzero, options, &scatteroptions, stage1_thread);
 
@@ -151,8 +149,8 @@ static double focei_stage2_evaluate_population_objfn(const long int _xlength,
 	let advanfuncs = params->advanfuncs;
 	let options = params->options;
 	let popmodel = &params->test.popmodel;
-	idata_etas_set(idata, params->best.eta);
-	encode_evaluate(&params->test, idata, advanfuncs, options);
+	idata_etas_write(idata, &params->best.etas);
+	encode_evaluate(&params->test, idata, advanfuncs, options, false);
 
 	/* update best imodel and inform the user if we improve */
 	update_best_imodel(params);
@@ -343,8 +341,8 @@ static bool focei(STAGE2_PARAMS* const params)
 
 			/* setting etas to zero at each restart seems to reduce the 
 			 * risk of local minimums */
-			let idata = params->idata;
-			memset(params->best.eta, 0, idata->nindivid * idata->nomega * sizeof(double));
+//			let idata = params->idata;
+//			idata_etas_reset(&params->best.etas, idata);
 
 			rhobeg = step_refine;
 			rhoend = nsig_step_final;
@@ -414,10 +412,11 @@ static void test_initial_objfn(STAGE2_PARAMS* params)
 	let options = params->options;
 	let popmodel = &params->test.popmodel;
 
-	idata_etas_set(idata, params->best.eta);
+	/* start from best eta so far, is this going to be 0? */
+	idata_etas_write(idata, &params->best.etas);
 
 	/* very first evaluation */
-	encode_evaluate(&params->test, idata, advanfuncs, options);
+	encode_evaluate(&params->test, idata, advanfuncs, options, true);
 	var timestamp = get_timestamp(params);
 	info(params->outstream,
 		 "time %.3f neval %i objfn %f\n",
@@ -428,8 +427,8 @@ static void test_initial_objfn(STAGE2_PARAMS* params)
 		warning(params->outstream, "objective function not finite\n");
 	
 	/*save the popmodel shouldnt actually have been changed */
-	save_besteta(params);
 	*params->best.model = *popmodel;
+	idata_etas_copy(&params->best.etas, idata);
 }
 
 static void focei_popmodel_stage2(STAGE2_PARAMS* params)
@@ -550,7 +549,7 @@ static STAGE2_PARAMS stage2_params_init(const char* filename,
 		.options = options,
 		.best = {
 			.model = popmodel,			/* best so far will be saved at the caller */
-			.eta = callocvar(double, idata->nindivid * idata->nomega),					
+			.etas = idata_etas_alloc(idata),
 		},
 		.begin = { }, 					/* set after initialization */
 		.outstream = outstream,
@@ -575,7 +574,7 @@ static void stage2_params_cleanup(STAGE2_PARAMS *params)
 		fclose(params->outstream);
 	if (params->extstream)
 		fclose(params->extstream);
-	free(params->best.eta);
+	idata_etas_free(&params->best.etas);
 }
 
 static void estimate_popmodel(const char* filename,
@@ -665,7 +664,12 @@ void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
 		fatal(0, "%s: %s", __func__, errctx.errmsg);
+		
+	/* estimate destroys a previous covariance matrix */
+	covariance_free(&pstate->covariance);
+	pstate->covariance = (COVARIANCE){ 0 };
 
+	/* do estimation */
 	estimate_popmodel(pmx->filename,
 					  &pstate->idata,
 					  pstate->advanfuncs,
@@ -675,7 +679,8 @@ void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 	pmx_copy_popmodel(pmx, &popmodel);
 }
 
-/// Evaluation is the same as estimation but with maxeval=0.
+/// Evaluation is the same as estimation but with maxeval=1. Note that 
+/// maxeval=0 would trigger the default number of evaluations.
 
 void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 {
@@ -702,4 +707,3 @@ void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const stage1)
 
 	pmx_copy_popmodel(pmx, &popmodel);
 }
-

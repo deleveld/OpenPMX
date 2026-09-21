@@ -77,7 +77,8 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 							   const int neval,
 							   const bool details,
 							   FILE* outstream,
-							   FILE* extstream);
+							   FILE* extstream,
+							   const char* extra);
 
 void popmodel_information(FILE* f2,
 						  const POPMODEL* const popmodel,

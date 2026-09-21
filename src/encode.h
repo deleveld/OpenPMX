@@ -1,4 +1,4 @@
-/*
+	/*
  * This file is part of OpenPMX (https://github.com/deleveld/openpmx).
  * Copyright (c) 2024 Douglas Eleveld.
  *
@@ -42,6 +42,10 @@ typedef struct {
 ENCODE encode_init(const POPMODEL* const popmodel);
 void encode_transform(ENCODE* const encode, const POPMODEL* popmodel);
 void encode_untransform(ENCODE* encode, const double* x);
+
+typedef char ENCODELABEL[64];
+const ENCODELABEL* encode_labels_alloc(ENCODE* encode, const bool _offset1);
+void encode_labels_free(const ENCODELABEL* labels);
 
 #ifdef __cplusplus
 }

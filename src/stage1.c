@@ -21,6 +21,9 @@
 /// can be called in parallel, i.e. individual can be processed in seperate
 /// threads.
 
+// # for anotther covariance method
+// https://claude.ai/share/d3800efc-45e5-4564-b74b-8f5364dd3e88
+
 #include <string.h>
 #include <assert.h>
 #include <float.h>
@@ -89,7 +92,8 @@ static double stage1_evaluate_individual_iobjfn(const long int nreta,
 
 /* NOTE: this function must be thread safe and only touch individual data */
 static bool estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX],
-											const STAGE1_PARAMS* const stage1_params)
+											const STAGE1_PARAMS* const stage1_params,
+											const SCATTEROPTIONS* const scatteroptions)
 {
 	var nonzero = stage1_params->nonzero;
 	let ievaluate_args = &stage1_params->ievaluate_args;
@@ -130,7 +134,8 @@ static bool estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 /// with step sizes from step_initial to step_refine. 
 	let wsize = (npt+5)*(npt+n)+3*n*(n+5)/2 + 10; 	/* a little bit extra room to be sure */
 	var w = mallocvar(double, wsize);
-	if (all_eta_zero) {
+	let is_eval = scatteroptions ? scatteroptions->stage1_evaluate : false;
+	if (all_eta_zero || is_eval) {
 		retcode = bobyqa(n, npt,
 						 stage1_evaluate_individual_iobjfn,
 						 (void*)stage1_params,
@@ -172,16 +177,16 @@ static bool estimate_individual_posthoc_eta(double reta[static OPENPMX_OMEGA_MAX
 
 static void write_icov_from_reduced(double* icov, 
 									const NONZERO* const nonzero,
-									const gsl_matrix* const reducedcov,
+									const gsl_matrix* const reducedicov,
 									const int nomega)
 {
-	let nreta = reducedcov->size1;
+	let nreta = reducedicov->size1;
 	let rowcol = nonzero->rowcol;
 	forcount(i, nreta) {
 		forcount(j, nreta) {
 			let row = rowcol[i];
 			let col = rowcol[j];
-			let v = gsl_matrix_get(reducedcov, i, j);
+			let v = gsl_matrix_get(reducedicov, i, j);
 			icov[row * nomega + col] = v;
 		}
 	}
@@ -197,7 +202,8 @@ static void write_icov_from_reduced(double* icov,
 static double stage1_individcov(const int nreta,
 								const double reta[static nreta],
 								const STAGE1_PARAMS* const params,
-								double* icov)
+								double* icov,
+								const int nobs)
 {
 	double* testeta = params->testeta;
 	let nonzero = params->nonzero;
@@ -215,9 +221,10 @@ static double stage1_individcov(const int nreta,
 	var yhatvar_minus_h = mallocvar(double, nrecord);
 	var logp_plus_h = mallocvar(double, nrecord);
 	var logp_minus_h = mallocvar(double, nrecord);
-	var J = gsl_matrix_alloc(params->nobs, nreta);
 	let nomega = popparam->nomega;
 	assert(gradient_step != 0.);
+	var J = gsl_matrix_alloc(nobs, nreta);
+	var reducedicov = gsl_matrix_alloc(nreta, nreta);
 
 	let advanfuncs = ievaluate_args->advanfuncs;
 	let record = ievaluate_args->record;
@@ -273,7 +280,7 @@ static double stage1_individcov(const int nreta,
 		timespec_duration(&t3, eval_msec);
 		*(params->ineval) += 1;
 
-		/* calculate derivatives, scaling by yhatvar */
+		/* calculate derivatives per observation, scaling by yhatvar */
 		var iobs = 0;
 		const RECORD* ptr = record;
 		forcount(k, nrecord) {
@@ -294,6 +301,7 @@ static double stage1_individcov(const int nreta,
 			}
 			ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
 		}
+		assert(iobs == nobs);
 	}
 	free(f_plus_h);
 	free(f_minus_h);
@@ -302,35 +310,34 @@ static double stage1_individcov(const int nreta,
 	free(logp_plus_h);
 	free(logp_minus_h);
 
-	/* for now accumulate the inverse in reducedcov */
-	var reducedcov = gsl_matrix_alloc(nreta, nreta);
+	/* for now accumulate the inverse in reducedicov */
 	let omegainverse = gsl_matrix_const_view_array(nonzero->inversedata, nreta, nreta);
-	gsl_matrix_memcpy(reducedcov, &omegainverse.matrix);
+	gsl_matrix_memcpy(reducedicov, &omegainverse.matrix);
 
 	/* we made J such that tJ*J is tGi*invVi*Gi in Term 5 from Bae and Yim */
 	/* multiply and accumulate omega inverse, all in one command */
-	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1., J, J, 1., reducedcov);
-	gsl_matrix_free(J);
+	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1., J, J, 1., reducedicov);
+	free(J);
 
 	/* we have added the contribution of the population omega inverse with
 	   the contribution from each individual to get the individual covariance,
 	   well, the inverse of it. Now we have to invert to get the actual
 	   individual covariance matrix */
 	let oldhandler = gsl_set_error_handler_off();
-	if (gsl_linalg_cholesky_decomp1(reducedcov) != GSL_SUCCESS) {
+	if (gsl_linalg_cholesky_decomp1(reducedicov) != GSL_SUCCESS) {
 		forcount(i, nreta) {
-			let val = gsl_matrix_get(reducedcov, i, i);
-			gsl_matrix_set(reducedcov, i, i, val + 1e-6); 
+			let val = gsl_matrix_get(reducedicov, i, i);
+			gsl_matrix_set(reducedicov, i, i, val + 1e-6); 
 		}
-		gsl_linalg_cholesky_decomp1(reducedcov);
+		gsl_linalg_cholesky_decomp1(reducedicov);
 	}
 	gsl_set_error_handler(oldhandler);
-	let lndet = matrix_lndet_from_cholesky(reducedcov);
-	gsl_linalg_cholesky_invert(reducedcov);
+	let lndet = matrix_lndet_from_cholesky(reducedicov);
+	gsl_linalg_cholesky_invert(reducedicov);
 
 	/* update icov now */
-	write_icov_from_reduced(icov, nonzero, reducedcov, nomega);
-	gsl_matrix_free(reducedcov);
+	write_icov_from_reduced(icov, nonzero, reducedicov, nomega);
+	gsl_matrix_free(reducedicov);
 
 	return lndet;
 }
@@ -413,7 +420,7 @@ void stage1_thread(INDIVID* const individ,
 		/* optimize the individual eta, the result is written into stage1_params.testeta
 		 * (which points to testeta right now) and is also written in reta as well and
 		 * write the result back into the individual */
-		all_eta_zero = estimate_individual_posthoc_eta(reta, &stage1_params);
+		all_eta_zero = estimate_individual_posthoc_eta(reta, &stage1_params, scatteroptions);
 		memcpy(ieta, testeta, nomega * sizeof(double));
 
 		/* eta likelihood for part of the objective function */
@@ -440,7 +447,7 @@ void stage1_thread(INDIVID* const individ,
 	++stage1_ineval;
 
 	/* we cant do covariance matrix if we have no etas or observations */
-	if (nreta == 0 || individ->nobs == 0)
+	if (nreta == 0 || individ->nobs == 0) 
 		return;
 
 	/* compute inverse covariance of best fit */
@@ -460,7 +467,8 @@ void stage1_thread(INDIVID* const individ,
 		individ->icov_lndet = stage1_individcov(nreta,
 												reta,
 												&stage1_params,
-												icov);
+												icov,
+												individ->nobs); 
 
 		/* if icov does not change, we can stop now */
 		if (fabs(last_icov_lndet - individ->icov_lndet) < 0.01)

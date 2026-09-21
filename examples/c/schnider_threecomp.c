@@ -1155,6 +1155,7 @@ RECORD OPENPMXTRAN_DATA_NAME[] = {
 #include "stage1.c"
 #include "scatter.c"
 #include "estimate.c"
+#include "covariance.c"
 #include "predict.c"
 #include "checkout.c"
 #include "encode.c"

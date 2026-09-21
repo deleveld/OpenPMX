@@ -31,6 +31,7 @@ extern "C" {
 
 typedef struct {
 	bool stage1_order;
+	bool stage1_evaluate;
 	bool checkout_errors;
 	FILE* logstream;
 } SCATTEROPTIONS;
