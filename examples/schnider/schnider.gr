@@ -32,3 +32,4 @@ $SIGMA(0.1)
 $MAIN
 	estimate();
 	covariance();
+	
