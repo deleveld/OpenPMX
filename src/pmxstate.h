@@ -21,6 +21,7 @@
 #include "popmodel.h"
 #include "idata.h"
 #include "options.h"
+#include "covariance.h"
 
 #include <gsl/gsl_rng.h>
 
@@ -35,6 +36,7 @@ typedef struct PMXSTATE {
 	IDATA idata;
 	int tablecount;
 	gsl_rng* rng;
+	COVARIANCE covariance;
 } PMXSTATE;
 
 OPENPMX pmx_copy(const OPENPMX* const pmx);

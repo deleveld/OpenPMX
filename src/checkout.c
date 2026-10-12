@@ -31,6 +31,7 @@
 #include "ievaluate.h"
 #include "scatter.h"
 #include "print.h"
+#include "advan/advan.h"
 #include "utils/c22.h"
 #include "utils/various.h"
 
@@ -78,6 +79,33 @@ void idata_checkout(const IDATA* const idata,
 					FILE* logstream)
 {
 	info(logstream, "checkout begin\n");
+	
+	/* check for NAN in any paramaters. */
+	let _offset1 = advanfuncs->recordinfo.dataconfig->_offset1 ? 1 : 0;
+	forcount(i, popmodel->ntheta) {
+		let v = popmodel->theta[i];
+		if (isnan(v)) {
+			let n = i + _offset1;
+			warning(logstream, "THETA(%i) is NAN\n", n);
+		}
+	}
+	forcount(i, popmodel->nsigma) {
+		let v = popmodel->sigma[i];
+		if (isnan(v)) {
+			let n = i + _offset1;
+			warning(logstream, "SIGMA(%i) is NAN\n", n);
+		}
+	}
+	forcount(i, popmodel->nomega) {
+		forcount(j, i+1) {
+			let v = popmodel->omega[i][j];
+			if (isnan(v)) {
+				let n1 = i + _offset1;
+				let n2 = j + _offset1;
+				warning(logstream, "OMEGA(%i,%i) is NAN\n", n1, n2);
+			}
+		}
+	}
 
 	SCATTEROPTIONS scatteroptions = { };
 	scatteroptions.checkout_errors = true;

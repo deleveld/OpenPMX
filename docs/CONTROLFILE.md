@@ -50,6 +50,8 @@ when read in by `openpmxtran`.
 
 Multiple `$OMEGA*` blocks are allowed and define successive blocks of the omega matrix. All other blocks may appear at most once.
 
+The control file must end with a newline.
+
 ---
 
 ## $DATA
@@ -63,6 +65,10 @@ The data file can be whitespace or comma separated and must start with a header.
 The header names defines the variable names so they must be valid C language identifers.
 
 All data values are treated as `double` variables. Values given as `.` are translated to `NAN`.
+
+Blank data lines are an error.
+
+The data file must end with a newline.
 
 ### Arguments
 
@@ -253,21 +259,21 @@ $IMODEL(V1, V2, V3, CL, Q2, Q3)
 	V1 = THETA(1) * SIZE * exp(ETA(1));
 	V2 = THETA(2) * SIZE * exp(ETA(2));
 	V3 = THETA(3) * SIZE * exp(ETA(3));
-	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4);
+	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4));
 	Q2 = THETA(5) * pow(SIZE, 0.75) * exp(ETA(5));
 	Q3 = THETA(6) * pow(SIZE, 0.75) * exp(ETA(6));
 ```
 
 ### Target-controlled-infusion (TCI) dose controller
 
-Dosing can be driven by a TCI controller. Within the `$IMODEL(...)` call `TCINIT(...)`
+Dosing can be driven by a TCI controller. Within the `$IMODEL(...)` call `TCIINIT(...)`
 with a `TCICONFIG` object containing the controller options. The first call does setup
 for the controller. Subsequent calls return immediately. The initial target is
 0 so no dosing is given.
 
 If it is computationally expensive to initialze the controller then `TCISTARTED()`
 is available which returns if the controller has been started or not. This allows
-the call to `TCIINIT()`, and the constrcution of the `TCICONFIG` object to be skipped.
+the call to `TCIINIT(...)`, and the constrcution of the `TCICONFIG` object to be skipped.
 
 Calling `TCITARGET()` sets the target for the TCI controller. This function passes
 doses to the advancer. Setting a negative target turns off the TCI controller. The
@@ -353,7 +359,7 @@ C code called at each ODE integration step. The following are available:
 
 | Symbol | Description |
 |---|---|
-| `A(i)` / `STATE(i)` | Current compartment amount i (read-only, 1-indexed) |
+| `A(i)` | Current compartment amount i (read-only, 1-indexed) |
 | `DADT(i)` | Rate of change of compartment i (write, 1-indexed) |
 | `$DATA` parameters | Values from each data record |
 | `$IMODEL` parameters | Values computed in `$IMODEL` for this individual |
@@ -461,8 +467,6 @@ $THETA
 
 Specifies a diagonal block of the inter-individual variability (IIV) covariance matrix.
 
-**Zero or negative values are treated as fixed** (not optimized).
-
 ### Arguments
 
 ```
@@ -473,7 +477,9 @@ $OMEGA(val1, val2, ...)
 
 Comma- or space-separated list of variance values. 
 The number of values equals the dimension of this diagonal block. 
-Off-diagonal covariances are zero (thus fixed). 
+
+Zero or negative values are treated as fixed and not optimized. 
+All off-diagonal covariances are zero and not optimized. 
 
 
 ```c
@@ -495,8 +501,6 @@ $OMEGA
 
 Specifies a full lower-triangular block of the omega matrix, allowing off-diagonal covariances.
 
-**Zero or negative values on the diagonal are treated as fixed** (not optimized).
-
 ### Arguments
 
 ```
@@ -505,7 +509,9 @@ $OMEGABLOCK(val1, val2, val3, ...)
 
 ### Content
 
-Lower-triangular elements listed row by row. For a block of dimension N, N*(N+1)/2 values are required. **Negative diagonal values are treated as fixed.**
+Lower-triangular elements listed row by row. For a block of dimension N, N*(N+1)/2 values are required.
+
+Zero or negative values on the diagonal are treated as fixed and not optimized.
 
 ```
 Row 1: val_11
@@ -535,7 +541,8 @@ $OMEGA
 
 ## $OMEGASAME()
 
-Duplicates a previously defined omega block by reproducing its structure.
+Duplicates a previously defined omega block by reproducing its content 
+in omega.
 
 ### Arguments
 
@@ -543,7 +550,7 @@ Duplicates a previously defined omega block by reproducing its structure.
 $OMEGASAME(n)
 ```
 
-Where `n` is the index of the previously defined omega block to replicate.
+Where `n` is the dimension of the previously defined omega block to replicate.
 
 ```c
 $OMEGASAME(1)
@@ -598,7 +605,8 @@ static void print_message(void)
 
 Contains arbitrary C code specifying what analysis to run. 
 
-A global object of the name openpmx of the type `OPENPMX`. 
+A global object of the name openpmx of the type `OPENPMX` is statically defined
+and initialized by code before that definein in `$MAIN`.
 
 It is possible to change the number of parallel threads/processes
 are used by setting `openpmx.nthread`. If set to `0` then the 
@@ -613,6 +621,13 @@ Within the block content some functions and C-macros are available:
 
 Monte Carlo simulation: samples ETAs from OMEGA and residuals from SIGMA, 
 computes predictions, and overwrites DV in the in-memory dataset. 
+
+Any previous covariance information (i.e. paramater limits) is removed.
+
+Simulate will fail if:
+
+1. The data is not writable. 
+2. The configured omega block is not positve-definite.
 
 Configuration is passed in a `SIMCONFIG` object:
 
@@ -629,6 +644,8 @@ $MAIN
 
 Evaluate the objective function at the current parameters without optimizing the outer loop.
 Only inner ETA optimization is run.
+
+When estimate is run, any previous covariance information (i.e. paramater limits) is removed.
 
 Configuration is passed in a `STAGE1CONFIG` object:
 
@@ -649,6 +666,8 @@ $MAIN
 
 Run population parameter estimation with an outer- and inner-optimization.
 
+When estimate is run, any previous covariance information (i.e. paramater limits) is removed.
+
 Configuration is passed in a `ESTIMCONFIG` object:
 
 | Option | Type | Default | Description |
@@ -668,17 +687,210 @@ Estimation optimization terminates when:
 This is considerd successful convergence.
 2. Change in objective function less than `dobjfn`. 
 The estimation is considered to have stalled and terminates.
+3. The maximum number of function evaluations has been reached.
 
 After estimation terminates:
 
-1. The achieved `nsig` is estimated by modifying the encoded model by the calculated `step_final`.
+1. If the run converged then converged the achieved `nsig` is estimated by modifying the encoded model by the calculated `step_final`. 
 2. Final model information is printed
-3. Standard estimation tables are written.
+3. Standard estimation tables are written (`.phi` file) or closed (`.ext` file).
 
 
 ```c
 $MAIN
 	estimate(.nsig=5);
+```
+
+#### `covariance(...);`
+
+Calculate the covariance matrix of the estimated parameters and the resulting
+confidence limits. This should follow an `estimate()` so that the final
+parameters and individual `ETA` values are available. If there is no previous
+result from `estimate()` or `evaluate()` then an error is written to the output file and nothing is calculated.
+
+The covariance is calculated by finite differences of the objective function in the 
+encoded (transformed) parameter space. Two matrices can be calculated:
+
+* **S**: the outer-product-of-gradients (OPG/BHHH) matrix, built from the per-individual 
+gradients of the objective function (NONMEM's S matrix).
+* **R**: the Hessian of the total objective function (NONMEM's R matrix).
+
+The step sizes for the finite differences are chosen adaptively so that the change in 
+the objective function is of a useful size. Evaluating S needs objective function evaluations twice the number of estimated parameters,
+so it is reasonably easy to caculate. Evaluating R needs a number of objective 
+function evaluations that grows with the square of the number of estimated parameters,
+so it can take a while for large models.
+
+Additional samples can be taken and refinement of the covariance matrix can
+be done by quadratic refinement, fitting all samples taken to a quadratic model.
+
+Configuration is passed in a `COVARIANCECONFIG` object:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `.type` | enum | `COVARIANCE_SANDWICH_QUADRATIC` | Methods to estimate to calculate, see below |
+| `.dobjfn` | `double` | `~6.63` | Delta objective function to explore covariance. |
+| `.step_size` | `double` | `0.1` | Initial finite-difference step in the encoded parameter space. The step is then adapted automatically |
+| `.details` | `bool` | `false` | Print detailed model information for each evaluation |
+| `.quadratic.nsample` | `int` | depends on `.type` | Number of resampling evaluations used for the quadratic refinement, see below |
+| `.diagnostics.nsample` | `int` | `0` | Number of samples for the diagnostic check of the covariance matrix. If `0` then no diagnostics are made |
+| `.diagnostics.filename` | `string` | — | If given, the predicted and observed change in objective function of each diagnostic sample is written to this file |
+| `.diagnostics.dobjfn` | `double` | `~6.63` | Expected increase in the objective function at the diagnostic samples |
+| `.stage1.*` | — | see `STAGE1CONFIG` | Inner (Stage 1) optimizer options |
+
+The `.type` can be:
+
+| Type | Covariance estimate |
+|---|---|
+| `COVARIANCE_SANDWICH_QUADRATIC` | Robust sandwich estimator `Rinv * S * Rinv`, followed by quadratic refinement (default) |
+| `COVARIANCE_SANDWICH` | Robust sandwich estimator `Rinv * S * Rinv` only |
+| `COVARIANCE_S_MATRIX` | Scaled inverse of the S matrix only |
+| `COVARIANCE_R_MATRIX` | Scaled inverse of the R matrix only |
+
+##### Quadratic refinement
+
+When `.quadratic.nsample` is non-zero, or if type is `COVARIANCE_SANDWICH_QUADRATIC` then
+this triggers resampling and quadratic refinement of the covariance
+matrix. Samples of the objective function are taken and then a quadratic model is fitted to all the evaluated points.
+This smooths the covariance estimate and can compensate for some numerical issues in gradient canculations.
+
+Samples are drawn for a full basis using antithetic sampling for each axis.
+So the number of samples taken is rounded up to two times a block size (the number of parameters estimated).
+The first basis is the canonical axes, afterward they are random.
+
+After testing each full basis, the Kullback-Liebler divergence is calculated between the adapted covariance matrix and
+the one from the previous basis. If this value is small (< 1e-4) then the sampling distribution has converged.
+
+If `.quadratic.nsample` is less than 0, then a default number of resamples occurs. 
+This varies depending on the type of estimation.
+
+##### Confidence limits
+
+The confidence limits are calculated for all estimated `THETA`, `SIGMA` and
+the diagonal elements of `OMEGA`. Fixed parameters are not included. 
+Limits are not calculated for off-diagonal elements of `OMEGA` blocks. 
+The limits are the estimate plus and minus the two-sided critical values
+are calculated in the encoded space and then transformed back, so the limits 
+need not be symmetric around the estimate on the parameter scale.
+
+Results are written to two files:
+
+* `<controlfile>.cov`: the progress of the calculation, the identifiability analysis of S and R (parameters that 
+are poorly determined by the data), the condition number of the correlation matrix, 
+the lower and upper limits of each parameter, and the parameter correlations 
+sorted by absolute size. If diagnostics are requested then a summary of 
+the predicted and observed change in objective function is also written here.
+* `<controlfile>.cov.ext`: the parameters and objective function value of each evaluation made.
+
+The calculated limits are also stored with the model, and can be retrieved in
+C code using `pmx_covariance_limit()`.
+
+```c
+$MAIN
+	estimate();
+	covariance();
+```
+
+```c
+$MAIN
+	estimate();
+	// estimate a covariance matrix and produce diagnostics to evaluate quality
+	covariance(.diagnostics.nsample=1000,
+			   .diagnostics.filename="diag.out");
+```
+
+#### `profile(...);`
+
+Likelihood profile for a single parameter. Starting from the current estimate,
+the parameter is moved towards a given value and fixed there, all other 
+parameters are re-estimated, and the objective function is compared to the
+estimate. A root finder then searches for the parameter value where the
+objective function has increased by `.dobjfn`. This gives a likelihood-based
+confidence limit, which does not assume the objective function is quadratic and
+so can be asymmetric and more reliable than the limits from `covariance()` 
+for poorly determined or strongly non-linear parameters.
+
+This should follow an `estimate()` so that the final parameters and individual `ETA`
+values are available as starting values. If there is no valid objective function value from a previous
+`estimate()` or `evaluate()` then an error is written and nothing is calculated. 
+
+Each call searches in one direction. The `.param.value` is the bracketing value on
+the other side of the estimate and the objective function there must be higher than the 
+target, otherwise the root can not be bracketed and the profile exits with an error. 
+Call `profile()` twice, once on each side of the estimate, to get both limits.
+
+Configuration is passed in a `PROFILECONFIG` object:
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `.param.type` | enum | — | Parameter to profile: `PARAM_THETA`, `PARAM_OMEGA` or `PARAM_SIGMA` (required) |
+| `.param.index` | `int` | — | Index of the parameter. For `PARAM_OMEGA` this is the diagonal element (required) |
+| `.param.value` | `double` | — | Bracketing value on the side of the estimate to be searched (required). Must differ from the estimate |
+| `.name` | `string` | `"left"` or `"right"` | Label for the side being profiled. The default is `"left"` if `.param.value` is below the estimate and `"right"` if above |
+| `.append` | `bool` | `false` | Append to the profile output file instead of overwriting it |
+| `.dobjfn` | `double` | `~6.63` | Increase in objective function to search for. The default is the chi-squared quantile for alpha 0.01 with 1 degree of freedom |
+| `.dobjfn_tol` | `double` | `1.0` | The root is accepted when the objective function is within this distance of the target |
+| `.maxeval` | `int` | `10` | Maximum number of profile points evaluated (each is a full `estimate()`) |
+| `.estimate.*` | — | see `ESTIMCONFIG` | Options for the estimation done at each profile point |
+
+The parameter can not be a part of an `$OMEGASAME()` block. Off-diagonal elements 
+of `OMEGA` can not be profiled.
+
+At each profile point the profiled parameter is fixed, the other parameters start
+from the estimate, and the `ETA` values start from their values in the estimate. The
+root finder (Brent) works on a transformed scale between the estimate and
+`.param.value`, so that the objective function is closer to linear in the search 
+variable. The default tolerance is usually sufficient for a smooth line through the 
+profile points to be close to the confidence limit.
+
+The search stops when:
+
+1. The objective function at a point is within `.dobjfn_tol` of the target. This is considered successful convergence.
+2. `.maxeval` points have been evaluated. 
+3. The root finder can not continue.
+
+After the search, the best interpolated value for the crossing point is reported 
+without doing another estimation. The console shows `profile converged` or 
+`profile failed` and the value.
+
+The profile is written to `<controlfile>.profile.<type>.<index>.<name>.iter`, 
+with one row for each evaluated point and columns `type`, `index`, `value`, `objfn`, `target` and `neval`.
+The last row contains the interpolated crossing point, with `objfn` and `neval` set to `0`. 
+If an `.iter` file already exists it is overwritten unless `.append=true`. 
+The files of the estimation at each point are written with the base name 
+`<controlfile>.profile.<type>.<index>.<name>`. If the model has no filename then
+no files are written.
+
+##### Test only mode
+
+If `.maxeval=1` and `.append=true` then a single point is evaluated at `.param.value` 
+and added to the profile file. No root finding is done and the other options are ignored. 
+This is useful to add points to a profile, for example to draw the 
+shape of the profile beyond the confidence limit.
+
+```c
+$MAIN
+	estimate();
+	// 99% likelihood-profile confidence limits for THETA 2
+	profile(.param.type=PARAM_THETA, .param.index=2, .param.value=0.5);
+	profile(.param.type=PARAM_THETA, .param.index=2, .param.value=2.0);
+```
+
+```c
+$MAIN
+	estimate();
+	// 95% limit, with more points and a tighter tolerance, appended to an existing profile
+	profile(.param.type=PARAM_OMEGA, .param.index=1, .param.value=0.5,
+			.name="upper", .append=true,
+			.dobjfn=3.84, .dobjfn_tol=0.1, .maxeval=20);
+```
+
+```c
+$MAIN
+	estimate();
+	// add a single point to the profile
+	profile(.param.type=PARAM_SIGMA, .param.index=1, .param.value=0.3,
+			.append=true, .maxeval=1);
 ```
 
 #### `predict();`
@@ -712,7 +924,7 @@ $MAIN
     estimate();
 ```
 
-#### `table("field, field ...", ...)`
+#### `table("field, field ...", ...);`
 
 Write a table of output columns to a file or stream.
 

@@ -38,7 +38,7 @@
 #include "utils/errctx.c"
 #include "utils/getdelim.c"
 
-#define OPENPMX_FUNCTIONS_MAX	10
+#define OPENPMX_FUNCTIONS_MAX		10
 #define OPENPMX_FILE_RECORDS_MAX	10
 
 static int strip_enclosing(char* s, const char terminal_begin, const char terminal_end)
@@ -66,127 +66,143 @@ static int strip_enclosing(char* s, const char terminal_begin, const char termin
 
 static void strip_comments_robust(char *s)
 {
-    typedef enum { 
-        NORMAL, 
-        IN_STRING, 
-        IN_CHARACTER,
-        IN_COMMENT_SINGLE, 
-        IN_COMMENT_MULTI,
-        POTENTIAL_COMMENT_START,
-        POTENTIAL_COMMENT_END
-    } State;
+	typedef enum { 
+		NORMAL, 
+		IN_STRING, 
+		IN_CHARACTER,
+		IN_COMMENT_SINGLE, 
+		IN_COMMENT_MULTI,
+		POTENTIAL_COMMENT_START,
+		POTENTIAL_COMMENT_END
+	} State;
 
-    State state = NORMAL;
-    char *src = s;
-    char *dst = s;
+	State state = NORMAL;
+	char *src = s;
+	char *dst = s;
 
-    while (*src) {
-        switch (state) {
-            case NORMAL:
-                if (*src == '"') {
-                    state = IN_STRING;
-                    *dst++ = *src;
-                } else if (*src == '\'') {
-                    state = IN_CHARACTER;
-                    *dst++ = *src;
-                } else if (*src == '/') {
-                    state = POTENTIAL_COMMENT_START;
-                } else {
-                    *dst++ = *src;
-                }
-                break;
+	while (*src) {
+		switch (state) {
+			case NORMAL:
+				if (*src == '"') {
+					state = IN_STRING;
+					*dst++ = *src;
+				} else if (*src == '\'') {
+					state = IN_CHARACTER;
+					*dst++ = *src;
+				} else if (*src == '/') {
+					state = POTENTIAL_COMMENT_START;
+				} else {
+					*dst++ = *src;
+				}
+				break;
 
-            case IN_STRING:
-                if (*src == '\\' && *(src + 1) != '\0') {
-                    // Handle any escaped character in string: \" or \\ etc.
-                    *dst++ = *src++;
-                    *dst++ = *src;
-                } else if (*src == '"') {
-                    state = NORMAL;
-                    *dst++ = *src;
-                } else {
-                    *dst++ = *src;
-                }
-                break;
+		   case IN_STRING:
+				if (*src == '\\' && *(src + 1) != '\0') {
+					// Handle any escaped character in string: \" or \\ etc.
+					*dst++ = *src++;
+					*dst++ = *src;
+				} else if (*src == '"') {
+					state = NORMAL;
+					*dst++ = *src;
+				} else if (*src == '\n') {
+					// C literals cannot span lines, so an unmatched quote
+					// (e.g. in the preamble text) ends here
+					state = NORMAL;
+					*dst++ = *src;
+				} else {
+					*dst++ = *src;
+				}
+				break;
 
-            case IN_CHARACTER:
-                if (*src == '\\' && *(src + 1) != '\0') {
-                    // Handle any escaped character in literal: \' or \\ etc.
-                    *dst++ = *src++;
-                    *dst++ = *src;
-                } else if (*src == '\'') {
-                    state = NORMAL;
-                    *dst++ = *src;
-                } else {
-                    *dst++ = *src;
-                }
-                break;
+			case IN_CHARACTER:
+				if (*src == '\\' && *(src + 1) != '\0') {
+					// Handle any escaped character in literal: \' or \\ etc.
+					*dst++ = *src++;
+					*dst++ = *src;
+				} else if (*src == '\'') {
+					state = NORMAL;
+					*dst++ = *src;
+				} else if (*src == '\n') {
+					// an unmatched apostrophe (e.g. "Douglas's model" in the
+					// preamble) must not swallow comment handling beyond its line
+					state = NORMAL;
+					*dst++ = *src;
+				} else {
+					*dst++ = *src;
+				}
+				break;
+				
+			case POTENTIAL_COMMENT_START:
+				if (*src == '/') {
+					state = IN_COMMENT_SINGLE;
+				} else if (*src == '*') {
+					state = IN_COMMENT_MULTI;
+				} else {
+					// False alarm: restore the slash and process current char
+					state = NORMAL;
+					*dst++ = '/';
+					// We stay on the same src char to re-evaluate it in NORMAL
+					continue; 
+				}
+				break;
 
-            case POTENTIAL_COMMENT_START:
-                if (*src == '/') {
-                    state = IN_COMMENT_SINGLE;
-                } else if (*src == '*') {
-                    state = IN_COMMENT_MULTI;
-                } else {
-                    // False alarm: restore the slash and process current char
-                    state = NORMAL;
-                    *dst++ = '/';
-                    // We stay on the same src char to re-evaluate it in NORMAL
-                    continue; 
-                }
-                break;
+			case IN_COMMENT_SINGLE:
+				if (*src == '\n') {
+					state = NORMAL;
+					*dst++ = '\n'; // Keep newline for line numbering
+				}
+				break;
 
-            case IN_COMMENT_SINGLE:
-                if (*src == '\n') {
-                    state = NORMAL;
-                    *dst++ = '\n'; // Keep newline for line numbering
-                }
-                break;
+			case IN_COMMENT_MULTI:
+				if (*src == '*') {
+					state = POTENTIAL_COMMENT_END;
+				} else if (*src == '\n') {
+					*dst++ = '\n'; // Keep newline for line numbering
+				}
+				break;
 
-            case IN_COMMENT_MULTI:
-                if (*src == '*') {
-                    state = POTENTIAL_COMMENT_END;
-                } else if (*src == '\n') {
-                    *dst++ = '\n'; // Keep newline for line numbering
-                }
-                break;
+			case POTENTIAL_COMMENT_END:
+				if (*src == '/') {
+					state = NORMAL;
+				} else if (*src == '*') {
+					// Sequence like ***/ - stay in POTENTIAL_END
+				} else {
+					state = IN_COMMENT_MULTI;
+					if (*src == '\n') *dst++ = '\n';
+				}
+				break;
+		}
+		src++;
+	}
 
-            case POTENTIAL_COMMENT_END:
-                if (*src == '/') {
-                    state = NORMAL;
-                } else if (*src == '*') {
-                    // Sequence like ***/ - stay in POTENTIAL_END
-                } else {
-                    state = IN_COMMENT_MULTI;
-                    if (*src == '\n') *dst++ = '\n';
-                }
-                break;
-        }
-        src++;
-    }
-    
-    // Clean up if the file ends on a trailing slash
-    if (state == POTENTIAL_COMMENT_START) *dst++ = '/';
-    
-    *dst = '\0';
+	// Clean up if the file ends on a trailing slash
+	if (state == POTENTIAL_COMMENT_START) *dst++ = '/';
+
+	*dst = '\0';
 }
 
 static VECPTR split_blocks(char *buf)
 {
-    VECPTR blocks = { 0 };
+	VECPTR blocks = { 0 };
+	
+	/* Skip UTF-8 BOM, which some editors add to identift UTF-8 encoding 
+	 * if this is not ignored, it can mess up detecting the first "$..."
+	 * block. */
+	if ((unsigned char)buf[0] == 0xEF && (unsigned char)buf[1] == 0xBB && (unsigned char)buf[2] == 0xBF)
+		buf += 3;
 
-    if (buf[0] == '$')
-        vector_append(blocks, 0);    // synthetic empty preamble
+	if (buf[0] == '$')
+		vector_append(blocks, 0);    // synthetic empty preamble
 
-    vector_append(blocks, buf);      // preamble text, or first $ block
-    for (char *p = buf; *p != '\0'; p++) {
-        if (*p == '\n' && *(p + 1) == '$') {
-            *p = '\0';
-            vector_append(blocks, p + 1);
-            p++;
-        }
-    }
-    return blocks;
+	vector_append(blocks, buf);      // preamble text, or first $ block
+	for (char *p = buf; *p != '\0'; p++) {
+		if (*p == '\n' && *(p + 1) == '$') {
+			*p = '\0';
+			vector_append(blocks, p + 1);
+			p++;
+		}
+	}
+	return blocks;
 }
 
 typedef struct {
@@ -196,11 +212,11 @@ typedef struct {
 
 static block_content extract_args_content(char *payload, ERRCTX* errctx)
 {
-    // '(' must appear as first char in payload
-    char *open = payload;
-    if (*open != '(') {
+	// '(' must appear as first char in payload
+	char *open = payload;
+	if (*open != '(') {
 		errctx_add(errctx, "%s: missing '('\n", __func__);
-        return (block_content) { 0 };
+		return (block_content) { 0 };
 	}
 
 	// Walk forward to find the closing ')', error on any nested '('
@@ -336,7 +352,7 @@ static void handle_advan(RESULT* result, char* payload, ERRCTX* errctx)
 static void handle_imodel(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	if (result->imodel.code) {
-		errctx_add(errctx, "%s: %s: second $IMODEL()\n", __func__);
+		errctx_add(errctx, "%s: second $IMODEL()\n", __func__);
 		return;
 	}
 	
@@ -358,7 +374,7 @@ static void handle_imodel(RESULT* result, char* payload, ERRCTX* errctx)
 static void handle_predict(RESULT* result, char* payload, ERRCTX* errctx) 
 {
 	if (result->predict.code) {
-		errctx_add(errctx, "%s: %s: second $PREDICT()\n", __func__);
+		errctx_add(errctx, "%s: second $PREDICT()\n", __func__);
 		return;
 	}
 	
@@ -379,7 +395,7 @@ static void handle_predict(RESULT* result, char* payload, ERRCTX* errctx)
 static void handle_diffeqn(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	if (result->diffeqn.code) {
-		errctx_add(errctx, "%s: %s: second $DIFFEQN()\n", __func__);
+		errctx_add(errctx, "%s: second $DIFFEQN()\n", __func__);
 		return;
 	}
 
@@ -393,7 +409,7 @@ static void handle_diffeqn(RESULT* result, char* payload, ERRCTX* errctx)
 static void handle_theta(RESULT* result, char* payload, ERRCTX* errctx) 
 { 
 	if (result->theta.code) {
-		errctx_add(errctx, "%s: %s: second $THETA\n", __func__);
+		errctx_add(errctx, "%s: second $THETA\n", __func__);
 		return;
 	}
 
@@ -802,7 +818,7 @@ static DATAINFO datainfo_create(FILECONTENT* dataptr, ERRCTX* errctx)
 
 		/* check for valid values */
 		forvector_val(value, v) {
-			if (!streq(value, ".")) {
+			if (!streq(value, ".") && !streq(value, "NA")) {
 				(void)checked_atof(value, errctx);
 				if (errctx->len) 
 					goto failed;
@@ -884,7 +900,7 @@ static void template_record_array(FILE* fp,
 			fprintf(fp, "\t{ ");
 
 /// Within the datafile a `.` as a data entry is replaced by NAN.
-		if (streq(v, ".")) {
+		if (streq(v, ".") || streq(v, "NA")) {
 			v = "NAN";
 
 		} else {
@@ -1523,12 +1539,13 @@ int is_valid_identifier(const char *s)
 
 static const char *keywords[] =
 {
+	/* C-language keywords */
     "auto","break","case","char","const","continue","default","do","double",
     "else","enum","extern","float","for","goto","if","inline","int","long",
     "register","restrict","return","short","signed","sizeof","static","struct",
     "switch","typedef","union","unsigned","void","volatile","while","_Alignas",
     "_Alignof","_Atomic","_Bool","_Complex","_Generic","_Imaginary","_Noreturn",
-    "_Static_assert","_Thread_local"
+    "_Static_assert","_Thread_local",
 };
 
 static int is_keyword(const char *s)
@@ -1590,6 +1607,9 @@ static void check_names(const RESULT* const result, const DATAINFO* const datain
 			(strcmp(v, "PRED") == 0) ||
 			(strcmp(v, "OBJ") == 0) ||
 			(strcmp(v, "INEVAL") == 0) ||
+			(strcmp(v, "THETA") == 0) ||
+			(strcmp(v, "ETA") == 0) ||
+			(strcmp(v, "A") == 0) ||
 			(strcmp(v, "NAN") == 0)) {
 			errctx_add(errctx, "%s: name \"%s\" is reserved\n", __func__, v);
 			goto done;

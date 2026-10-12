@@ -62,7 +62,8 @@ POPMODEL popmodel_init(const THETATYPE* const theta,
 
 void extfile_header(FILE * f,
 					const POPMODEL* const popmodel,
-					const bool _offset1);
+					const bool _offset1,
+					const bool rangeinfo);
 void extfile_append(FILE* f,
 					const POPMODEL* const popmodel,
 					const double runtime_s,
@@ -77,7 +78,8 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 							   const int neval,
 							   const bool details,
 							   FILE* outstream,
-							   FILE* extstream);
+							   FILE* extstream,
+							   const char* extra);
 
 void popmodel_information(FILE* f2,
 						  const POPMODEL* const popmodel,

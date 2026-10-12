@@ -131,7 +131,6 @@ cat <<-CONTROLFILE >tcisimulation.gr
 				.k31 = model.k31,
 				.ke0 = model.KE0,
 				.vc = V1,
-				.max_rate = 1.,
 				.target_effect = true);
 
 		TOTAMT = TCITARGET(E50);

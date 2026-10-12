@@ -48,7 +48,7 @@ typedef struct {
 	double eta_min2ll;
 	double icov_lndet;
 	double iobjfn;
-
+	
 	/* execution time */
 	double eval_msec;
 	double stage1_msec;
@@ -92,8 +92,17 @@ double idata_objfn(const IDATA* const idata,
 				   const double omega_nonzero_lndet);
 int idata_ineval(const IDATA* const idata, const bool reset);
 
-double* idata_etas_copy_alloc(IDATA* const idata);
-void idata_etas_set(IDATA* const idata, const double* eta);
+/* save and replace individual state */
+typedef struct IDATAETAS {
+	double* etas;
+	double* icov;
+} IDATAETAS;
+
+IDATAETAS idata_etas_alloc(const IDATA* const idata);
+void idata_etas_reset(IDATAETAS* const val, const IDATA* const idata);
+void idata_etas_copy(IDATAETAS* const val, const IDATA* const idata);
+void idata_etas_write(IDATA* const idata, const IDATAETAS* const val);
+void idata_etas_free(const IDATAETAS* const val);
 
 double* idata_alloc_simerr(const IDATA* const idata);
 void idata_free_simerr(const IDATA* const idata);

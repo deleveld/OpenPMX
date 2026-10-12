@@ -83,7 +83,9 @@ extern RECORD data[11]; /* forward declaration */
 #include "ievaluate.c"
 #include "predict.c"
 #include "stage1.c"
+#include "encode.c"
 #include "scatter.c"
+#include "covariance.c"
 #include "utils/vector.c"
 #include "utils/various.c"
 #include "utils/errctx.c"
@@ -162,11 +164,11 @@ int main(void)
 				  0 /*scatteroptions*/);
 
 	idata_predict_pred_thread(idata.individ,
-				  advanfuncs,
-				  &popmodel,
-				  0,
-				  &options,
-				  0 /*scatteroptions*/);
+							  advanfuncs,
+							  &popmodel,
+							  0,
+							  &options,
+							  0 /*scatteroptions*/);
 
 	forcount(i, idata.nindivid) {
 		let individ = &idata.individ[i];
@@ -187,7 +189,7 @@ int main(void)
 
 	advanfuncs_free(advanfuncs);
 	idata_destruct(&idata);
-	
+
 	return EXIT_SUCCESS;
 }
 

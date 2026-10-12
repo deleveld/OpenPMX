@@ -38,33 +38,37 @@ void do_profile(const int type,
 				const char* name)
 {
 	PROFILECONFIG p = {
-		.type = type,
-		.index = index,
-		.value = lower,
+		.param = {
+			.type = type,
+			.index = index,
+			.value = lower,
+		},
 		.dobjfn = 15.,
 		.name = name,
 	};
 	profile(&p);
-	double left = p.value;
+	double left = p.param.value;
 
-	p.value = upper;
+	p.param.value = upper;
 	p.append = true;
 	profile(&p);
-	double right = p.value;
+	double right = p.param.value;
 	
 	p.maxeval = 1;
-	for (p.value=left; p.value<=right; p.value+=(right-left)/10.) 
+	for (p.param.value=left; 
+		 p.param.value<=right; 
+		 p.param.value+=(right-left)/10.) 
 		profile(&p);
 }
 $MAIN
 	estimate();
 	
-	do_profile(PROFILE_THETA, 1, 1, 40, "V1");
-	do_profile(PROFILE_THETA, 2, 5, 100, "V2");
-	do_profile(PROFILE_THETA, 3, 100, 400, "V3");
-	do_profile(PROFILE_THETA, 4, .1, 4, "CL");
-	do_profile(PROFILE_THETA, 5, .1, 4, "Q2");
-	do_profile(PROFILE_THETA, 6, .1, 4, "Q3");
+	do_profile(PARAM_THETA, 1, 1, 40, "V1");
+	do_profile(PARAM_THETA, 2, 5, 100, "V2");
+	do_profile(PARAM_THETA, 3, 100, 400, "V3");
+	do_profile(PARAM_THETA, 4, .1, 4, "CL");
+	do_profile(PARAM_THETA, 5, .1, 4, "Q2");
+	do_profile(PARAM_THETA, 6, .1, 4, "Q3");
 
 	
 	

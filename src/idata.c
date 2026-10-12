@@ -102,7 +102,7 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 			.eta_min2ll = 0.,
 			.icov_lndet = 0.,
 			.iobjfn = DBL_MAX,
-
+			
 			.eval_msec = 1. + nrecordi,		/* first guess as to evaluation time is the number of records */
 			.stage1_msec = 1. + nrecordi,
 			.ineval = 0,
@@ -124,33 +124,33 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 		.nstate = nstate,
 		.imodel_size = imodel_size,
 		.predictvars_size = predictvars_size,
-
+		
 		.individ = individ,
 	};
 }
 
 void idata_destruct(IDATA* const idata)
 {
-    /* check if idata is null or if there are no individuals to clean up */
-    if (idata == NULL || idata->individ == NULL || idata->nindivid <= 0) 
-        return;
+	/* check if idata is null or if there are no individuals to clean up */
+	if (idata == NULL || idata->individ == NULL || idata->nindivid <= 0) 
+		return;
 
-    /* the first individual has the all the memory allocated in idata_construct */
-    var firstindivid = &idata->individ[0];
-    free(firstindivid->imodel);
-    free(firstindivid->istate);
-    free(firstindivid->eta);
-    free(firstindivid->icov);
-    free(firstindivid->yhat);
-    free(firstindivid->yhatvar);
-    free(firstindivid->pred);
-    free(firstindivid->predictvars);
-    
-    /* these pointers are only non-zero if idata_alloc_... functions were called */
-    free(firstindivid->isimerr);
+	/* the first individual has the all the memory allocated in idata_construct */
+	var firstindivid = &idata->individ[0];
+	free(firstindivid->imodel);
+	free(firstindivid->istate);
+	free(firstindivid->eta);
+	free(firstindivid->icov);
+	free(firstindivid->yhat);
+	free(firstindivid->yhatvar);
+	free(firstindivid->pred);
+	free(firstindivid->predictvars);
 
-    /* now we can safely delete the individ array itself */
-    free(idata->individ);
+	/* these pointers are only non-zero if idata_alloc_... functions were called */
+	free(firstindivid->isimerr);
+
+	/* now we can safely delete the individ array itself */
+	free(idata->individ);
 }
 
 double* idata_alloc_simerr(const IDATA* const idata)
@@ -194,19 +194,48 @@ int idata_ineval(const IDATA* const idata, const bool reset)
 	return ineval;
 }
 
-double* idata_etas_copy_alloc(IDATA* const idata)
+IDATAETAS idata_etas_alloc(const IDATA* const idata)
 {
-	var ret = mallocvar(double, idata->nindivid * idata->nomega);
-	var firstindivid = &idata->individ[0];
-	memcpy(ret, firstindivid->eta, idata->nindivid * idata->nomega * sizeof(double));
-	return ret;
+	let nindivid = idata->nindivid;
+	let nomega = idata->nomega;
+	return (IDATAETAS) {
+		.etas = mallocvar(double, nindivid * nomega),
+		.icov = callocvar(double, nindivid * nomega * nomega),
+	};
 }
 
-void idata_etas_set(IDATA* const idata, const double* eta)
+void idata_etas_reset(IDATAETAS* const val, const IDATA* const idata)
 {
-	assert(eta);
+	let nindivid = idata->nindivid;
+	let nomega = idata->nomega;
+	memset(val->etas, 0, nindivid * nomega * sizeof(double));
+	memset(val->icov, 0, nindivid * nomega * nomega * sizeof(double));
+}
+
+void idata_etas_copy(IDATAETAS* const val, const IDATA* const idata)
+{
+	let nindivid = idata->nindivid;
+	let nomega = idata->nomega;
 	var firstindivid = &idata->individ[0];
-	memcpy(firstindivid->eta, eta, idata->nindivid * idata->nomega * sizeof(double));
+	
+	memcpy(val->etas, firstindivid->eta, nindivid * nomega * sizeof(double));
+	memcpy(val->icov, firstindivid->icov, nindivid * nomega * nomega * sizeof(double));
+}
+
+void idata_etas_write(IDATA* const idata, const IDATAETAS* const val)
+{
+	let nindivid = idata->nindivid;
+	let nomega = idata->nomega;
+	var firstindivid = &idata->individ[0];
+	
+	memcpy(firstindivid->eta, val->etas, nindivid * nomega * sizeof(double));
+	memcpy(firstindivid->icov, val->icov, nindivid * nomega * nomega * sizeof(double));
+}
+
+void idata_etas_free(const IDATAETAS* const val)
+{
+	free(val->etas);
+	free(val->icov);
 }
 
 static FILE* idata_results_fopen(const char* name, const char* ext, const char* mode)

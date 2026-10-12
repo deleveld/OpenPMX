@@ -60,13 +60,10 @@ double matrix_lndet_from_cholesky(const gsl_matrix* const chol)
 	   https://math.stackexchange.com/questions/2001041/logarithm-of-the-determinant-of-a-positive-definite-matrix
 	   so we can sum the logs along the diagonal. */
 	let n = chol->size1;
-
 	double sum = 0.;
-	forcount(i, n) {
-		let v = 2. * log(gsl_matrix_get(chol, i, i));
-		sum += v;
-	}
-	return sum;
+	forcount(i, n) 
+		sum += log(gsl_matrix_get(chol, i, i));
+	return 2. * sum;
 }
 
 double sample_min2ll_from_cholesky(const double* const data,

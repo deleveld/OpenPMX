@@ -298,6 +298,8 @@ if (is.data.frame(yhatdata)) {
 	# do we have a DVTY
 	if ("DVTY" %in% pnames)
 		preddvid <- yhatdata[["DVTY"]]
+	else if ("DVID" %in% pnames)
+		preddvid <- yhatdata[["DVID"]]
 	else 
 		preddvid <- rep(1, nrow(yhatdata))
 	dvid_types <- unique(preddvid)

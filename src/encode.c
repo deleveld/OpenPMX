@@ -452,3 +452,47 @@ void encode_untransform(ENCODE* encode, const double* x)
 	popmodel->result.nsig = 0.;
 }
 
+const ENCODELABEL* encode_labels_alloc(ENCODE* encode, const bool _offset1)
+{
+	let popmodel = &encode->popmodel;
+	let nparam = encode->nparam;
+
+	var labels = mallocvar(ENCODELABEL, nparam);
+	var j = 0;
+	let _off = (_offset1) ? 1 : 0;
+	forcount(i, popmodel->ntheta) {
+		if (popmodel->thetaestim[i] != FIXED) {
+			snprintf(labels[j], sizeof(ENCODELABEL), "THETA(%i)", i + _off); 
+			++j;
+		}
+	}
+
+	forcount(i, popmodel->nsigma) {
+		if (popmodel->sigmafixed[i] == 0) {
+			snprintf(labels[j], sizeof(ENCODELABEL), "SIGMA(%i)", i + _off); 
+			++j;
+		}
+	}
+
+	forcount(i,  encode->omegainfo.nonfixed.n) {
+		forcount(k, i+1) {
+			var rowcol = encode->omegainfo.nonfixed.rowcol;
+			let r = rowcol[i];
+			let c = rowcol[k];
+			if (popmodel->omegafixed[r][c] == 0) {
+				snprintf(labels[j], sizeof(ENCODELABEL), "OMEGA(%i,%i)", r + _off, c + _off); 
+				++j;
+			}
+		}
+	}
+	assert(j == nparam);
+
+	/* take the array pointer, we dont need to free the vector */
+	return labels;
+}
+
+void encode_labels_free(const ENCODELABEL* labels)
+{
+	free((void*)labels);
+}
+

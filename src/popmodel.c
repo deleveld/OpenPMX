@@ -245,7 +245,8 @@ failed:
 
 void extfile_header(FILE * f,
 					const POPMODEL* const popmodel,
-					const bool _offset1)
+					const bool _offset1,
+					const bool rangeinfo)
 {
 
 	char temp[1024];
@@ -273,108 +274,109 @@ void extfile_header(FILE * f,
 	fprintf(f, OPENPMX_SFORMAT, "INEVAL");
 	fprintf(f, "\n");
 
-	/* NON-STANDARD!!! DIFFERENT THAN NONMEM
-	 * add extra line with theta upper and lower limits */
+	if (rangeinfo) {
+		/* NON-STANDARD!!! DIFFERENT THAN NONMEM
+		 * add extra line with theta upper and lower limits */
 
-	fprintf(f, OPENPMX_IFORMAT, OPENPMX_EXTFILE_LOWER_BOUNDS);
-	forcount(i, ntheta)
-		fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->lower[i]);
-	forcount(i, nsigma)
-		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	forcount(i, popmodel->nomega)
-		forcount(j, i+1)
+		fprintf(f, OPENPMX_IFORMAT, OPENPMX_EXTFILE_LOWER_BOUNDS);
+		forcount(i, ntheta)
+			fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->lower[i]);
+		forcount(i, nsigma)
 			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_IFORMAT, 0);
-	fprintf(f, "\n");
-
-	fprintf(f, OPENPMX_IFORMAT, OPENPMX_EXTFILE_UPPER_BOUNDS);
-	forcount(i, ntheta)
-		fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->upper[i]);
-	forcount(i, nsigma)
+		forcount(i, popmodel->nomega)
+			forcount(j, i+1)
+				fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
 		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	forcount(i, popmodel->nomega)
-		forcount(j, i+1)
+		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+		fprintf(f, OPENPMX_IFORMAT, 0);
+		fprintf(f, "\n");
+
+		fprintf(f, OPENPMX_IFORMAT, OPENPMX_EXTFILE_UPPER_BOUNDS);
+		forcount(i, ntheta)
+			fprintf(f, OPENPMX_TABLE_FORMAT, popmodel->upper[i]);
+		forcount(i, nsigma)
 			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_IFORMAT, 0);
-	fprintf(f, "\n");
+		forcount(i, popmodel->nomega)
+			forcount(j, i+1)
+				fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+		fprintf(f, OPENPMX_IFORMAT, 0);
+		fprintf(f, "\n");
 
-	fprintf(f, OPENPMX_IFORMAT, OPENPMX_EXTFILE_EXTRA_FIXED);
-	forcount(i, ntheta) {
-		let est = (popmodel->thetaestim[i] == FIXED) ? 1. : 0.;
-		fprintf(f, OPENPMX_TABLE_FORMAT, est);
-	}
-	forcount(i, nsigma)
-		fprintf(f, OPENPMX_TABLE_FORMAT, (double)popmodel->sigmafixed[i]);
-
-	forcount(i, popmodel->nomega) {
-		forcount(j, i+1) {
-			let fixed = popmodel->omegafixed[i][j];
-			let v = omegafixed_encode(fixed);
-			fprintf(f, OPENPMX_TABLE_FORMAT, v);
+		fprintf(f, OPENPMX_IFORMAT, OPENPMX_EXTFILE_EXTRA_FIXED);
+		forcount(i, ntheta) {
+			let est = (popmodel->thetaestim[i] == FIXED) ? 1. : 0.;
+			fprintf(f, OPENPMX_TABLE_FORMAT, est);
 		}
-	}
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_IFORMAT, 0);
-	fprintf(f, "\n");
+		forcount(i, nsigma)
+			fprintf(f, OPENPMX_TABLE_FORMAT, (double)popmodel->sigmafixed[i]);
 
-	fprintf(f, OPENPMX_IFORMAT, OPENPMX_EXTFILE_OMEGA_BLOCKS);
-	forcount(i, ntheta) 
-		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	forcount(i, nsigma)
-		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-
-	int omegablock[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX] = { 0 };
-	var d = 0;
-	forcount(i, popmodel->nblock) {
-		let ndim = popmodel->blockdim[i];
-		let type = popmodel->blocktype[i];
-		if (type == OMEGA_BLOCK) {
-			forcount(r, ndim) {
-				/* off diagonal */
-				for (var c=0; c<r; c++) {
-					omegablock[d + c][d + r] = i + 1;
-					omegablock[d + r][d + c] = i + 1;
-				}
-				/* on diagonal */
-				omegablock[d + r][d + r] = i + 1;
+		forcount(i, popmodel->nomega) {
+			forcount(j, i+1) {
+				let fixed = popmodel->omegafixed[i][j];
+				let v = omegafixed_encode(fixed);
+				fprintf(f, OPENPMX_TABLE_FORMAT, v);
 			}
+		}
+		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+		fprintf(f, OPENPMX_IFORMAT, 0);
+		fprintf(f, "\n");
 
-		/* get entries from elsewhere set omega elements */
-		} else if (type == OMEGA_SAME) {
-			forcount(r, ndim) {
-				/* off diagonal */
-				for (var c=0; c<r; c++) {
-					omegablock[d + c][d + r] = i + 1;
-					omegablock[d + r][d + c] = i + 1;
+		fprintf(f, OPENPMX_IFORMAT, OPENPMX_EXTFILE_OMEGA_BLOCKS);
+		forcount(i, ntheta) 
+			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+		forcount(i, nsigma)
+			fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+
+		int omegablock[OPENPMX_OMEGA_MAX][OPENPMX_OMEGA_MAX] = { 0 };
+		var d = 0;
+		forcount(i, popmodel->nblock) {
+			let ndim = popmodel->blockdim[i];
+			let type = popmodel->blocktype[i];
+			if (type == OMEGA_BLOCK) {
+				forcount(r, ndim) {
+					/* off diagonal */
+					for (var c=0; c<r; c++) {
+						omegablock[d + c][d + r] = i + 1;
+						omegablock[d + r][d + c] = i + 1;
+					}
+					/* on diagonal */
+					omegablock[d + r][d + r] = i + 1;
 				}
-				/* on diagonal */
-				omegablock[d + r][d + r] = i + 1;
-			}
 
-		/* normal diagonal omega block */
-		} else if (type == OMEGA_DIAG) {
-			forcount(r, ndim) 
-				omegablock[d + r][d + r] = i + 1;
-			
-		} else
-			fatal(0, "invalid OMEGA block type (%i)\n", type);
+			/* get entries from elsewhere set omega elements */
+			} else if (type == OMEGA_SAME) {
+				forcount(r, ndim) {
+					/* off diagonal */
+					for (var c=0; c<r; c++) {
+						omegablock[d + c][d + r] = i + 1;
+						omegablock[d + r][d + c] = i + 1;
+					}
+					/* on diagonal */
+					omegablock[d + r][d + r] = i + 1;
+				}
 
-		/* set offset for the next block */
-		d += ndim; 
+			/* normal diagonal omega block */
+			} else if (type == OMEGA_DIAG) {
+				forcount(r, ndim) 
+					omegablock[d + r][d + r] = i + 1;
+				
+			} else
+				fatal(0, "invalid OMEGA block type (%i)\n", type);
+
+			/* set offset for the next block */
+			d += ndim; 
+		}
+		forcount(i, popmodel->nomega)
+			forcount(j, i+1)
+				fprintf(f, OPENPMX_TABLE_FORMAT, (double)omegablock[i][j]);
+		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+		fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
+		fprintf(f, OPENPMX_IFORMAT, 0);
+		fprintf(f, "\n");
 	}
-	forcount(i, popmodel->nomega)
-		forcount(j, i+1)
-			fprintf(f, OPENPMX_TABLE_FORMAT, (double)omegablock[i][j]);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_TABLE_FORMAT, 0.);
-	fprintf(f, OPENPMX_IFORMAT, 0);
-	fprintf(f, "\n");
-
 	fflush(f);
 }
 
@@ -446,11 +448,12 @@ void extfile_trailer(FILE* f, const POPMODEL* const popmodel, const double runti
 
 static void info_iteration(FILE* f1,
 						   const double runtime_s,
-						   const POPMODEL* popmodel)
+						   const POPMODEL* popmodel,
+						   const char* extra)
 {
 	let _objfn = popmodel->result.objfn;
 	let neval = popmodel->result.neval;
-	info(f1, "time %.3f neval %i objfn %.6f\n", runtime_s, neval, _objfn);
+	info(f1, "time %.3f neval %i objfn %.6f%s\n", runtime_s, neval, _objfn, extra ? extra : "");
 }
 
 void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double timestamp)
@@ -493,7 +496,12 @@ void popmodel_information(FILE* f2, const POPMODEL* const popmodel, const double
 		forcount(j, i+1) {
 			let v = popmodel->omega[i][j];
 			let f = popmodel->omegafixed[i][j];
-			info(f2, OPENPMX_FFORMAT "%s", v, f != OMEGAFIXED_ESTIMATE ? "*" : "");
+			const char* annotation = "";
+			if (f == OMEGAFIXED_FIXED)
+				annotation = "*";
+			if (f == OMEGAFIXED_SAME)
+				annotation = "**";
+			info(f2, OPENPMX_FFORMAT "%s", v, annotation);
 		}
 		info(f2, "\n");
 	}
@@ -513,12 +521,13 @@ void popmodel_eval_information(const POPMODEL* const popmodel,
 							   const int ineval,
 							   const bool details,
 							   FILE* outstream,
-							   FILE* extstream)
+							   FILE* extstream,
+							   const char* extra)
 {
 	if (details)
 		popmodel_information(outstream, popmodel, runtime_s);
 
-	info_iteration(outstream, runtime_s, popmodel);
+	info_iteration(outstream, runtime_s, popmodel, extra);
 
 	if (extstream) 
 		extfile_append(extstream, popmodel, runtime_s, popmodel->result.neval, ineval);

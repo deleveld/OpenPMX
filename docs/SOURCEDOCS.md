@@ -215,6 +215,60 @@ calculation, prediction, etc do not have any check to maximize
 speed.
 
 
+# src/covariance.c
+
+This file calculates the covariance matrix of the estimate to provide
+information about upper and lower bounds of paramater estimates.
+
+Two matrices are computed, both by central finite differences: R,
+the Hessian of the total objective function (NONMEM's R-matrix),
+and S, the OPG/BHHH cross-product-of-gradients estimate (NONMEM's
+S-matrix). These are combined into the robust sandwich estimator
+Cov = Rinv * S * Rinv, which is what gets reported below.
+
+The upper and lower bounds are not calculated for off-diagonal values
+in omega. Its not really clear how to transform these from the
+unbounded encoded space to the bounded paramater space.
+
+All work is done in the encoded (transformed) parameter space using
+central finite differences of the total objective function (-2LL).
+Two matrices are available:
+
+- **R**: the Hessian of the total objfn (NONMEM's R matrix).
+- **S**: the OPG/BHHH cross-product of per-individual gradients (S = J'J).
+
+They are combined into the sandwich estimator `Cov = Rinv * S * Rinv`, or
+used alone (`Sinv` or `Rinv`, scaled because the objfn is -2LL). Optional
+quadratic resampling can then refine the result. The covariance type is
+chosen with `COVARIANCE_S_MATRIX`, `COVARIANCE_R_MATRIX`,
+`COVARIANCE_SANDWICH` or the default `COVARIANCE_SANDWICH_QUADRATIC`.
+
+  Results go to `<filename>.cov` and `<filename>.cov.ext` when the
+  source has a filename.
+- `covariance_free(cov)`: frees the limit array of a `COVARIANCE`.
+- `pmx_covariance_limit(pmx, param)`: looks up the stored `COVLIMIT`
+  for a given parameter type and index. It is fatal if no covariance has
+  been calculated.
+
+## Resampling and smoothing
+
+- With quadratic smoothin the functions `covariance_resample` /
+  `covariance_resample_sample`: draws antithetic
+  (forward/backward) samples from the Cholesky factor of the covariance,
+  scaled so the expected objfn rise equals a requested value, and
+  evaluates the true objfn at each. When doing quadratic resampling,
+  the covariance is adjusted after each pair to match the observed objfn.
+- When diagnostic samples are requested the calculate  predicted vs
+  observed dobjfn is written to the diagnostics file and
+  summarised (log-ratio mean and sd).
+
+## Reporting
+
+- `print_correlations`: correlation pairs sorted by absolute value.
+- `print_nonidentifiable_parameters`: eigen-analysis of S or R that
+  finds all parameters confined to the near-null subspace (eigenvalues
+  below `reltol * lambda_max`), also reporting negative eigenvalues.
+
 # src/dataconfig/dataconfig.c
 
 This file initializes a RECORDINFO object from a DATACONFIG object.
@@ -233,11 +287,10 @@ This file performs the encoding and decoding of a POPMODEL to and
 from an unbounded vector. This is a part of the Stage 2 of 
 optimization.
 
-Calling encode_offset() makes such that a zero-initialized vector 
+Calling encode_transform() makes such that a zero-initialized vector 
 will reproduce the given POPMODEL. 
 
-Different transformations are possible to address theta bounds but 
-the default is to use tanh/atanh.
+Different transformations are possible to address theta bounds. 
 
 Sigma is log-transformed. 
 
@@ -280,7 +333,8 @@ At the end of estimation the phi file is written and a trailer is
 put onto the ext file. Also the yhat file is written with prediction
 varaiables including pred, yhat, yhatvar, and the state.
 
-Evaluation is the same as estimation but with maxeval=0.
+Evaluation is the same as estimation but with maxeval=1. Note that 
+maxeval=0 would trigger the default number of evaluations.
 
 
 # src/idata.c
@@ -560,8 +614,10 @@ sigma.
 For simulation random ETA values are chosen according to the omega
 matrix.
 
-Upon simulation the individualized values (ETA and objective 
-function components) are set to zero.
+Upon simulation the individualized values the objective function components are set to zero.
+
+Upon simulation the individualized eta values are randomly selected from 
+from the distribution of the omega matrix.
 
 After simulation a prediction occurs and the DV in the dataset is
 replaced by observation with noise. PRED is set to zero and yhat is
