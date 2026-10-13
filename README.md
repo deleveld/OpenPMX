@@ -41,10 +41,8 @@ This repository contains the work-in-progress (WIP) development version and coul
 ### New features 0.1.7
 - Covariance matrix of estimation via `covariance()` to determine parameter limits.
 	- For a given change in objective function value, the upper and lower bounds of the estimated `THETA()`, `SIGMA()`, and `OMEGA()` diagonal values are calculated
-	- The default uses the Sandwitch matrix (R^-1 * S * R^-1 ) which is afterward fitted to a quadratic model for smoothing
-	- The S and R are examined to determine non-idenifiable parameters
-	- Optional diagnostics of the covariance matrix may be output
-- Tests of `covariance()` added to the test set 
+	- The default uses the Sandwitch matrix (R<sup>-1</sup>*S*R<sup>-1</sup>) which is afterward fitted to a quadratic model for smoothing
+	- The near-null space of S and R are examined to determine non-idenifiable parameters
 - Likelihood profiles via `profile()` to determine parameter limits. Uses bracketing to find the paramater value for a 
   delta objective function to a desired accuracy
 - Use BLQ estimates in model estimation using the `loglik_llq()` function within the `$PRED()` record
