@@ -21,9 +21,6 @@
 /// can be called in parallel, i.e. individual can be processed in seperate
 /// threads.
 
-// # for anotther covariance method
-// https://claude.ai/share/d3800efc-45e5-4564-b74b-8f5364dd3e88
-
 #include <string.h>
 #include <assert.h>
 #include <float.h>
@@ -286,6 +283,8 @@ static double stage1_individcov(const int nreta,
 		forcount(k, nrecord) {
 			if (RECORDINFO_EVID(recordinfo, ptr) == 0) {
 				var deriv = 0.;
+				/* TODO: this can be better handling NAN, now if observation
+				 * doesnt work, its assumed to be a logp observation */
 				if (yhatvar_plus_h[k] != 0. && yhatvar_minus_h[k] != 0.) {
 					let dv = RECORDINFO_DV(recordinfo, ptr);
 					let upper = (f_plus_h[k] - dv) / sqrt(yhatvar_plus_h[k]);
@@ -317,7 +316,7 @@ static double stage1_individcov(const int nreta,
 	/* we made J such that tJ*J is tGi*invVi*Gi in Term 5 from Bae and Yim */
 	/* multiply and accumulate omega inverse, all in one command */
 	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1., J, J, 1., reducedicov);
-	free(J);
+	gsl_matrix_free(J);
 
 	/* we have added the contribution of the population omega inverse with
 	   the contribution from each individual to get the individual covariance,

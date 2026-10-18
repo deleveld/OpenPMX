@@ -199,7 +199,7 @@ IDATAETAS idata_etas_alloc(const IDATA* const idata)
 	let nindivid = idata->nindivid;
 	let nomega = idata->nomega;
 	return (IDATAETAS) {
-		.etas = mallocvar(double, nindivid * nomega),
+		.etas = callocvar(double, nindivid * nomega),
 		.icov = callocvar(double, nindivid * nomega * nomega),
 	};
 }

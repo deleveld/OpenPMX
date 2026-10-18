@@ -20,6 +20,19 @@
 /// during optimization to calculate the objective function, for 
 /// prediction of PREDICTVARS after Stage 1, to checkout the data before
 /// estimation to detect errors, and to perform simulations.
+///
+/// individual_fasteval() is the optimized core used by the objective
+/// function: it advances the ADVAN over the records and accumulates
+/// separate sums for continuous observations (squared error divided by
+/// the prediction variance, and its log) and for discrete observations
+/// given as a log-likelihood. individual_evaluate() does the same but
+/// also stores per-record predictions, variances and states.
+/// The prediction variance (yhatvar) is obtained by propagating the
+/// SIGMA error through the model with central differences around zero
+/// error. loglik_llq() gives the log-likelihood for observations below
+/// the limit of quantification. individual_simulate() advances the
+/// model while applying supplied residual errors. All functions work
+/// on a single individual and must be thread safe.
 
 #include <stdlib.h>
 #include <stdio.h>

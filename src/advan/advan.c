@@ -191,26 +191,17 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 /// + The next RECORD time is achieved
 /// + A previous infusion starts or stopped
 /// + A bolus dose is given
-/// + If `pmx_advan_inittime()` has been called, which is `INITTIME()` in 
-/// openpmxtran
+/// + If `pmx_advan_inittime()` has been called, which is `INITTIME()` in openpmxtran
 	/* advance through time and handle infusions and doses when they start
 	 * or stop up until the time of the current record */
 	assert(advan->time <= final_time);
-	double totalrates[nstate];
+	assert(nstate <= OPENPMX_STATE_MAX);
+	static const double norates[OPENPMX_STATE_MAX] = { 0. };
+	double totalrates[OPENPMX_STATE_MAX];
 	do {
 		let currenttime = advan->time;
 
-		/* remove doses in the past, or infusions that have just now
-		 * stopped, or inittimes in the past */
-		for (int i=0; i<advan->ninfusions; i++) {
-			let v = &advan->infusions[i];
-			if ((v->end < currenttime) ||	
-				(v->end <= currenttime && v->rate > 0.)) {
-				remove_infusion(advan->infusions, &advan->ninfusions, i);
-				--i;
-			}
-		}
-		/* remove past inittimes, this should nver happen actually */
+		/* remove past inittimes, this should never happen actually */
 		for (int i=0; i<advan->ninittime; i++) {
 			if (advan->inittime[i] < currenttime) {
 				remove_inittime(advan->inittime, &advan->ninittime, i);
@@ -218,16 +209,43 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 			}
 		}
 
-		/* find the first place we have to stop at going to the next record
-		 * first look to the start or stop of dose */
+		/* One pass over the infusions that: removes doses in the past and
+		 * infusions that have just now stopped, finds the first place we
+		 * have to stop (start or stop of a dose), collects the infusion
+		 * rates running now, and notes if a bolus is due right now. Kept
+		 * infusions are visited in array order, same as separate passes,
+		 * so the rate sums are bitwise identical. */
 		double intervalstop = final_time;
-		for (int i=0; i<advan->ninfusions; i++) {
-			let v = &advan->infusions[i];
+		bool anyrate = false;
+		bool anybolus = false;
+		int ninf = 0;
+		while (ninf < advan->ninfusions) {
+			let v = &advan->infusions[ninf];
+			if ((v->end < currenttime) ||
+				(v->end <= currenttime && v->rate > 0.)) {
+				remove_infusion(advan->infusions, &advan->ninfusions, ninf);
+				continue;
+			}
 			if (v->end < intervalstop)
 				intervalstop = v->end;
 			if (v->start > currenttime && v->start < intervalstop)
 				intervalstop = v->start;
+
+			if (v->rate > 0.) {
+				if (v->start <= currenttime && v->end >= currenttime) {
+					/* zero the rates only if there is something to add */
+					if (!anyrate) {
+						memset(totalrates, 0, nstate * sizeof(double));
+						anyrate = true;
+					}
+					let cmt = v->cmt;
+					totalrates[cmt] += v->rate * advan->bioavail[cmt];
+				}
+			} else if (v->start == currenttime)
+				anybolus = true;
+			ninf++;
 		}
+
 		/* next find out if we have to call init and remove if we
 		 * actually will call init */
 		int initindex = -1;
@@ -243,41 +261,30 @@ PREDICTSTATE advan_advance(ADVAN* const advan,
 		if (initindex != -1)
 			remove_inittime(advan->inittime, &advan->ninittime, initindex);
 
-		/* do we advance time at all */
+		/* do we advance time at all, process the interval with constant rates */
 		if (intervalstop > currenttime) {
-
-			/* collect the infusion rates between now and the intervalstop */
-			memset(totalrates, 0, nstate * sizeof(double));
-			for (int i=0; i<advan->ninfusions; i++) {
-				let v = &advan->infusions[i];
-				if (v->start <= currenttime && v->end >= currenttime && v->rate > 0.) {
-					let cmt = v->cmt;
-					let rate = v->rate;
-					var bioavail = advan->bioavail[cmt];
-					totalrates[cmt] += rate * bioavail;
-				}
-			}
-			
-			/* process the interval with constant rates */
-			advanfuncs->interval(advan, imodel, record, state, popparam, intervalstop, totalrates);
+			advanfuncs->interval(advan, imodel, record, state, popparam, intervalstop,
+								 anyrate ? totalrates : norates);
 			advan->time = intervalstop;	/* force and update to time, although the advancer_object might do this as well */
 		}
 
 		/* are any bolus needed to be given right now */
 		/* we take them off the infusion list so they wont be seen again */
 		bool need_reset_now = false;
-		for (int i=0; i<advan->ninfusions; i++) {
-			let v = &advan->infusions[i];
-			if (v->start == currenttime && v->rate == 0.) {
-				assert(v->start == v->end);
-				assert(v->cmt >= 0);
-				let record_cmt = v->cmt;
-				let record_amt = v->amt;
-				var bioavail = advan->bioavail[record_cmt];
-				state[record_cmt] += record_amt * bioavail;
-				remove_infusion(advan->infusions, &advan->ninfusions, i);
-				--i;
-				need_reset_now = true;
+		if (anybolus) {
+			for (int i=0; i<advan->ninfusions; i++) {
+				let v = &advan->infusions[i];
+				if (v->start == currenttime && v->rate == 0.) {
+					assert(v->start == v->end);
+					assert(v->cmt >= 0);
+					let record_cmt = v->cmt;
+					let record_amt = v->amt;
+					var bioavail = advan->bioavail[record_cmt];
+					state[record_cmt] += record_amt * bioavail;
+					remove_infusion(advan->infusions, &advan->ninfusions, i);
+					--i;
+					need_reset_now = true;
+				}
 			}
 		}
 		if (need_reset_now && advanfuncs->reset)

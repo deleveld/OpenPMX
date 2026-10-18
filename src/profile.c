@@ -49,30 +49,42 @@ static int param_index(const PARAM* const param, const bool _offset1)
 static const char* param_name(const PARAM* const param)
 {
 	switch (param->type) {
-		case PARAM_THETA: return "theta";
-		case PARAM_OMEGA: return "omega";
-		case PARAM_SIGMA: return "sigma";
-		default:          return "unknown";
+		case PARAM_THETA:
+			return "theta";
+		case PARAM_OMEGA:
+			return "omega";
+		case PARAM_SIGMA:
+			return "sigma";
+		default:
+			return "unknown";
 	}
 }
 
 static int param_count(const POPMODEL* const popmodel, const PARAM* const param)
 {
 	switch (param->type) {
-		case PARAM_THETA: return popmodel->ntheta;
-		case PARAM_OMEGA: return popmodel->nomega;
-		case PARAM_SIGMA: return popmodel->nsigma;
-		default:          return 0;
+		case PARAM_THETA:
+			return popmodel->ntheta;
+		case PARAM_OMEGA:
+			return popmodel->nomega;
+		case PARAM_SIGMA:
+			return popmodel->nsigma;
+		default:
+			return 0;
 	}
 }
 
 static double* param_value(POPMODEL* const popmodel, const PARAM* const param, const int i)
 {
 	switch (param->type) {
-		case PARAM_THETA: return &popmodel->theta[i];
-		case PARAM_OMEGA: return &popmodel->omega[i][i];
-		case PARAM_SIGMA: return &popmodel->sigma[i];
-		default:          return NULL;
+		case PARAM_THETA:
+			return &popmodel->theta[i];
+		case PARAM_OMEGA:
+			return &popmodel->omega[i][i];
+		case PARAM_SIGMA:
+			return &popmodel->sigma[i];
+		default:
+			return NULL;
 	}
 }
 
@@ -81,9 +93,15 @@ static void popmodel_apply_param(POPMODEL* const popmodel, const PARAM* const pa
 {
 	*param_value(popmodel, param, i) = param->value;
 	switch (param->type) {
-		case PARAM_THETA: popmodel->thetaestim[i] = FIXED; break;
-		case PARAM_OMEGA: popmodel->omegafixed[i][i] = OMEGAFIXED_FIXED; break;
-		case PARAM_SIGMA: popmodel->sigmafixed[i] = 1; break;
+		case PARAM_THETA:
+			popmodel->thetaestim[i] = FIXED;
+			break;
+		case PARAM_OMEGA:
+			popmodel->omegafixed[i][i] = OMEGAFIXED_FIXED;
+			break;
+		case PARAM_SIGMA:
+			popmodel->sigmafixed[i] = 1;
+			break;
 		default: break;
 	}
 }

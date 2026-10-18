@@ -59,7 +59,6 @@
 #include <gsl/gsl_complex_math.h>
 #include <gsl/gsl_linalg.h>
 #include <gsl/gsl_permutation.h>
-#include <gsl/gsl_blas.h>
 
 /// For the eigensystem advancer the system matrix must be provided
 /// in row-major order. The user can write this using
@@ -92,11 +91,24 @@ typedef struct {
 	gsl_permutation* perm;    
 	double* eigvals;							/* eigenvalues (real parts) */
 	
-	gsl_matrix* V_m;							/* right eigenvector matrix */
-	gsl_matrix* Vinv_m;							/* inverse of V */
-	gsl_vector* x_modal_v;
-	gsl_vector* j_modal_v;
-	gsl_vector* x_modal_new_v;
+	gsl_matrix* V_m;							/* right eigenvector matrix (tda == n, contiguous row-major) */
+	gsl_matrix* Vinv_m;							/* inverse of V (tda == n, contiguous row-major) */
+
+	/* transposed copies (row k = column k of the original) so the advance can
+	 * accumulate y += col_k * x[k] over contiguous, SIMD-friendly rows */
+	double Vt[OPENPMX_STATE_MAX * OPENPMX_STATE_MAX];
+	double Vinvt[OPENPMX_STATE_MAX * OPENPMX_STATE_MAX];
+
+	/* per-mode constants, filled by eigen_decompose() */
+	int degen[OPENPMX_STATE_MAX];				/* eigenvalue ~ 0: pure accumulation */
+	double ieig[OPENPMX_STATE_MAX];				/* 1/(-eigval), 0 if degenerate */
+
+	/* time-dependent cache, valid for one dt until re-decomposition.
+	 * zeroed by advan_base_construct() so dtvalid starts at 0 */
+	int dtvalid;
+	double dtlast;
+	double decay[OPENPMX_STATE_MAX];			/* exp(eigval*dt) */
+	double step[OPENPMX_STATE_MAX];				/* (1-decay)/(-eigval), or dt if degenerate */
 } ADVANCER_EIGEN;
 
 static void advancer_eigen_info(const struct ADVANFUNCS* const advanfuncs,
@@ -135,14 +147,8 @@ static void advancer_eigen_construct(ADVAN* advan,
 
 	self->V_m = gsl_matrix_alloc(n, n);
 	self->Vinv_m = gsl_matrix_alloc(n, n);
-	self->x_modal_v = gsl_vector_alloc(n);
-	self->j_modal_v = gsl_vector_alloc(n);
-	self->x_modal_new_v = gsl_vector_alloc(n);
 	assert(self->V_m);
 	assert(self->Vinv_m);
-	assert(self->x_modal_v);
-	assert(self->j_modal_v);
-	assert(self->x_modal_new_v);
 
 	/* point to our sysmat so users can see it and update */
 	advan->eigen_sysmat_data = self->sysmat_data;
@@ -154,9 +160,6 @@ static void advancer_eigen_destruct(ADVAN* advan)
 
 	gsl_matrix_free(self->V_m);
 	gsl_matrix_free(self->Vinv_m);
-	gsl_vector_free(self->x_modal_v);
-	gsl_vector_free(self->j_modal_v);
-	gsl_vector_free(self->x_modal_new_v);
 
 	free(self->eigvals);
 	gsl_permutation_free(self->perm);
@@ -227,6 +230,11 @@ static void eigen_decompose(ADVANCER_EIGEN* self,
 
 		self->eigvals[i] = GSL_REAL(eval_i);
 
+		/* per-mode constants for the advance: one division here instead
+		 * of one per mode per call */
+		self->degen[i] = !(fabs(self->eigvals[i]) > 1e-15);
+		self->ieig[i] = self->degen[i] ? 0. : -1./self->eigvals[i];
+
 		/* Extract real parts of eigenvectors into V (row-major).
 		 * GSL returns complex eigenvectors even for real eigenvalues;
 		 * for PK systems the imaginary parts should be negligible. */
@@ -264,8 +272,16 @@ static void eigen_decompose(ADVANCER_EIGEN* self,
 		exit(EXIT_FAILURE);
 	}
 
+	/* 5. transposed copies for the advance */
+	forcount(i, n) {
+		forcount(j, n) {
+			self->Vt[j*n + i] = self->V_m->data[i*n + j];
+			self->Vinvt[j*n + i] = self->Vinv_m->data[i*n + j];
+		}
+	}
+
 #if 0
-	/* 5. Verify reconstruction: S = V * diag(eigvals) * Vinv */
+	/* 6. Verify reconstruction: S = V * diag(eigvals) * Vinv */
 	forcount(i, n) {
 		forcount(j, n) {
 			double sum = 0.;
@@ -340,74 +356,83 @@ static void advancer_eigen_advance_interval(ADVAN* advan,
 			memcpy(self->last_sysmat_data,
 				   self->sysmat_data,
 				   n * n * sizeof(double));
+			self->dtvalid = 0;
 		}
 		self->last_recalc_initcount = advan->initcount;
 	}
 
-	/* Steps 1+2: project state and rates into modal coordinates via Vinv.
-	 *
-	 * x_modal = Vinv * state
-	 * j_modal = Vinv * rates
-	 *
-	 * cblas_dgemv with CblasRowMajor / CblasNoTrans computes:
-	 *   y = alpha * A * x + beta * y
-	 * where A is (n x n) row-major, x and y are length-n vectors.
-	 * alpha=1, beta=0 gives a plain matrix-vector product.
-	 *
-	 * The two calls share the same matrix Vinv; BLAS will use optimised
-	 * SIMD kernels (SSE2/AVX on x86, NEON on ARM) automatically.
-	 */
-	var Vinv_m = self->Vinv_m;
-	var V_m    = self->V_m;
-	let x_modal_v = self->x_modal_v;
-	let j_modal_v = self->j_modal_v;
-	var state_v   = gsl_vector_view_array(state, n);
-	let rates_v   = gsl_vector_const_view_array(rates, n);
-	gsl_blas_dgemv(CblasNoTrans, 1., Vinv_m,
-	               &state_v.vector, 0., x_modal_v);   /* x_modal = Vinv * state */
-	gsl_blas_dgemv(CblasNoTrans, 1., Vinv_m,
-	               &rates_v.vector, 0., j_modal_v);   /* j_modal = Vinv * rates */
-
-	/* Step 3: advance each mode analytically.
-	 *
-	 * For each eigenvalue lambda_i (negative for stable systems):
-	 *   decay = exp(lambda_i * dt)
-	 *   x_new = x_old * decay + j_modal * (1 - decay) / (-lambda_i)
-	 *
-	 * The (1 - decay)/(-lambda) term is the step response coefficient.
-	 * This is exactly STANPUMP's p_coef mechanism generalized to n
-	 * dimensions -- see Minto's equation (57).
-	 */
+	/* per-mode decay and step coefficients depend only on dt and the
+	 * eigenvalues, so cache them for repeated dt */
 	let dt = endtime - advan->time;
 	assert(dt > 0.);
-	let x_modal = self->x_modal_v->data;
-	let j_modal = self->j_modal_v->data;
-	let x_modal_new = self->x_modal_new_v->data;
-	forcount(i, n) {
-		let eigval = self->eigvals[i];
-
-		/* Normal case: mode decays and accumulates */
-		if (fabs(eigval) > 1e-15) {
-			let decay  = exp(eigval * dt);
-			let step_coef = (1. - decay) / (-eigval);
-			x_modal_new[i] = x_modal[i] * decay + j_modal[i] * step_coef;
-
-		/* Degenerate case: eigenvalue ~ 0, pure accumulation.
-		 * Limit as eigval -> 0: (1 - exp(eigval*dt)) / (-eigval) -> dt */
-		} else 
-			x_modal_new[i] = x_modal[i] + j_modal[i] * dt;
+	if (!self->dtvalid || dt != self->dtlast) {
+		for (int i = 0; i < n; i++) {
+			if (__builtin_expect(self->degen[i], 0)) {
+				/* limit of (1 - exp(eigval*dt)) / (-eigval) as eigval -> 0 */
+				self->decay[i] = 1.;
+				self->step[i] = dt;
+			} else {
+				let decay = exp(self->eigvals[i] * dt);
+				self->decay[i] = decay;
+				self->step[i] = (1. - decay) * self->ieig[i];
+			}
+		}
+		self->dtlast = dt;
+		self->dtvalid = 1;
 	}
 
-	/* Step 4: transform back to compartment coordinates.
-	 *
-	 * state = V * x_modal_new
-	 *
-	 * state_v still points at the `state` array so the result is written
-	 * back in-place — no extra copy needed.
-	 */
-	let x_modal_new_v = self->x_modal_new_v;
-	gsl_blas_dgemv(CblasNoTrans, 1., V_m,
-	               x_modal_new_v, 0., &state_v.vector); /* state = V * x_modal_new */
+	/* modal advance on raw arrays: for n of 2-10 the GSL view/BLAS call
+	 * overhead costs more than the arithmetic. Matrix-vector products are
+	 * written column-wise (y[i] += Mt[k][i]*x[k]) so the inner loop over i
+	 * vectorizes without -ffast-math and keeps the same summation order.
+	 *   xm = decay .* (Vinv*state) + step .* (Vinv*rates)
+	 *   state = V*xm */
+	let Vinvt = self->Vinvt;
+	let Vt = self->Vt;
+	let decay = self->decay;
+	let step = self->step;
+
+	double xm[OPENPMX_STATE_MAX] = { 0. };
+	double jm[OPENPMX_STATE_MAX] = { 0. };
+
+	for (int k = 0; k < n; k++) {
+		let col = Vinvt + k*n;
+		let sk = state[k];
+		for (int i = 0; i < n; i++)
+			xm[i] += col[i]*sk;
+	}
+
+	/* skip the input projection when no infusion is running */
+	int norates = 1;
+	for (int k = 0; k < n; k++)
+		if (rates[k] != 0.) {
+			norates = 0;
+			break;
+		}
+	if (norates) {
+		for (int i = 0; i < n; i++)
+			xm[i] *= decay[i];
+	} else {
+		for (int k = 0; k < n; k++) {
+			let col = Vinvt + k*n;
+			let rk = rates[k];
+			for (int i = 0; i < n; i++)
+				jm[i] += col[i]*rk;
+		}
+		for (int i = 0; i < n; i++)
+			xm[i] = xm[i]*decay[i] + jm[i]*step[i];
+	}
+
+	/* back to compartment coordinates, in place (xm holds all inputs) */
+	double out[OPENPMX_STATE_MAX] = { 0. };
+	for (int k = 0; k < n; k++) {
+		let col = Vt + k*n;
+		let xk = xm[k];
+		for (int i = 0; i < n; i++)
+			out[i] += col[i]*xk;
+	}
+	for (int i = 0; i < n; i++)
+		state[i] = out[i];
 }
 
 typedef struct {

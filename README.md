@@ -39,6 +39,7 @@ This repository contains the work-in-progress (WIP) development version and coul
 - Few dependencies: [gcc](https://gcc.gnu.org/), [GSL](https://www.gnu.org/software/gsl/)
 
 ### New features 0.1.7
+- Speed optimized advance functions for two- and three-compartment models and eigensystem solver.
 - Covariance matrix of estimation via `covariance()` to determine parameter limits.
 	- For a given change in objective function value, the upper and lower bounds of the estimated `THETA()`, `SIGMA()`, and `OMEGA()` diagonal values are calculated
 	- The default uses the Sandwitch matrix (R<sup>-1</sup>*S*R<sup>-1</sup>) which is afterward fitted to a quadratic model for smoothing
@@ -90,7 +91,7 @@ Andresen C, Goodale DB, Shafer SL, Youngs EJ. The influence of method of
 administration and covariates on the pharmacokinetics of propofol in adult
 volunteers. Anesthesiology 1998;88:1170-82. 
 
-In this example a 3-compartment allometric model is estimated.
+In this example a 3-compartment allometric model is estimated. The covariance limits are also calculated.
 - `../../openpmx schnider.gr`
 
 The same example, but using the differential equation solver.

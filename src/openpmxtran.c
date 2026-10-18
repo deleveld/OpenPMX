@@ -15,9 +15,21 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-/// This file implements a translation program for structured control
-/// files into compilable C source to perform model
-/// estimation/simulation etc.
+/// openpmxtran: translator from OpenPMX control files to C source.
+///
+/// Reads a NONMEM-like control file made of `$BLOCK` sections ($DATA,
+/// $ADVAN, $IMODEL, $PREDICT, $DIFFEQN, $THETA, $OMEGA, $OMEGABLOCK,
+/// $OMEGASAME, $SIGMA, $FUNCTIONS, $MAIN, $FILE), strips C-style
+/// comments, splits the text into blocks and dispatches each to a
+/// handler that fills a RESULT structure. The header of the data file
+/// is read to determine the RECORD fields, names are checked against
+/// the model, and everything is expanded into the embedded C template
+/// (`openpmxtran_template`). The generated program defines the model
+/// callbacks (imodel_init, imodel_diffeqn, imodel_predict), the data
+/// preprocessing, the initial THETA/OMEGA/SIGMA values and a main()
+/// that runs the user's $MAIN code (estimate, evaluate, simulate,
+/// covariance, table, ...). Any $FILE sections are written out as
+/// auxiliary files alongside the generated source.
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -168,7 +180,8 @@ static void strip_comments_robust(char *s)
 					// Sequence like ***/ - stay in POTENTIAL_END
 				} else {
 					state = IN_COMMENT_MULTI;
-					if (*src == '\n') *dst++ = '\n';
+					if (*src == '\n') 
+						*dst++ = '\n';
 				}
 				break;
 		}
@@ -188,7 +201,9 @@ static VECPTR split_blocks(char *buf)
 	/* Skip UTF-8 BOM, which some editors add to identift UTF-8 encoding 
 	 * if this is not ignored, it can mess up detecting the first "$..."
 	 * block. */
-	if ((unsigned char)buf[0] == 0xEF && (unsigned char)buf[1] == 0xBB && (unsigned char)buf[2] == 0xBF)
+	if ((unsigned char)buf[0] == 0xEF && 
+		(unsigned char)buf[1] == 0xBB && 
+		(unsigned char)buf[2] == 0xBF)
 		buf += 3;
 
 	if (buf[0] == '$')

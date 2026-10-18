@@ -52,9 +52,7 @@ Advancing is done in "steps" to the earliest of:
 + The next RECORD time is achieved
 + A previous infusion starts or stopped
 + A bolus dose is given
-+ If `pmx_advan_inittime()` has been called, which is `INITTIME()` in 
-openpmxtran
-
++ If `pmx_advan_inittime()` has been called, which is `INITTIME()` in openpmxtran
 Calling `pmx_advan_amtlag()` (in openpmxtran this is `ALAG()`) 
 delays the application of subsequent dosing. It does not change the 
 moment of application of doses that are already in the buffer.
@@ -170,6 +168,8 @@ The equations were obtained from: Abuhelwa AY, Foster DJ, Upton RN.
 ADVAN-style analytical solutions for common pharmacokinetic imodels.
 Journal of pharmacological and toxicological methods. 2015 Jun 30;73:42-8.
 
+Applied some AI guided optimizations for speed.
+
 
 # src/advan/twocomp.c
 
@@ -179,6 +179,8 @@ model.
 The equations were obtained from: Abuhelwa AY, Foster DJ, Upton RN.
 ADVAN-style analytical solutions for common pharmacokinetic imodels.
 Journal of pharmacological and toxicological methods. 2015 Jun 30;73:42-8.
+
+Applied some AI guided optimizations for speed.
 
 
 # src/bobyqa/bobyqa.c
@@ -220,54 +222,38 @@ speed.
 This file calculates the covariance matrix of the estimate to provide
 information about upper and lower bounds of paramater estimates.
 
-Two matrices are computed, both by central finite differences: R,
-the Hessian of the total objective function (NONMEM's R-matrix),
-and S, the OPG/BHHH cross-product-of-gradients estimate (NONMEM's
-S-matrix). These are combined into the robust sandwich estimator
-Cov = Rinv * S * Rinv, which is what gets reported below.
-
-The upper and lower bounds are not calculated for off-diagonal values
-in omega. Its not really clear how to transform these from the
-unbounded encoded space to the bounded paramater space.
+For off-diagonal values it is not really clear how to transform these from the
+unbounded encoded space to the bounded paramater space, so no limits
+are calculated for them.
 
 All work is done in the encoded (transformed) parameter space using
-central finite differences of the total objective function (-2LL).
-Two matrices are available:
+central finite differences of the objective function (-2LL).
+Two matrices are relevant:
 
 - **R**: the Hessian of the total objfn (NONMEM's R matrix).
 - **S**: the OPG/BHHH cross-product of per-individual gradients (S = J'J).
 
 They are combined into the sandwich estimator `Cov = Rinv * S * Rinv`, or
-used alone (`Sinv` or `Rinv`, scaled because the objfn is -2LL). Optional
-quadratic resampling can then refine the result. The covariance type is
+used alone (`Sinv` or `Rinv`, scaled because the objfn is -2LL). 
+Quadratic smoothing can then refine the result. The covariance type is
 chosen with `COVARIANCE_S_MATRIX`, `COVARIANCE_R_MATRIX`,
 `COVARIANCE_SANDWICH` or the default `COVARIANCE_SANDWICH_QUADRATIC`.
 
   Results go to `<filename>.cov` and `<filename>.cov.ext` when the
   source has a filename.
-- `covariance_free(cov)`: frees the limit array of a `COVARIANCE`.
 - `pmx_covariance_limit(pmx, param)`: looks up the stored `COVLIMIT`
-  for a given parameter type and index. It is fatal if no covariance has
-  been calculated.
-
-## Resampling and smoothing
-
-- With quadratic smoothin the functions `covariance_resample` /
-  `covariance_resample_sample`: draws antithetic
-  (forward/backward) samples from the Cholesky factor of the covariance,
-  scaled so the expected objfn rise equals a requested value, and
-  evaluates the true objfn at each. When doing quadratic resampling,
-  the covariance is adjusted after each pair to match the observed objfn.
-- When diagnostic samples are requested the calculate  predicted vs
-  observed dobjfn is written to the diagnostics file and
-  summarised (log-ratio mean and sd).
+  for a given parameter type and index. If no covariance has
+  been calculated an empty `COVLIMIT` is returned.
 
 ## Reporting
 
-- `print_correlations`: correlation pairs sorted by absolute value.
-- `print_nonidentifiable_parameters`: eigen-analysis of S or R that
-  finds all parameters confined to the near-null subspace (eigenvalues
-  below `reltol * lambda_max`), also reporting negative eigenvalues.
+- Correlation pairs sorted by absolute value are reported.
+- Eigen-analysis of S and/or R finds all parameters confined to the
+  near-null subspace (eigenvalues below `reltol * lambda_max`), also
+  reporting negative eigenvalues.
+- When diagnostic samples are requested the predicted vs observed
+  dobjfn is written to the diagnostics file and summarised
+  (log-ratio mean and sd).
 
 # src/dataconfig/dataconfig.c
 
@@ -286,6 +272,18 @@ This file define the file extenstions and numeric formats used.
 This file performs the encoding and decoding of a POPMODEL to and 
 from an unbounded vector. This is a part of the Stage 2 of 
 optimization.
+
+Only non-fixed parameters are encoded, in the order THETA, SIGMA,
+then the lower triangle of the non-fixed OMEGA. Encoding is relative
+to an offset vector, so a zero vector reproduces the POPMODEL given
+to encode_transform(). THETA is mapped from its (lower, upper) bounds
+(compile-time selectable: ENCODE_SPECIAL, ATANH, LINEAR, NONMEM).
+SIGMA and the OMEGA diagonal are log-transformed (as standard
+deviations if ESTIMATE_SD_NOT_VAR is defined). OMEGA off-diagonals
+are encoded via the Cholesky factor of the correlation matrix and
+canonical partial correlations (atanh transformed). The file also
+handles OMEGA_SAME block filling, and the creation of parameter
+labels such as THETA(1) and OMEGA(2,1).
 
 Calling encode_transform() makes such that a zero-initialized vector 
 will reproduce the given POPMODEL. 
@@ -311,18 +309,102 @@ values with the same variances to be estimated.
 
 This file does the outer (stage 2) estimation.
 
+OpenPMX estimates population models in two nested stages. Stage 1
+(see stage1.c) finds, for fixed population parameters, the individual
+random effects (etas) that minimize each individual's objective
+function contribution, and evaluates the first-order conditional
+estimation with interaction (FOCEI) approximation of the likelihood.
+Stage 2, implemented here, searches over the population parameters
+(theta, omega and sigma) to minimize the total objective function
+summed over all individuals. Every objective function evaluation of
+stage 2 therefore runs stage 1 for all individuals, in parallel over
+the available threads.
+
+The public entry points are pmx_estimate() and pmx_evaluate().
+Evaluation is estimation with a single objective function evaluation:
+the model is not changed, but the individual etas, the objective
+function, the predictions and the output files are produced exactly
+as they would be for an estimation.
+
+Parameter encoding
+
+The population parameters are not optimized directly. They are encoded
+(see encode.h) as an unconstrained vector of offsets relative to the
+current model, so an all-zero vector reproduces the current model.
+This puts parameters of very different scales on a common footing.
+The step sizes used by the optimizer are therefore in encoded units,
+not in the units of the parameters. Only the parameters that are
+actually estimated are part of the vector. If there are none, no
+optimization is done after the initial evaluation.
+
+Optimization
+
+The objective function is minimized with BOBYQA, a derivative-free
+bounded quadratic-model trust region optimizer. Estimation runs in
+phases, controlled by the estimate options (maxeval, step_initial,
+step_refine, nsig, dobjfn):
+
+ 1. Initial evaluation. The model as given is evaluated once, which
+    sets the starting objective function and the starting etas. A
+    warning is given if it is not finite.
+ 2. Initial optimization. BOBYQA runs with a trust region radius
+    from step_initial down to step_refine. This makes large changes
+    to the parameters and does the bulk of the work.
+ 3. Final step size. The smallest trust region radius that can still
+    resolve nsig significant digits in the parameters is found by
+    halving a radius, starting at half of step_refine, until
+    perturbing each encoded parameter by plus or minus that radius
+    leaves the decoded parameters agreeing to more than nsig digits.
+    The search stops at 1e-8.
+ 4. Refinement. BOBYQA is restarted from the best model so far with a
+    radius from step_refine down to the final step size. After each
+    restart the number of significant digits (nsig) shared by the
+    parameters before and after the restart is reported, as the
+    minimum over all theta, sigma and the lower triangle of omega.
+    Restarts continue until nsig exceeds the requested nsig
+    (converged), until the change in the objective function between
+    restarts is smaller than dobjfn (stalled), until BOBYQA reports
+    an error, or until the evaluations allowed by maxeval are used up.
+
+The result is marked as final only if the refinement converged,
+otherwise it is the best model found so far. BOBYQA errors are
+reported as warnings and do not discard the progress made.
+
+Best model so far
+
+The best model is tracked separately from the model under test and is
+returned to the caller, so the result is always the best model seen
+and not the last model evaluated. Only a finite objective function
+is ever accepted as best: NaN and infinite values are rejected, and
+a non-finite starting objective function is replaced by the first
+finite one. When the best model improves, the etas of every individual
+are saved and used as starting values for the next evaluations.
+
+Output
+
+Progress is written to the screen and, if the model has a filename, to
+the out file. By default a single line is updated in place on a
+terminal, the details and verbose options print every improvement or
+every evaluation instead. At the start a header with the version,
+the parallel configuration and the data is written, followed by a
+data checkout (see checkout.c and ievaluate.c) that detects errors
+before any time is spent on estimation. During estimation each
+improvement is appended to the ext file. At the end the phi file
+(individual parameters and etas) and the yhat file (pred, yhat,
+yhatvar and the state) are written and the ext file gets its trailer.
+
 Each time the objective function improves during estimation the eta
 values are saved. They will be used as initial values for subsequent
 optimization.
-
-Model estimation begins with an intial optimization with large 
-changes to paramater values with BOBYQA rho values from 
-step_initial, stopping at step_refine. 
 
 After initial optimization, a smaller search space is used from 
 rho_refine to rho_final. This is repeated until the change in 
 parameters between restarts is greater than nsig or objective 
 function between restarts is less than dobjfn.
+
+Model estimation begins with an intial optimization with large 
+changes to paramater values with BOBYQA rho values from 
+step_initial, stopping at step_refine. 
 
 At start of estimation the header of the ext file is written.
 
@@ -358,6 +440,19 @@ model over the data records. This is done for various reasons:
 during optimization to calculate the objective function, for 
 prediction of PREDICTVARS after Stage 1, to checkout the data before
 estimation to detect errors, and to perform simulations.
+
+individual_fasteval() is the optimized core used by the objective
+function: it advances the ADVAN over the records and accumulates
+separate sums for continuous observations (squared error divided by
+the prediction variance, and its log) and for discrete observations
+given as a log-likelihood. individual_evaluate() does the same but
+also stores per-record predictions, variances and states.
+The prediction variance (yhatvar) is obtained by propagating the
+SIGMA error through the model with central differences around zero
+error. loglik_llq() gives the log-likelihood for observations below
+the limit of quantification. individual_simulate() advances the
+model while applying supplied residual errors. All functions work
+on a single individual and must be thread safe.
 
 The variance of y prediction (yhatvar) is estimated by central 
 differences around err=0.
@@ -451,9 +546,21 @@ sufentanil. Anesthesiology. 1995 Dec 1;83(6):1194-204.
 
 # src/openpmxtran.c
 
-This file implements a translation program for structured control
-files into compilable C source to perform model
-estimation/simulation etc.
+openpmxtran: translator from OpenPMX control files to C source.
+
+Reads a NONMEM-like control file made of `$BLOCK` sections ($DATA,
+$ADVAN, $IMODEL, $PREDICT, $DIFFEQN, $THETA, $OMEGA, $OMEGABLOCK,
+$OMEGASAME, $SIGMA, $FUNCTIONS, $MAIN, $FILE), strips C-style
+comments, splits the text into blocks and dispatches each to a
+handler that fills a RESULT structure. The header of the data file
+is read to determine the RECORD fields, names are checked against
+the model, and everything is expanded into the embedded C template
+(`openpmxtran_template`). The generated program defines the model
+callbacks (imodel_init, imodel_diffeqn, imodel_predict), the data
+preprocessing, the initial THETA/OMEGA/SIGMA values and a main()
+that runs the user's $MAIN code (estimate, evaluate, simulate,
+covariance, table, ...). Any $FILE sections are written out as
+auxiliary files alongside the generated source.
 
 Any text preceeding the blocks defined by $... is ignored and can
 be used for a description of the control file.

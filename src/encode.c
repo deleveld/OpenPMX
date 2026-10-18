@@ -18,6 +18,18 @@
 /// This file performs the encoding and decoding of a POPMODEL to and 
 /// from an unbounded vector. This is a part of the Stage 2 of 
 /// optimization.
+///
+/// Only non-fixed parameters are encoded, in the order THETA, SIGMA,
+/// then the lower triangle of the non-fixed OMEGA. Encoding is relative
+/// to an offset vector, so a zero vector reproduces the POPMODEL given
+/// to encode_transform(). THETA is mapped from its (lower, upper) bounds
+/// (compile-time selectable: ENCODE_SPECIAL, ATANH, LINEAR, NONMEM).
+/// SIGMA and the OMEGA diagonal are log-transformed (as standard
+/// deviations if ESTIMATE_SD_NOT_VAR is defined). OMEGA off-diagonals
+/// are encoded via the Cholesky factor of the correlation matrix and
+/// canonical partial correlations (atanh transformed). The file also
+/// handles OMEGA_SAME block filling, and the creation of parameter
+/// labels such as THETA(1) and OMEGA(2,1).
 
 #include <assert.h>
 #include <math.h>
@@ -495,4 +507,3 @@ void encode_labels_free(const ENCODELABEL* labels)
 {
 	free((void*)labels);
 }
-
