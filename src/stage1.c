@@ -323,13 +323,17 @@ static double stage1_individcov(const int nreta,
 	   well, the inverse of it. Now we have to invert to get the actual
 	   individual covariance matrix */
 	let oldhandler = gsl_set_error_handler_off();
+	var saved_reducedicov = gsl_matrix_alloc(nreta, nreta);
+	gsl_matrix_memcpy(saved_reducedicov, reducedicov);
 	if (gsl_linalg_cholesky_decomp1(reducedicov) != GSL_SUCCESS) {
 		forcount(i, nreta) {
-			let val = gsl_matrix_get(reducedicov, i, i);
-			gsl_matrix_set(reducedicov, i, i, val + 1e-6); 
+			let val = gsl_matrix_get(saved_reducedicov, i, i);
+			gsl_matrix_set(saved_reducedicov, i, i, val + 1e-6); 
 		}
+		gsl_matrix_memcpy(reducedicov, saved_reducedicov);
 		gsl_linalg_cholesky_decomp1(reducedicov);
 	}
+	gsl_matrix_free(saved_reducedicov);
 	gsl_set_error_handler(oldhandler);
 	let lndet = matrix_lndet_from_cholesky(reducedicov);
 	gsl_linalg_cholesky_invert(reducedicov);

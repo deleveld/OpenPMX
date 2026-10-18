@@ -15,6 +15,7 @@ find . -type f \( \
     -name "*.iter" -o \
     -name "*.gr.c" \
     -name "*.covcheck" \
+    -name "*.o" \
 \) -exec rm -v {} +
 
 echo "Cleanup complete!"

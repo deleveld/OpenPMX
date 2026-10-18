@@ -39,6 +39,7 @@ This repository contains the work-in-progress (WIP) development version and coul
 - Few dependencies: [gcc](https://gcc.gnu.org/), [GSL](https://www.gnu.org/software/gsl/)
 
 ### New features 0.1.7
+- Documentation of the FOCEI method derived from code and documentation submitted by Erik Olofsen (e.olofsen@weggetjes.nl)
 - Speed optimized advance functions for two- and three-compartment models and eigensystem solver.
 - Covariance matrix of estimation via `covariance()` to determine parameter limits.
 	- For a given change in objective function value, the upper and lower bounds of the estimated `THETA()`, `SIGMA()`, and `OMEGA()` diagonal values are calculated
