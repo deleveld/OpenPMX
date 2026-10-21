@@ -44,10 +44,10 @@ This repository contains the work-in-progress (WIP) development version and coul
 - Speed optimized advance functions for two- and three-compartment models and eigensystem solver.
 - Covariance matrix of estimation via `covariance()` to determine parameter limits.
 	- For a given change in objective function value, the upper and lower bounds of the estimated `THETA()`, `SIGMA()`, and `OMEGA()` diagonal values are calculated
-	- The default uses the Sandwitch matrix (R<sup>-1</sup>*S*R<sup>-1</sup>) which is afterward fitted to a quadratic model for smoothing
+	- The default uses the Sandwitch matrix (R<sup>-1</sup>*S*R<sup>-1</sup>)
 	- The near-null space of S and R are examined to determine non-idenifiable parameters
 - Likelihood profiles via `profile()` to determine parameter limits. Uses bracketing to find the paramater value for a 
-  delta objective function to a desired accuracy
+  delta objective function to a desired accuracy.  
 - Use BLQ estimates in model estimation using the `loglik_llq()` function within the `$PRED()` record
 - Simulate Target-Controlled-Infusion (TCI) dosing on any model
 - Reload population models via `reload()` from previous (even incomplete) estimations
