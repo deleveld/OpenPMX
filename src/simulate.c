@@ -149,7 +149,9 @@ static void idata_resample_eta(IDATA* const idata,
 			let x = gsl_ran_gaussian(rng, 1.);
 			gsl_vector_set(v, j, x);
 		}
-		gsl_blas_dgemv(CblasNoTrans, 1., &cholesky.matrix, v, 0., s);
+//		gsl_blas_dgemv(CblasNoTrans, 1., &cholesky.matrix, v, 0., s);
+		gsl_blas_dcopy(v, s);  
+		gsl_blas_dtrmv(CblasLower, CblasNoTrans, CblasNonUnit, &cholesky.matrix, s);
 
 		/* fill in the non-zero places in eta */
 		let eta = individ->eta;
@@ -191,7 +193,9 @@ static void idata_predict_dv(IDATA* const idata,
 		fatal(0, "writeable data does not match readable data\n");
 
 	var offsetDV = recordinfo->offsetDV;
+	var offsetEVID = recordinfo->offsetEVID;
 	let pred = idata->individ[0].pred;
+	assert(offsetEVID >= 0);
 
 	/* write back from pred (obs *with* noise) into DV
 	 * and zero pred after this */
@@ -199,8 +203,11 @@ static void idata_predict_dv(IDATA* const idata,
 	var recordsize = dataconfig->recordfields.size;
 	forcount(i, ndata) {
 		var ptr = (double*)((char*)writeable + recordsize * i);
-		var ptrdv = (double*)((char*)ptr + offsetDV);
-		*ptrdv = pred[i];
+		var ptrevid = (double*)((char*)ptr + offsetEVID);
+		if (*ptrevid == 0) {
+			var ptrdv = (double*)((char*)ptr + offsetDV);
+			*ptrdv = pred[i];
+		}
 		pred[i] = 0.;
 	}
 }

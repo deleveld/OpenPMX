@@ -67,8 +67,6 @@ static void pmxstate_free(PMXSTATE* pstate)
 	if (pstate->rng)
 		gsl_rng_free(pstate->rng);
 		
-	pmx_covariance_free(&pstate->covariance);
-
 	free(pstate);
 }
 
@@ -90,6 +88,26 @@ void pmx_ensure_state_rng(OPENPMX* const pmx, const OPTIONS* const options)
 		gsl_rng_set(pstate->rng, seed);
 	}
 	assert(pstate->rng);
+}
+
+void pmx_copy_idata(OPENPMX* const dest, const OPENPMX* const source)
+{
+	pmx_ensure_state(dest);
+	
+	let state = source->state;
+	if (!state)
+		return;
+
+	/* get source etas */
+	let idata_src = &state->idata;
+	let idataetas = idata_etas_alloc(idata_src);
+	
+	/* write to dest */
+	let idata_dest = &dest->state->idata;
+	idata_etas_write(idata_dest, &idataetas);
+
+	/* cleanup */
+	idata_etas_free(&idataetas);
 }
 
 void pmx_release_state(OPENPMX* pmx)
@@ -143,7 +161,6 @@ void pmx_copy_popmodel(OPENPMX* const pmx, const POPMODEL* const popmodel)
 		assert(pmx->omega[k].ndim == ndim);
 
 		switch (type) {
-
 			case OMEGA_DIAG: {
 				forcount(i, ndim) {
 					double v = omega[offset + i][offset + i];

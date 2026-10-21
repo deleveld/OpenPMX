@@ -94,8 +94,8 @@ OMEGAINFO omegainfo_init(const int nomega,
 			/* sum of this row and coloum */
 			var sum = 0.;
 			forcount(j, i+1) {
-				sum += omega[i][j];
-				sum += omega[j][i];
+				sum += fabs(omega[i][j]);
+				sum += fabs(omega[j][i]);
 			}
 
 			/* there is something non-zero in this row/col */

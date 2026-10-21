@@ -753,17 +753,12 @@ static void run_popmodel(OPENPMX* const pmx, const OPTIONS* const options)
 void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimate)
 {
 	pmx_ensure_state(pmx);
-	var pstate = pmx->state;
 
 	var options = options_init(pmx);
 	if (estimate) {
 		options.estimate = estimconfig_default(estimate);
 		*estimate = options.estimate;
 	}
-
-	/* estimate destroys a previous covariance matrix */
-	pmx_covariance_free(&pstate->covariance);
-	pstate->covariance = (COVARIANCE){ 0 };
 
 	run_popmodel(pmx, &options);
 }

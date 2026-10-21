@@ -684,77 +684,7 @@ failed:
 	return (RESULT) { 0 };
 }
 
-typedef struct {
-	char* mutptr;
-	int size;
-} FILECONTENT;
-
-static void file_content_destroy(FILECONTENT* file)
-{
-	free(file->mutptr);
-}
-
-static FILECONTENT read_file(const char* filename, ERRCTX* errctx)
-{
-	char* buffer = 0;
-	var fp = fopen(filename, "rb");
-	if (!fp) {
-		errctx_add(errctx, "%s: fopen \"%s\" failed\n", __func__, filename);
-		goto failed;
-	}
-
-    if (fseek(fp, 0, SEEK_END) != 0) {
-		errctx_add(errctx, "%s: fseek end failed\n", __func__);
-		goto failed;
-	}
-
-    long filesize = ftell(fp);
-	if (filesize == -1L) {
-		errctx_add(errctx, "%s: ftell failed\n", __func__);
-		goto failed;
-	}
-    
-    if (fseek(fp, 0, SEEK_SET) != 0) {
-		errctx_add(errctx, "%s: fseek begin failed\n", __func__);
-		goto failed;
-	}
-	
-	buffer = mallocvar(char, filesize + 1);
-    if (!buffer) {
-		errctx_add(errctx, "%s: malloc failed\n", __func__);
-		goto failed;
-	}
-
-    let bytesRead = fread(buffer, 1, filesize, fp);
-    if (ferror(fp)) {
-		errctx_add(errctx, "%s: fread failed\n", __func__);
-		goto failed;
-	}
-    buffer[bytesRead] = '\0';
-
-    if (bytesRead == 0) {
-		errctx_add(errctx, "%s: file empty\n", __func__);
-		goto failed;
-	}
-
-    if (buffer[bytesRead - 1] != '\n') {
-		errctx_add(errctx, "%s: file must end with newline\n", __func__);
-		goto failed;
-	}
-
-	fclose(fp);
-	return (FILECONTENT) {
-		.mutptr = buffer,
-		.size = bytesRead,
-	};
-
-failed:
-	if (buffer)
-		free(buffer);
-	if (fp)
-		fclose(fp);
-	return (FILECONTENT) { 0 };
-}
+#include "utils/filecontent.c"
 
 typedef struct {
 	VECPTR header;
@@ -1674,7 +1604,7 @@ int main(int argc, char* argv[])
 
 	/* read in control file */
 	ERRCTX errctx = { };
-	var controltext = read_file(grfilename, &errctx);
+	var controltext = filecontent_alloc(grfilename, &errctx);
 	if (errctx.len) {
 		fprintf(stderr, "%s: %s", filename, errctx.errmsg);
 		exit(EXIT_FAILURE);
@@ -1706,7 +1636,7 @@ int main(int argc, char* argv[])
 	}
 
 	/* read in datafile and parse it */
-	var datatext = read_file(datafile_to_use, &errctx);
+	var datatext = filecontent_alloc(datafile_to_use, &errctx);
 	if (errctx.len) {
 		fprintf(stderr, "%s: %s", filename, errctx.errmsg);
 		exit(EXIT_FAILURE);
@@ -1742,8 +1672,8 @@ int main(int argc, char* argv[])
 	/* cleanup */
 	datainfo_destroy(&datainfo);
 	result_destroy(&result);
-	file_content_destroy(&datatext);
-	file_content_destroy(&controltext);
+	filecontent_free(&datatext);
+	filecontent_free(&controltext);
 	vector_free(blocks);
 	exit(EXIT_SUCCESS);
 }
@@ -1965,11 +1895,13 @@ char openpmxtran_template[] =
 "	},\n"
 "};\n"
 "\n"
-"#define estimate(...) pmx_estimate(&openpmx, &(ESTIMCONFIG){ __VA_ARGS__ })\n"
-"#define evaluate(...) pmx_evaluate(&openpmx, &(STAGE1CONFIG){ __VA_ARGS__ })\n"
-"#define simulate(...) pmx_simulate(&openpmx, &(SIMCONFIG){ __VA_ARGS__ })\n"
-"#define covariance(...) pmx_covariance(&openpmx, &(COVARIANCECONFIG){ __VA_ARGS__ })\n"
-"#define profile(...) pmx_profile(&openpmx, __VA_ARGS__ )\n"
+"#define estimate(...) 			pmx_estimate(&openpmx, &(ESTIMCONFIG){ __VA_ARGS__ })\n"
+"#define evaluate(...) 			pmx_evaluate(&openpmx, &(STAGE1CONFIG){ __VA_ARGS__ })\n"
+"#define simulate(...) 			pmx_simulate(&openpmx, &(SIMCONFIG){ __VA_ARGS__ })\n"
+"#define covariance(...) 		pmx_covariance(&openpmx, &(COVARIANCECONFIG){ __VA_ARGS__ })\n"
+"#define profile(...) 			pmx_profile(&openpmx, __VA_ARGS__ )\n"
+"#define profile_add(...) 		pmx_profile_add(&openpmx, __VA_ARGS__ )\n"
+"#define profile_clean(...) 	pmx_profile_clean(&openpmx, &(PARAM){ __VA_ARGS__ })\n"
 "\n"
 "void predict(void)\n"
 "{\n"

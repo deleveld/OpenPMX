@@ -196,7 +196,7 @@ static void write_icov_from_reduced(double* icov,
 /// eta values, so it properly handles eta-sigma interaction.
 
 /* calculate individual variance covariance matrix */
-static double stage1_individcov(const int nreta,
+static double stage1_jacobian(const int nreta,
 								const double reta[static nreta],
 								const STAGE1_PARAMS* const params,
 								double* icov,
@@ -345,6 +345,240 @@ static double stage1_individcov(const int nreta,
 	return lndet;
 }
 
+#include <gsl/gsl_eigen.h>
+#include <gsl/gsl_blas.h>
+
+/* Replace symmetric R (n x n) by the inverse of its nearest-PD version:
+ * eigenvalues below eps * lambda_max are clamped up to that floor.
+ * Returns ln det of the clamped matrix, or NAN if the eigensolver fails.
+ * Drop-in replacement for the cholesky + lndet + invert block. */
+static double matrix_eigen_clamp_invert(gsl_matrix* const R,
+										const double eps,
+										int* const nclamp)
+{
+	let n = R->size1;
+	var work = gsl_eigen_symmv_alloc(n);
+	var eval = gsl_vector_alloc(n);
+	var evec = gsl_matrix_alloc(n, n);
+	var W = gsl_matrix_alloc(n, n);
+	let status = gsl_eigen_symmv(R, eval, evec, work);
+	double lndet = NAN;
+	if (status == GSL_SUCCESS) {
+		double lmax = 0.;
+		forcount(k, n)
+			lmax = fmax(lmax, fabs(gsl_vector_get(eval, k)));
+		let floor = eps * lmax;
+		int nc = 0;
+		lndet = 0.;
+		gsl_matrix_memcpy(W, evec);
+		forcount(k, n) {
+			let ev = gsl_vector_get(eval, k);
+			if (ev < floor)
+				nc++;
+			let l = fmax(fabs(ev), floor);	/* reflect, don't floor */
+			lndet += log(l);
+			var col = gsl_matrix_column(W, k);
+			gsl_vector_scale(&col.vector, 1. / l);
+		}
+		gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1., W, evec, 0., R);
+		if (nclamp)
+			*nclamp = nc;
+	}
+	gsl_matrix_free(W);
+	gsl_matrix_free(evec);
+	gsl_vector_free(eval);
+	gsl_eigen_symmv_free(work);
+	return lndet;
+}
+
+/* calculate individual variance covariance matrix */
+static double stage1_laplace(const int nreta,
+								const double reta[static nreta],
+								const STAGE1_PARAMS* const params,
+								double* icov,
+								const double f0)
+{
+	var testeta = params->testeta;
+	let nonzero = params->nonzero;
+	let ievaluate_args = &params->ievaluate_args;
+	let nrecord = ievaluate_args->nrecord;
+	let popparam = &ievaluate_args->popparam;
+	let gradient_step = params->stage1->gradient_step;
+	var eval_msec = params->eval_msec;
+
+	assert(nreta > 0);
+	assert(nrecord > 0);
+	let nomega = popparam->nomega;
+	assert(gradient_step != 0.);
+	var R = gsl_matrix_alloc(nreta, nreta);
+
+	/* step size per parameter */
+	double hstep[OPENPMX_OMEGA_MAX];
+	forcount(j, nreta) {
+		var step = gradient_step;
+		let i = nonzero->rowcol[j];
+		let omega_var = icov[i * nomega + i];
+		if (omega_var != 0.)
+			step = sqrt(omega_var);
+//		hstep[j] = fmax(step, gradient_step);
+		hstep[j] = fmax(0.2 * step, gradient_step);
+	}
+
+	/* do diagonal first */
+	double xx[OPENPMX_OMEGA_MAX] = { };
+	double obs_lndet;
+	double obs_min2ll;
+	double obs_logp;
+	double eta_min2ll;
+	struct timespec t3;
+	forcount(j, nreta) {
+		memcpy(xx, reta, nreta * sizeof(double));
+		let v = reta[j];
+
+		/* step eta forward */
+		let above = v + hstep[j];
+		xx[j] = above;
+		unreduce_eta(testeta, xx, nonzero);
+		clock_gettime(CLOCK_MONOTONIC, &t3);
+		individual_evaluate(ievaluate_args,
+							0,				/* dont save imodel */
+							0,				/* dont save predictvars */
+							0,				/* dont save state */
+							0, 0, 0,		/* no output */
+							&obs_lndet,	/* do need objfn */
+							&obs_min2ll,
+							&obs_logp);
+		eta_min2ll = sample_min2ll(nreta, xx, nonzero);
+		timespec_duration(&t3, eval_msec);
+		*(params->ineval) += 1;
+		let fplus = obs_lndet + obs_min2ll + obs_logp + eta_min2ll;
+
+		/* step eta backward */
+		let below = v - hstep[j];
+		xx[j] = below;
+		unreduce_eta(testeta, xx, nonzero);
+		clock_gettime(CLOCK_MONOTONIC, &t3);
+		individual_evaluate(ievaluate_args,
+							0,				/* dont save imodel */
+							0,				/* dont save predictvars */
+							0,				/* dont save state */
+							0, 0, 0,		/* no output */
+							&obs_lndet,	/* do need objfn */
+							&obs_min2ll,
+							&obs_logp);
+		eta_min2ll = sample_min2ll(nreta, xx, nonzero);
+		timespec_duration(&t3, eval_msec);
+		*(params->ineval) += 1;
+		let fminus = obs_lndet + obs_min2ll + obs_logp + eta_min2ll;
+
+		/* second derivative */
+		let h = hstep[j];
+		let hpp = (fplus - 2. * f0 + fminus) / (h * h);
+		gsl_matrix_set(R, j, j, 0.5 * hpp);
+	}
+
+	forcount(i, nreta) {
+		forcount(j, i) {
+			let hi = hstep[i];
+			let hj = hstep[j];
+
+			/* both positive */
+			memcpy(xx, reta, nreta * sizeof(double));
+			xx[i] += hi;
+			xx[j] += hj;
+			unreduce_eta(testeta, xx, nonzero);
+			clock_gettime(CLOCK_MONOTONIC, &t3);
+			individual_evaluate(ievaluate_args,
+								0,				/* dont save imodel */
+								0,				/* dont save predictvars */
+								0,				/* dont save state */
+								0, 0, 0,		/* no output */
+								&obs_lndet,	/* do need objfn */
+								&obs_min2ll,
+								&obs_logp);
+			eta_min2ll = sample_min2ll(nreta, xx, nonzero);
+			timespec_duration(&t3, eval_msec);
+			*(params->ineval) += 1;
+			let fpp = obs_lndet + obs_min2ll + obs_logp + eta_min2ll;
+
+			/* one positive, one negative */
+			memcpy(xx, reta, nreta * sizeof(double));
+			xx[i] += hi;
+			xx[j] -= hj;
+			unreduce_eta(testeta, xx, nonzero);
+			clock_gettime(CLOCK_MONOTONIC, &t3);
+			individual_evaluate(ievaluate_args,
+								0,				/* dont save imodel */
+								0,				/* dont save predictvars */
+								0,				/* dont save state */
+								0, 0, 0,		/* no output */
+								&obs_lndet,	/* do need objfn */
+								&obs_min2ll,
+								&obs_logp);
+			eta_min2ll = sample_min2ll(nreta, xx, nonzero);
+			timespec_duration(&t3, eval_msec);
+			*(params->ineval) += 1;
+			let fpm = obs_lndet + obs_min2ll + obs_logp + eta_min2ll;
+
+			/* one negative, one positive */
+			memcpy(xx, reta, nreta * sizeof(double));
+			xx[i] -= hi;
+			xx[j] += hj;
+			unreduce_eta(testeta, xx, nonzero);
+			clock_gettime(CLOCK_MONOTONIC, &t3);
+			individual_evaluate(ievaluate_args,
+								0,				/* dont save imodel */
+								0,				/* dont save predictvars */
+								0,				/* dont save state */
+								0, 0, 0,		/* no output */
+								&obs_lndet,	/* do need objfn */
+								&obs_min2ll,
+								&obs_logp);
+			eta_min2ll = sample_min2ll(nreta, xx, nonzero);
+			timespec_duration(&t3, eval_msec);
+			*(params->ineval) += 1;
+			let fmp = obs_lndet + obs_min2ll + obs_logp + eta_min2ll;
+
+			/* both negative */
+			memcpy(xx, reta, nreta * sizeof(double));
+			xx[i] -= hi;
+			xx[j] -= hj;
+			unreduce_eta(testeta, xx, nonzero);
+			clock_gettime(CLOCK_MONOTONIC, &t3);
+			individual_evaluate(ievaluate_args,
+								0,				/* dont save imodel */
+								0,				/* dont save predictvars */
+								0,				/* dont save state */
+								0, 0, 0,		/* no output */
+								&obs_lndet,	/* do need objfn */
+								&obs_min2ll,
+								&obs_logp);
+			eta_min2ll = sample_min2ll(nreta, xx, nonzero);
+			timespec_duration(&t3, eval_msec);
+			*(params->ineval) += 1;
+			let fmm = obs_lndet + obs_min2ll + obs_logp + eta_min2ll;
+
+			/* set off-diagonal of symmetric R matrix based on samples */
+			let hij = (fpp - fpm - fmp + fmm) / (4. * hi * hj);
+			gsl_matrix_set(R, i, j, 0.5 * hij);
+			gsl_matrix_set(R, j, i, 0.5 * hij);
+		}
+	}
+
+	/* we have added the contribution of the population omega inverse with
+	   the contribution from each individual to get the individual covariance,
+	   well, the inverse of it. Now we have to invert to get the actual
+	   individual covariance matrix */
+	let oldhandler = gsl_set_error_handler_off();
+	int nclamp;
+	let lndet = matrix_eigen_clamp_invert(R, 1e-8, &nclamp);
+	gsl_set_error_handler(oldhandler);
+
+	write_icov_from_reduced(icov, nonzero, R, nomega);
+	gsl_matrix_free(R);
+	return lndet;
+}
+
 /* NOTE: this function must be thread safe on the level of an individual */
 void stage1_thread(INDIVID* const individ,
 				   const ADVANFUNCS* const advanfuncs,
@@ -467,11 +701,24 @@ void stage1_thread(INDIVID* const individ,
 		 * contribution from each individual to get the inverse individual
 		 * covariance and then inverts that and writes icov back */
 		let last_icov_lndet = individ->icov_lndet;
-		individ->icov_lndet = stage1_individcov(nreta,
-												reta,
-												&stage1_params,
-												icov,
-												individ->nobs); 
+		if (options->estimate.stage1.laplace) {
+			let f0 = individ->obs_lndet +
+					 individ->obs_min2ll +
+					 individ->obs_logp +
+					 individ->eta_min2ll;
+			individ->icov_lndet = stage1_laplace(nreta,
+												 reta,
+												 &stage1_params,
+												 icov,
+												 f0);
+		/* regular FOCEI with Jacobian outer-product */
+		} else {
+			individ->icov_lndet = stage1_jacobian(nreta,
+												  reta,
+												  &stage1_params,
+												  icov,
+												  individ->nobs);
+		} 
 
 		/* if icov does not change, we can stop now */
 		if (fabs(last_icov_lndet - individ->icov_lndet) < 0.01)

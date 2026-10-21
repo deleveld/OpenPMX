@@ -39,6 +39,7 @@ This repository contains the work-in-progress (WIP) development version and coul
 - Few dependencies: [gcc](https://gcc.gnu.org/), [GSL](https://www.gnu.org/software/gsl/)
 
 ### New features 0.1.7
+- Added an initial LAPLACE method the stage1.c, still testing to see if any performance is gained.
 - Documentation of the FOCEI method derived from code and documentation submitted by Erik Olofsen (e.olofsen@weggetjes.nl)
 - Speed optimized advance functions for two- and three-compartment models and eigensystem solver.
 - Covariance matrix of estimation via `covariance()` to determine parameter limits.

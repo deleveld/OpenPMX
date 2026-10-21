@@ -33,13 +33,7 @@
 /// used alone (`Sinv` or `Rinv`, scaled because the objfn is -2LL). 
 /// Quadratic smoothing can then refine the result. The covariance type is
 /// chosen with `COVARIANCE_S_MATRIX`, `COVARIANCE_R_MATRIX`,
-/// `COVARIANCE_SANDWICH` or the default `COVARIANCE_SANDWICH_QUADRATIC`.
-///
-///   Results go to `<filename>.cov` and `<filename>.cov.ext` when the
-///   source has a filename.
-/// - `pmx_covariance_limit(pmx, param)`: looks up the stored `COVLIMIT`
-///   for a given parameter type and index. If no covariance has
-///   been calculated an empty `COVLIMIT` is returned.
+/// `COVARIANCE_SANDWICH` which is the default.
 ///
 /// ## Reporting
 ///
@@ -84,183 +78,6 @@
 #define COVARIANCE_DOBJFN_TARGET_LOWER		4.
 #define COVARIANCE_DOBJFN_TARGET_UPPER		8.
 
-typedef struct {
-	const double* offset;
-	double objfn;
-} VB_SAMPLE;
-
-typedef struct {
-	VECTOR(VB_SAMPLE) samples;
-	const int nparam;
-} VB_HISTORY;
-
-static void history_append(VB_HISTORY* const hist,
-						   const double* offset,
-						   const double objfn)
-{
-	var p = mallocvar(double, hist->nparam);
-	memcpy(p, offset, hist->nparam * sizeof(double));
-	
-	vector_append(hist->samples, 
-		(VB_SAMPLE) {
-			.offset = p,
-			.objfn = objfn,
-		});
-}
-
-static VB_HISTORY history_new(const int nparam)
-{
-	return (VB_HISTORY) {
-		.samples = { { 0 } },
-		.nparam = nparam,
-	};
-}	
-
-static void history_free(VB_HISTORY* const hist)
-{
-	forvector_ptr(p, hist->samples)
-		free((void*)p->offset);
-	vector_free(hist->samples);
-}
-
-static int history_prune_above(VB_HISTORY* const hist, const double threshold, FILE* outstream)
-{
-	int kept = 0;
-	let oldsize = hist->samples.size;
-	forcount(s, oldsize) {
-		let sp = &hist->samples.ptr[s];
-		if (!(sp->objfn <= threshold)) { /* handles NAN peroperly */
-			info(outstream, "prune %f\n", sp->objfn);
-			free((void*)sp->offset);
-		} else {
-			if (kept != s)
-				hist->samples.mutptr[kept] = *sp;
-			kept++;
-		}
-	}
-	vector_resize(hist->samples, kept);
-	return oldsize - kept;
-}
-
-/*
- * Fit a quadratic surface with fixed minimum f0 at center and offset 0:
- *   f(x) - f0 = (1/2) x^T H x
- */
-static void vb_fit_quadratic(const VB_HISTORY* const hist,
-							 const double f0,
-							 FILE* outstream,
-							 gsl_matrix* const cov)
-{
-	let ndim = hist->nparam;
-	let nsamples = hist->samples.size;
-
-	/* Number of quadratic basis terms: ndim*(ndim+1)/2 (no intercept, no linear terms) */
-	let nfitparam = ndim * (ndim + 1) / 2;
-	if (nsamples <= nfitparam) {
-		info(outstream, "failed need %i samples, have %i\n", (int)nfitparam, (int)nsamples);
-		return;
-	}
-
-	/* Build design matrix X [nsamples x nfitparam] and response vector y */
-	int rc = 0;
-	double chisq = -1.;
-	var c = gsl_vector_alloc(nfitparam);
-	{
-		gsl_matrix* X = gsl_matrix_alloc(nsamples, nfitparam);
-		gsl_vector* y = gsl_vector_alloc(nsamples);
-		{
-			var x = mallocvar(double, ndim);
-			forcount(s, nsamples) {
-				/* centered coordinates */
-				let sp = &hist->samples.ptr[s];
-				forcount(j, ndim)
-					x[j] = sp->offset[j];
-
-				/* quadratic terms only */
-				int col = 0;
-				forcount(i, ndim) {
-					for (int j = i; j < ndim; j++) {
-						let val = (i == j) ? 0.5 * x[i] * x[j] : x[i] * x[j];
-						gsl_matrix_set(X, s, col++, val);
-					}
-				}
-				assert(col == nfitparam);
-
-				/* Shift response vector by f0 */
-				/* f0 is assumed to be the true objfn at offset 0. If it is the
-				 * estimation-time value rather than one evaluated the same way
-				 * as the samples, the fit has a systematic offset. */
-				gsl_vector_set(y, s, sp->objfn - f0);
-			}
-			free(x);
-		}
-		/* least squares without intercept via GSL multifit */
-		{
-			var wcov  = gsl_matrix_alloc(nfitparam, nfitparam);
-			var work = gsl_multifit_linear_alloc(nsamples, nfitparam);
-			/* NOTE: unweighted. Samples far from the optimum (up to f0+30
-			 * after pruning) have the largest |residuals| if the surface is
-			 * not exactly quadratic, so they dominate the fit although the
-			 * Hessian at the optimum is what is wanted. gsl_multifit_wlinear with e.g.
-			 * w = 1/(1 + objfn - f0) would favour the near points but this
-			 * requires more samples for the same amount of information. */
-			rc = gsl_multifit_linear(X, y, c, wcov, &chisq, work);
-			gsl_multifit_linear_free(work);
-			gsl_matrix_free(wcov);
-		}
-		gsl_matrix_free(X);
-		gsl_vector_free(y);
-	}
-	if (rc != 0) {
-		info(outstream, "failed (%i)\n", rc);
-		gsl_vector_free(c);
-		return;
-	}
-
-	info(outstream, "nsamples %i chisq/(nsamples-nfitparam) %f\n",
-		nsamples,
-		chisq/(nsamples-nfitparam));
-	
-	/* extract Hessian H directly from fitted coefficients c */
-	var hessian = gsl_matrix_alloc(ndim, ndim);
-	gsl_matrix_set_zero(hessian);
-	var col = 0;
-	forcount(i, ndim) {
-		for (int j = i; j < ndim; j++) {
-			let v = gsl_vector_get(c, col++);
-			if (i == j) {
-				gsl_matrix_set(hessian, i, i, v);
-			} else {
-				gsl_matrix_set(hessian, i, j, v);
-				gsl_matrix_set(hessian, j, i, v);
-			}
-		}
-	}
-	gsl_vector_free(c);
-
-	/* invert hessian and scale in-place before copying to user */
-	var saved_hessian = gsl_matrix_alloc(ndim, ndim);
-	gsl_matrix_memcpy(saved_hessian, hessian);
-	if (gsl_linalg_cholesky_decomp1(hessian) != GSL_SUCCESS) {
-		info(outstream, "cov quadratic hessian not positive-definite, failing\n");
-		goto done;
-	}
-	if (gsl_linalg_cholesky_invert(hessian) != GSL_SUCCESS) {
-		info(outstream, "cov quadratic cholesky invert failed\n");
-		goto done;
-	}
-
-	/* success, so copy results to user */
-	/* hessian here is the inverse Hessian of the -2LL surface, and
-	 * Cov = 2 * H^-1 on that scale (f - f0 = x' Cov^-1 x = 1/2 x'Hx). */
-	gsl_matrix_scale(hessian, 2.);
-	gsl_matrix_memcpy(cov, hessian);
-	
-done:
-	gsl_matrix_free(saved_hessian);
-	gsl_matrix_free(hessian);
-}
-
 #define HESSIAN_MSTEP_MAXITER				5
 
 static double encode_covariance_evaluate(ENCODE* const test,
@@ -291,15 +108,11 @@ static double encode_covariance_evaluate_offset(ENCODE* const encode,
 												IDATA* const idata,
 												const IDATAETAS* const warm_etas,
 												const ADVANFUNCS* const advanfuncs,
-												VB_HISTORY* history,
 												const OPTIONS* const options)
 {
 	idata_etas_write(idata, warm_etas);
 	encode_untransform(encode, offset);
 	let objfn = encode_covariance_evaluate(encode, idata, advanfuncs, options);
-	if (history)
-		history_append(history, offset, objfn);
-		
 	return objfn;
 }
 
@@ -318,7 +131,6 @@ static void show_progress(const POPMODEL* const popmodel,
 
 typedef struct {
 	ENCODE* const encode;
-	VB_HISTORY* history;
 	IDATA* const idata;
 	const ADVANFUNCS* const advanfuncs;
 	const OPTIONS* const options;
@@ -334,8 +146,7 @@ typedef struct {
 typedef typeof(((ENCODE*)0)->offset) OFFSET;
 
 /* Evaluate the total objfn at scale * direction in the encoded space,
- * starting from the warm etas. The point is recorded in the history
- * (if any) and reported as progress. If iobjfn_out is given it receives
+ * starting from the warm etas. If iobjfn_out is given it receives
  * the per-individual objfn at this point. */
 static double hessian_eval_step(const COVARGS* const covargs,
 								const double* const direction,
@@ -354,7 +165,6 @@ static double hessian_eval_step(const COVARGS* const covargs,
 											  idata, 
 											  covargs->warm_etas, 
 											  covargs->advanfuncs, 
-											  covargs->history, 
 											  covargs->options);
 	show_progress(&encode->popmodel,
 				  covargs->begin,
@@ -530,7 +340,6 @@ static double pmx_hessian_R_crossterm(const COVARGS* const covargs,
 												covargs->idata, 
 												covargs->warm_etas, 
 												covargs->advanfuncs, 
-												covargs->history,
 												covargs->options);
 	show_progress(&covargs->encode->popmodel, 
 				  covargs->begin, 
@@ -572,27 +381,27 @@ static gsl_matrix* pmx_hessian_R(const COVARGS* const covargs,
 	let nparam = encode->nparam;
 	let _off = advanfuncs->recordinfo._offset1 ? 1 : 0;
 
-	/* rotate: eigendecompose S to get the directions to step along.
-	 * Scopy protects the caller's S from gsl_eigen_symmv's in-place
-	 * destruction -- S is still needed untouched for the sandwich
-	 * estimator after this returns. */
+	/* rotate: eigendecompose S to get the directions to step along,
+	 * or use an identity fallback if S is not provided. */
 	var evalS = gsl_vector_alloc(nparam);
 	var U = gsl_matrix_alloc(nparam, nparam);
-	{
-		/* if S is present use it, otherwise just guess */
+	
+	if (S) { 
 		var Scopy = gsl_matrix_alloc(nparam, nparam);
-		if (S) { 
-			gsl_matrix_memcpy(Scopy, S);
-		} else {
-			gsl_matrix_set_identity(Scopy);
-			gsl_matrix_scale(Scopy, 1. / (step_size_init * step_size_init)); /* curvature, not step */
-		}
+		gsl_matrix_memcpy(Scopy, S);
 		
 		var w = gsl_eigen_symmv_alloc(nparam);
 		gsl_eigen_symmv(Scopy, evalS, U, w);
 		gsl_eigen_symmv_free(w);
 		gsl_matrix_free(Scopy);
+	} else {
+		/* If S is absent, skip the eigensolver entirely: 
+		 * the eigenvectors are standard canonical axes (identity U) 
+		 * and the curvature eigenvalues correspond to the initial step size. */
+		gsl_matrix_set_identity(U);
+		gsl_vector_set_all(evalS, 1. / (step_size_init * step_size_init));
 	}
+
 	let lambda_max = gsl_vector_max(evalS);
 	var Rp = gsl_matrix_alloc(nparam, nparam);
 
@@ -704,7 +513,8 @@ static bool cov_from_inverse(const gsl_matrix* const M,
 							 FILE* outstream,
 							 gsl_matrix* const cov)
 {
-	var tmp = gsl_matrix_alloc(M->size1, M->size2);
+	let nparam = M->size1;
+	var tmp = gsl_matrix_alloc(nparam, nparam);
 	gsl_matrix_memcpy(tmp, M);
 	let ok = gsl_linalg_cholesky_decomp1(tmp) == GSL_SUCCESS &&
 			 gsl_linalg_cholesky_invert(tmp) == GSL_SUCCESS;
@@ -742,8 +552,7 @@ static bool covariance_calculate(const gsl_matrix* const R,
 	}
 	/* objfn is -2LL: E[R] = 2*I and E[S] = 4*I (so E[R] = E[S]/2),
 	 * hence cov = I^-1 = 2*Rinv or 4*Sinv */
-	/* Using 2 because it seems to work better in most (but certainly)
-	 * not all cases */
+	/* Need to make benchmarks for this */
 	if (S) {
 		info(outstream, "using S matrix\n");
 		return cov_from_inverse(S, 2., "OPG/BHHH", outstream, cov);
@@ -774,9 +583,32 @@ static int correntry_sort_callback(const void* _v1, const void* _v2)
 	return 0;
 }
 
-static void print_correlations(const gsl_matrix* const corr, const ENCODELABEL* labels, FILE* outstream)
+static void print_correlations(const gsl_matrix* const cov, const ENCODELABEL* labels, FILE* outstream)
 {
-	let nparam = corr->size1;
+	let nparam = cov->size1;
+
+	var corr = gsl_matrix_alloc(nparam, nparam);
+	var Heigen = gsl_matrix_alloc(nparam, nparam);
+	gsl_matrix_memcpy(Heigen, cov);
+	scale_to_match_diagonal(Heigen, 0); /* scales for 1 on diagonal */
+	gsl_matrix_memcpy(corr, Heigen);	/* save for printing correlations */
+
+	var eval = gsl_vector_alloc(nparam);
+	var evec = gsl_matrix_alloc(nparam, nparam);
+	var w    = gsl_eigen_symmv_alloc(nparam);
+	gsl_eigen_symmv(Heigen, eval, evec, w);
+	gsl_eigen_symmv_sort(eval, evec, GSL_EIGEN_SORT_ABS_ASC);
+	let lambda_min = gsl_vector_get(eval, 0);
+	let lambda_max = gsl_vector_get(eval, nparam - 1);
+	if (lambda_min != 0.)
+		info(outstream, "condition number %g\n", fabs(lambda_max / lambda_min));
+	else
+		info(outstream, "cov is singular\n");
+
+	gsl_eigen_symmv_free(w);
+	gsl_matrix_free(evec);
+	gsl_vector_free(eval);
+	gsl_matrix_free(Heigen);
 
 	let entries = mallocvar(CORRENTRY, nparam * (nparam + 1) / 2);
 	int k = 0;
@@ -787,6 +619,7 @@ static void print_correlations(const gsl_matrix* const corr, const ENCODELABEL* 
 										 .val = gsl_matrix_get(corr, i, j) };
 		}
 	}
+	gsl_matrix_free(corr);
 	qsort(entries, k, sizeof(entries[0]), correntry_sort_callback);
 
 	info(outstream, "correlations\n");
@@ -883,7 +716,6 @@ static void print_nonidentifiable_parameters(const gsl_matrix* const M,
 	}
 	gsl_matrix_free(evec);
 	gsl_vector_free(eval);
-
 	qsort(entries, nparam, sizeof(entries[0]), eigcontrib_sort_callback);
 
 	if (nneg)
@@ -900,347 +732,6 @@ static void print_nonidentifiable_parameters(const gsl_matrix* const M,
 	}
 
 	free(entries);
-}
-
-/*
- * S0           : original covariance (n x n, SPD)
- * x            : sample
- * observed_2ll : observed Gaussian -2LL of x
- * S            : output, adjusted covariance with 2LL(S; x) = observed_2ll
- * kl           : output, KL(N(0,S) || N(0,S0)), may be NULL
- *
- * Returns GSL_SUCCESS, GSL_EDOM (S0 not SPD or x == 0)
- */
-static int covariance_match_2ll(const gsl_matrix *S0,
-								const gsl_vector *x,
-								double observed_2ll,   /* target x'S^-1 x */
-								gsl_matrix *S,
-								double *kl)
-{
-	let n = S0->size1;
-	var L = gsl_matrix_alloc(n, n);
-	var z = gsl_vector_alloc(n);
-	var status = GSL_EDOM;
-
-	if (!(observed_2ll > 0.0))
-		goto done;
-
-	gsl_matrix_memcpy(L, S0);
-	if (gsl_linalg_cholesky_decomp1(L) != GSL_SUCCESS)
-		goto done;
-
-//	let dobjfn0 = sample_min2ll_from_cholesky(x->data, L);
-//	printf("observed %f at start predicted dobjfn = %f\n", observed_2ll, dobjfn0);
-
-	gsl_linalg_cholesky_solve(L, x, z);
-	var a = 0.0;
-	gsl_blas_ddot(x, z, &a);
-	if (!(a > 0.0))
-		goto done;
-
-	/* Rank-one update S = S0 + delta*x*x'. By Sherman-Morrison,
-	 * x'S^-1 x = a/(1 + delta*a), so choosing delta = 1/observed - 1/a
-	 * makes it equal 'observed' exactly. S stays positive definite iff
-	 * 1 + delta*a = a/observed > 0, which the checks above guarantee. */
-	let delta = 1.0 / observed_2ll - 1.0 / a;
-	forcount(i, n) {
-		forcount(j, i + 1) {
-			let xi = gsl_vector_get(x, i);
-			let xj = gsl_vector_get(x, j);
-			let v = gsl_matrix_get(S0, i, j) + delta * xi * xj;
-			gsl_matrix_set(S, i, j, v);
-			gsl_matrix_set(S, j, i, v);
-		}
-	}
-	if (kl)
-		*kl = 0.5 * (a / observed_2ll - 1.0 - log(a / observed_2ll));
-	status = GSL_SUCCESS;
-
-//	gsl_matrix_memcpy(L, S);
-//	if (gsl_linalg_cholesky_decomp1(L) != GSL_SUCCESS)
-//		goto done;
-//	let dobjfn1 = sample_min2ll_from_cholesky(x->data, L);
-//	printf("at end predicted dobjfn = %f\n", dobjfn1);
-
-done:
-	gsl_matrix_free(L);
-	gsl_vector_free(z);
-	return status;
-}
-
-/* Haar-random orthonormal basis in the columns of Q (n x n),
- * via modified Gram-Schmidt on Gaussian columns (applied twice for stability) */
-static void random_orthonormal_basis(gsl_rng* rng, gsl_matrix* Q)
-{
-	let n = Q->size1;
-	forcount(j, n) {
-		var cj = gsl_matrix_column(Q, j);
-		for (;;) {
-			forcount(i, n)
-				gsl_vector_set(&cj.vector, i, gsl_ran_ugaussian(rng));
-			forcount(pass, 2) {
-				forcount(k, j) {
-					gsl_vector_view ck = gsl_matrix_column(Q, k);
-					double d;
-					gsl_blas_ddot(&ck.vector, &cj.vector, &d);
-					gsl_blas_daxpy(-d, &ck.vector, &cj.vector);
-				}
-			}
-			let nrm = gsl_blas_dnrm2(&cj.vector);
-			if (nrm > 1e-8) {
-				gsl_vector_scale(&cj.vector, 1. / nrm);
-				break;
-			}
-		}
-	}
-}
-
-/* observed dobjfn at a sample point; only logs to history when fitting */
-static double resample_evaluate(const COVARGS* const covargs,
-								const double* offset,
-								const bool append_history)
-{
-	let objfn = encode_covariance_evaluate_offset(covargs->encode,
-												  offset,
-												  covargs->idata,
-												  covargs->warm_etas,
-												  covargs->advanfuncs,
-												  append_history ? covargs->history : 0,
-												  covargs->options);
-	return objfn - covargs->f0;
-}
-
-static void resample_progress(const COVARGS* const covargs,
-							  const int k,
-							  const int nsample,
-							  const double dobjfn0,
-							  const double dobjfn1,
-							  const double kl)
-{
-	char klmessage[256] = "";
-	if (kl >= 0.)
-		snprintf(klmessage, sizeof(klmessage), " kl %.6f", kl);
-	char message[256];
-	snprintf(message, sizeof(message), " sample %i/%i dobjfn (%.3f, %.3f)%s",
-			 k+1, nsample, dobjfn0, dobjfn1, klmessage);
-	var encode = covargs->encode;
-	var extstream = covargs->extstream;
-	var begin = covargs->begin;
-	show_progress(&encode->popmodel, begin, covargs->details,
-				  covargs->outstream, extstream, message);
-}
-
-#define RESAMPLE_MAX_INFLATE	10.	/* avg dobjfn floored at dobjfn0 / this */
-#define RESAMPLE_CAP_ABOVE		6.	/* avg dobjfn capped at dobjfn0 + this */
-
-static void print_resample_results(const double* predicted_dobjfn,
-								   const double* observed_dobjfn,
-								   const int nsample,
-								   FILE* outstream,
-								   FILE* diagstream)
-{
-	if (diagstream)
-		fprintf(diagstream, OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_SFORMAT "\n",
-				"SAMPLE", "PREDICTED", "OBSERVED");
-
-	/* log ratio only defined for positive pairs; count the rest */
-	var lratio = mallocvar(double, nsample);
-	int nratio = 0;
-	forcount(i, nsample) {
-		let pred = predicted_dobjfn[i];
-		let obs = observed_dobjfn[i];
-		if (pred > 0. && obs > 0.)
-			lratio[nratio++] = log(obs / pred);
-		if (diagstream)
-			fprintf(diagstream, OPENPMX_FFORMAT OPENPMX_FFORMAT OPENPMX_FFORMAT "\n",
-					(double)i, pred, obs);
-	}
-	if (nratio > 1)
-		info(outstream, "resample logratio %g(%g) negative %i\n",
-			 gsl_stats_mean(lratio, 1, nratio),
-			 gsl_stats_sd(lratio, 1, nratio),
-			 nsample - nratio);
-	else
-		info(outstream, "resample logratio unavailable (%i negative)\n",
-			 nsample - nratio);
-	info(outstream, "resample predicted %g(%g) observed %g(%g)\n",
-		 gsl_stats_mean(predicted_dobjfn, 1, nsample),
-		 gsl_stats_sd(predicted_dobjfn, 1, nsample),
-		 gsl_stats_mean(observed_dobjfn, 1, nsample),
-		 gsl_stats_sd(observed_dobjfn, 1, nsample));
-	free(lratio);
-}
-
-/* Additional samples for quadratic fitting: fixed Mahalanobis radius,
- * antithetic pairs, cov is updated after each pair and every evaluation
- * is logged to history. */
-static void covariance_resample(const COVARGS* const covargs,
-								gsl_matrix* cov,
-								gsl_rng *rng,
-								const int nsample_requested,
-								const double expected_dobjfn)
-{
-	let nparam = (int)cov->size1;
-	let outstream = covargs->outstream;
-
-	/* whole blocks of nparam*2 so every forward sample has a backward partner */
-	let blocksize = nparam * 2;
-	let nblock = (nsample_requested + blocksize - 1) / blocksize;
-	let nsample = nblock * blocksize;
-	let radius = sqrt(expected_dobjfn);
-
-	var predicted_dobjfn = mallocvar(double, nsample);
-	var observed_dobjfn = mallocvar(double, nsample);
-	var u = gsl_vector_alloc(nparam);
-	var sample = gsl_vector_alloc(nparam);
-	var L = gsl_matrix_alloc(nparam, nparam);
-	var oldcov = gsl_matrix_alloc(nparam, nparam);
-	var basis = gsl_matrix_alloc(nparam, nparam);
-	gsl_matrix_set_identity(basis);	/* first block: identity */
-
-	var k = 0;
-	forcount(iblock, nblock) {
-		/* L0 from cov at the START of the block, fixed for the whole block.
-		 * Directions L0 q_j with Q orthonormal are conjugate, so the
-		 * rank-one updates within the block do not interfere. */
-		gsl_matrix_memcpy(L, cov);
-		if (cholesky_decomposition(L)) {
-			info(outstream, "error: resample cholesky failed\n");
-			goto cleanup;
-		}
-		if (iblock > 0)
-			random_orthonormal_basis(rng, basis);
-
-		var block_kl = 0.;
-		var block_capped = 0;
-		var block_pairs = 0;
-		var block_nonpos = 0;
-		forcount(ibasis, nparam) {
-			let q = gsl_matrix_column(basis, ibasis);
-
-			/* forward sample, then its antithetic partner */
-			var forward_dobjfn = 0.;
-			forcount(backward, 2) {
-				gsl_vector_memcpy(u, &q.vector);
-				gsl_vector_scale(u, backward ? -radius : radius);
-				gsl_blas_dgemv(CblasNoTrans, 1., L, u, 0., sample);
-
-				let dobjfn0 = sample_min2ll_from_cholesky(sample->data, L);
-				let dobjfn1 = resample_evaluate(covargs, sample->data, true);
-				predicted_dobjfn[k] = dobjfn0;
-				observed_dobjfn[k] = dobjfn1;
-
-				var kl = -1.;
-				if (!backward)
-					forward_dobjfn = dobjfn1;	/* update once the pair is complete */
-				else {
-					let avg = (forward_dobjfn + dobjfn1) / 2.;
-					if (!(avg > 0.)) {
-						/* non-positive or NaN: a point better than f0, or a
-						 * failed evaluation. No update possible. */
-						block_nonpos += 1;
-					} else {
-						/* limit both shrinkage (cap) and inflation (floor) */
-						let lo = dobjfn0 / RESAMPLE_MAX_INFLATE;
-						let hi = dobjfn0 + RESAMPLE_CAP_ABOVE;
-						let adj = fmin(fmax(avg, lo), hi);	/* avg == inf -> hi */
-						gsl_matrix_memcpy(oldcov, cov);
-						if (covariance_match_2ll(oldcov, sample, adj, cov, &kl) == GSL_SUCCESS) {
-							block_pairs += 1;
-							block_capped += (adj != avg);
-							if (kl >= 0.)
-								block_kl += kl;
-						}
-					}
-				}
-				resample_progress(covargs, k, nsample, dobjfn0, dobjfn1, kl);
-				++k;
-			}
-		}
-		info(outstream, "block %i/%i kl %.6f kl/nparam %.6f capped %i/%i nonpositive %i\n",
-			 iblock+1, nblock, block_kl, block_kl / nparam,
-			 block_capped, block_pairs, block_nonpos);
-	}
-
-	print_resample_results(predicted_dobjfn, observed_dobjfn, nsample, outstream, 0);
-
-cleanup:
-	gsl_matrix_free(basis);
-	gsl_matrix_free(oldcov);
-	gsl_matrix_free(L);
-	gsl_vector_free(sample);
-	gsl_vector_free(u);
-	free(predicted_dobjfn);
-	free(observed_dobjfn);
-}
-
-/* Diagnostics: chi(nparam) radius scaled to the target on average, cov is
- * not modified, nothing is logged to history. */
-static void covariance_resample_diagnostics(const COVARGS* const covargs,
-											FILE* diagstream,
-											const gsl_matrix* const cov,
-											gsl_rng *rng,
-											const int nsample_requested,
-											const double expected_dobjfn)
-{
-	let nparam = (int)cov->size1;
-	let outstream = covargs->outstream;
-
-	/* whole blocks of nparam*2 so every forward sample has a backward partner */
-	let blocksize = nparam * 2;
-	let nblock = (nsample_requested + blocksize - 1) / blocksize;
-	let nsample = nblock * blocksize;
-
-	/* cov is fixed, so one Cholesky factor serves every block */
-	var L = gsl_matrix_alloc(nparam, nparam);
-	gsl_matrix_memcpy(L, cov);
-	if (cholesky_decomposition(L)) {
-		info(outstream, "error: resample cholesky failed\n");
-		gsl_matrix_free(L);
-		return;
-	}
-
-	var predicted_dobjfn = mallocvar(double, nsample);
-	var observed_dobjfn = mallocvar(double, nsample);
-	var u = gsl_vector_alloc(nparam);
-	var sample = gsl_vector_alloc(nparam);
-	var basis = gsl_matrix_alloc(nparam, nparam);
-	gsl_matrix_set_identity(basis);	/* first block: identity */
-
-	var k = 0;
-	forcount(iblock, nblock) {
-		if (iblock > 0)
-			random_orthonormal_basis(rng, basis);
-
-		forcount(ibasis, nparam) {
-			let q = gsl_matrix_column(basis, ibasis);
-			let radius = sqrt(gsl_ran_chisq(rng, (double)nparam) * expected_dobjfn / nparam);
-
-			/* forward sample, then its antithetic partner */
-			forcount(backward, 2) {	
-				gsl_vector_memcpy(u, &q.vector);
-				gsl_vector_scale(u, backward ? -radius : radius);
-				gsl_blas_dgemv(CblasNoTrans, 1., L, u, 0., sample);
-
-				let dobjfn0 = sample_min2ll_from_cholesky(sample->data, L);
-				let dobjfn1 = resample_evaluate(covargs, sample->data, false);
-				predicted_dobjfn[k] = dobjfn0;
-				observed_dobjfn[k] = dobjfn1;
-
-				resample_progress(covargs, k, nsample, dobjfn0, dobjfn1, -1.);
-				++k;
-			}
-		}
-	}
-
-	print_resample_results(predicted_dobjfn, observed_dobjfn, nsample, outstream, diagstream);
-
-	gsl_matrix_free(basis);
-	gsl_matrix_free(L);
-	gsl_vector_free(sample);
-	gsl_vector_free(u);
-	free(predicted_dobjfn);
-	free(observed_dobjfn);
 }
 
 typedef struct {
@@ -1279,17 +770,38 @@ static COVARIANCECONFIG covariance_args_resolve(COVARIANCECONFIG* const userargs
 		args.dobjfn = delta->dobjfn;
 	if (args.step_size <= 0.)
 		args.step_size = 0.1;
-	if (args.diagnostics.dobjfn <= 0.)
-		args.diagnostics.dobjfn = args.dobjfn;
 	if (userargs)
 		*userargs = args;
 	return args;
 }
 
+static PARAM covlimit_make(ENCODE* const encode,
+							  const gsl_matrix* const cov,
+							  const int j,
+							  const double z,
+							  const int type,
+							  const int index,
+							  const double value,
+							  const double* const decoded) /* points into encode->popmodel */
+{
+	decode_popmodel_limit(encode, cov, j, z);
+	let upper = *decoded;
+	decode_popmodel_limit(encode, cov, j, -z);
+	let lower = *decoded;
+
+	return (PARAM) {
+		.type = type,
+		.index = index,
+		.lower = lower,
+		.value = value,
+		.upper = upper,
+	};
+}
+
 /* we have the upper and lower limits, so append to the .cov.ext file */
 /* Value of the next limit entry if it matches (type, index), else 0.
  * Advances *k on a match. FIXED parameters have no entry and give 0. */
-static double covext_limit_value(const COVLIMIT* const limit,
+static double covext_limit_value(const PARAM* const limit,
 								 const int nlimit,
 								 int* const k,
 								 const int type,
@@ -1300,7 +812,7 @@ static double covext_limit_value(const COVLIMIT* const limit,
 		return 0.;
 
 	let ptr = &limit[*k];
-	if ((int)ptr->param.type != type || ptr->param.index != index)
+	if ((int)ptr->type != type || ptr->index != index)
 		return 0.;
 
 	(*k)++;
@@ -1310,7 +822,7 @@ static double covext_limit_value(const COVLIMIT* const limit,
 /* write one bound row (lower or upper) of the .cov.ext file */
 static void covext_append_limit_row(FILE* extstream,
 									const POPMODEL* const popmodel,
-									const COVLIMIT* const limit,
+									const PARAM* const limit,
 									const int nlimit,
 									const bool upper,
 									const double runtime_s)
@@ -1345,27 +857,121 @@ static void covext_append_limit_row(FILE* extstream,
 	fflush(extstream);
 }
 
-static COVLIMIT covlimit_make(ENCODE* const encode,
-							  const gsl_matrix* const cov,
-							  const int j,
-							  const double z,
-							  const int type,
-							  const int index,
-							  const double value,
-							  const double* const decoded) /* points into encode->popmodel */
-{
-	decode_popmodel_limit(encode, cov, j, z);
-	let upper = *decoded;
-	decode_popmodel_limit(encode, cov, j, -z);
-	let lower = *decoded;
 
-	return (COVLIMIT) {
-		.param = { .type = type,
-				   .value = value,
-				   .index = index },
-		.lower = lower,
-		.upper = upper,
-	};
+/* This is dependent on the order of the parameter offsets in the
+ * ENCODE object. It would perhaps be better if there was a way to 
+ * indicate the relationship between the transformed and 
+ * untransformed spaces. */
+static void covlimits_output(ENCODE* const encode, 
+							 const gsl_matrix* const cov, 
+							 const DELTA* delta,
+							 const POPMODEL* const popmodel, 
+							 struct timespec* begin,
+							 FILE* outstream, 
+							 FILE* extstream,
+							 COVARIANCECONFIG* args,
+							 const bool offset1)
+{
+	let nparam = encode->nparam;
+	var limit = mallocvar(PARAM, nparam);
+	var nlimit = 0;
+	var j = 0;
+	forcount(i, popmodel->ntheta) {
+		if (popmodel->thetaestim[i] == FIXED)
+			continue;
+		limit[nlimit] = covlimit_make(encode,
+									  cov,
+									  j,
+									  delta->z,
+									  PARAM_THETA,
+									  i,
+									  popmodel->theta[i],
+									  &encode->popmodel.theta[i]);
+		nlimit++;
+		j++;
+	}
+	forcount(i, popmodel->nsigma) {
+		if (popmodel->sigmafixed[i])
+			continue;
+		limit[nlimit] = covlimit_make(encode,
+									  cov,
+									  j,
+									  delta->z,
+									  PARAM_SIGMA,
+									  i,
+									  popmodel->sigma[i],
+									  &encode->popmodel.sigma[i]);
+		nlimit++;
+		j++;
+	}
+	let rowcol = encode->omegainfo.nonfixed.rowcol;
+	forcount(i, encode->omegainfo.nonfixed.n) {
+		forcount(k, i+1) {
+			let r = rowcol[i];
+			let c = rowcol[k];
+			if (popmodel->omegafixed[r][c])
+				continue;
+			/* omega diagonals get a limit */
+			/* off-diagonals get no limit becaus one encoded param can affect several */
+			if (i == k) {
+				limit[nlimit] = covlimit_make(encode,
+											  cov,
+											  j,
+											  delta->z,
+											  PARAM_OMEGA,
+											  r,
+											  popmodel->omega[r][c],
+											  &encode->popmodel.omega[r][c]);
+				nlimit++;
+			}
+			j++;
+		}
+	}
+	assert(j == encode->nparam);
+
+	/* we have the upper and lower limits, so append to the .cov.ext file */
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	let runtime_s = timespec_time_difference(begin, &now) / 1000.;
+	covext_append_limit_row(extstream, popmodel, limit, nlimit, false, runtime_s);
+	covext_append_limit_row(extstream, popmodel, limit, nlimit, true, runtime_s);
+
+	/* print requested upper and lower parameter limits */
+	info(outstream, "dobjfn %g Z %g alpha %g\n", delta->dobjfn, delta->z, delta->alpha);
+	info(outstream, OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_SFORMAT "\n",
+		"PARAMETER", "LOWER", "VALUE", "UPPER ");
+	let offs = offset1 ? 1 : 0;
+	forcount(i, nlimit) {
+		let p = &limit[i];
+		char name[128];
+		switch (p->type) {
+		case PARAM_THETA:
+			snprintf(name, sizeof(name), "THETA(%i)", p->index + offs);
+			break;
+		case PARAM_SIGMA:
+			snprintf(name, sizeof(name), "SIGMA(%i)", p->index + offs);
+			break;
+		case PARAM_OMEGA:
+			snprintf(name, sizeof(name), "OMEGA(%i,%i)", p->index + offs, p->index + offs);
+			break;
+		default:
+			assert(0);
+		}
+		info(outstream, OPENPMX_SFORMAT OPENPMX_FFORMAT OPENPMX_FFORMAT OPENPMX_FFORMAT "\n", 
+			name, p->lower, p->value, p->upper);
+	}
+	
+	/* write back results to user, each limit and number used */
+	int i;
+	for (i=0; i<nlimit; i++) {
+		if (i >= args->nlimit)
+			break;
+		args->limit[i] = limit[i];
+	}
+	args->nlimit = i;
+	
+	/* cleanup */
+	free(limit);
 }
 
 void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
@@ -1388,11 +994,11 @@ void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
 		extstream = estimate_covariance_results_fopen(source->filename, OPENPMX_COVFILE OPENPMX_EXTFILE);
 	if (!source->state) {
 		info(outstream, "error: source does not have state, not previously estimated?\n");
-		goto failed;
+		goto cleanup;
 	}
 	if (source->result.type == OBJFN_INVALID || source->result.objfn == DBL_MAX) {
 		info(outstream, "error: source not previously estimated?\n");
-		goto failed;
+		goto cleanup;
 	}
 
 	struct timespec begin;
@@ -1411,19 +1017,19 @@ void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
 	let nparam = encode.nparam;
 	if (nparam == 0) {
 		info(outstream, "error: no parameters\n");
-		goto failed;
+		goto cleanup;
 	}
 	labels = encode_labels_alloc(&encode, pmx.data._offset1);
 
 	/* handle args and defaults */
 	var options = options_init(&pmx);
 	DELTA delta;
-	let args = covariance_args_resolve(userargs, &delta);
+	var args = covariance_args_resolve(userargs, &delta);
 	if (userargs)
 		options.estimate.stage1 = args.stage1;
 	if (!isfinite(args.dobjfn) || args.dobjfn <= 0.) {
 		info(outstream, "error: invalid dobjfn (%g), covariance not calculated\n", args.dobjfn);
-		goto failed;
+		goto cleanup;
 	}
 
 	info(outstream, "nparam %i initial step size %g\n", nparam, args.step_size);
@@ -1432,21 +1038,14 @@ void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
 	popmodel_eval_information(&popmodel, 0, 0, false, outstream, extstream, " final");
 
 	/* do the evaluations */
-	let idata = &pstate->idata;
 	{
-		/* allocate history if necessary */
-		var history = (VB_HISTORY*)0;
-		var _history = history_new(nparam);
-		if (args.quadratic.nsample || args.type == COVARIANCE_SANDWICH_QUADRATIC) 
-			history = &_history;
-
+		let idata = &pstate->idata;
 		/* center point f(0), needed by the adaptive step-size search */
 		let f0 = source->result.objfn;
 		var warm_etas = idata_etas_alloc(&source->state->idata);
 		idata_etas_copy(&warm_etas, &source->state->idata);
 		let covargs = (COVARGS) {
 			.encode = &encode,
-			.history = history,
 			.idata = idata,
 			.advanfuncs = pstate->advanfuncs,
 			.options = &options,
@@ -1461,16 +1060,14 @@ void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
 		/* S matrix the OPG/BHHH cross-product-of-gradients */
 		var S = (gsl_matrix*)0;
 		if (args.type == COVARIANCE_S_MATRIX ||
-			args.type == COVARIANCE_SANDWICH ||
-			args.type == COVARIANCE_SANDWICH_QUADRATIC ) {
+			args.type == COVARIANCE_SANDWICH) {
 			S = pmx_opg_S(&covargs, labels, args.step_size);
 		}
 		
 		/* Hessian matrix R */
 		var R = (gsl_matrix*)0;
 		if (args.type == COVARIANCE_R_MATRIX ||
-			args.type == COVARIANCE_SANDWICH ||
-			args.type == COVARIANCE_SANDWICH_QUADRATIC ) {
+			args.type == COVARIANCE_SANDWICH) {
 			R = pmx_hessian_R(&covargs, S, args.step_size);
 		}
 
@@ -1481,66 +1078,15 @@ void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
 			print_nonidentifiable_parameters(R, "R", labels, R_FLOOR_RELTOL, outstream);
 
 		/* make the covariance matrix via sandwich Rinv*S*Rinv, 2*Sinv, or 2*Rinv
-		 * Or should it be 4*Sinv? */
+		 * or should it be 4*Sinv? */
 		cov = gsl_matrix_alloc(nparam, nparam);
 		if (!covariance_calculate(R, S, outstream, cov)) {
 			gsl_matrix_free(cov);
 			cov = 0;
-			goto cov_cleanup;
-		}
-
-		/* make sure we have enough samples if we are doing quadratic smoothing */
-		var nsample = args.quadratic.nsample;
-		if (nsample < 0) {
-			nsample = nparam * 2;
-			let nfitparam = nparam * (nparam + 1) / 2;
-			if (args.type == COVARIANCE_S_MATRIX) 
-				nsample = nfitparam * 6;
-			if (args.type == COVARIANCE_R_MATRIX) 
-				nsample = nfitparam * 2;
-		}
-
-		/* additional resamples for quadratic smoothing */
-		if (nsample > 0) {
-			info(outstream, "additional samples %i\n", nsample);
-			pmx_ensure_state_rng(source, &options);
-			covariance_resample(&covargs,
-								cov,
-								source->state->rng,
-								nsample,
-								args.dobjfn);
-		}
-		
-		/* quadratic smoothing */
-		if (history) {
-			info(outstream, "using quadratic smoothing\n");
-			history_prune_above(history, f0 + 30., outstream);
-			vb_fit_quadratic(history, f0, outstream, cov);
-		}
-
-		/* diagnostics if requested */
-		if (args.diagnostics.nsample > 0) {
-			FILE* diagstream = 0;
-			if (args.diagnostics.filename)
-				diagstream = fopen(args.diagnostics.filename, "w");
-
-			let n = args.diagnostics.nsample;
-			info(outstream, "diagnostics resample %i\n", n);
-			pmx_ensure_state_rng(source, &options);
-			covariance_resample_diagnostics(&covargs,
-											diagstream,
-											cov,
-											source->state->rng,
-											n,
-											args.diagnostics.dobjfn);
-			if (diagstream)
-				fclose(diagstream);
 		}
 
 		/* cleanup */
-cov_cleanup:
 		idata_etas_free(&warm_etas);
-		history_free(&_history);
 		if (S)
 			gsl_matrix_free(S);
 		if (R)
@@ -1550,150 +1096,16 @@ cov_cleanup:
 	/* did everything fail? */
 	if (!cov) {
 		info(outstream, "cov failed\n");
-		goto failed;
+		goto cleanup;
 	}
 
-	/* This is dependent on the order of the parameter offsets in the
-	 * ENCODE object. It would perhaps be better if there was a way to 
-	 * indicate the relationship between the transformed and 
-	 * untransformed spaces. */
-	let z = delta.z;
-	VECTOR(COVLIMIT) limit = { 0 };
-	{
-		var j = 0;
-		vector_reserve(limit, nparam);
-		forcount(i, popmodel.ntheta) {
-			if (popmodel.thetaestim[i] == FIXED)
-				continue;
-			var l = covlimit_make(&encode,
-								  cov,
-								  j++,
-								  z,
-								  PARAM_THETA,
-								  i,
-								  popmodel.theta[i],
-								  &encode.popmodel.theta[i]);
-			vector_append(limit, l);
-		}
-		forcount(i, popmodel.nsigma) {
-			if (popmodel.sigmafixed[i])
-				continue;
-			var l = covlimit_make(&encode,
-								  cov,
-								  j++,
-								  z,
-								  PARAM_SIGMA,
-								  i,
-								  popmodel.sigma[i],
-								  &encode.popmodel.sigma[i]);
-			vector_append(limit, l);
-		}
-		let rowcol = encode.omegainfo.nonfixed.rowcol;
-		forcount(i, encode.omegainfo.nonfixed.n) {
-			forcount(k, i+1) {
-				let r = rowcol[i];
-				let c = rowcol[k];
-				if (popmodel.omegafixed[r][c])
-					continue;
-				/* off-diagonals get no limit (one encoded param can affect several) */
-				if (i == k) {
-					var l = covlimit_make(&encode,
-										  cov,
-										  j,
-										  z,
-										  PARAM_OMEGA,
-										  r,
-										  popmodel.omega[r][c],
-										  &encode.popmodel.omega[r][c]);
-					vector_append(limit, l);
-				}
-				j++;
-			}
-		}
-		assert(j == encode.nparam);
-
-		/* we have the upper and lower limits, so append to the .cov.ext file */
-		struct timespec now;
-		clock_gettime(CLOCK_MONOTONIC, &now);
-		let runtime_s = timespec_time_difference(&begin, &now) / 1000.;
-
-		covext_append_limit_row(extstream, &popmodel, limit.ptr, limit.size, false, runtime_s);
-		covext_append_limit_row(extstream, &popmodel, limit.ptr, limit.size, true, runtime_s);
-	}
-
-	/* Eigendecomposition of the correlations in the approximate
-	 * covariance matrix, the Hessian inverse. We normalize the diagonal
-	 * to 1 to obtain the correlation matrix, so any scaling does not 
-	 * play a role */
-	var corr = gsl_matrix_alloc(nparam, nparam);
-	{
-		var Heigen = gsl_matrix_alloc(nparam, nparam);
-		gsl_matrix_memcpy(Heigen, cov);
-		scale_to_match_diagonal(Heigen, 0); /* scales for 1 on diagonal */
-		gsl_matrix_memcpy(corr, Heigen);	/* save for printing correlations */
-
-		var eval = gsl_vector_alloc(nparam);
-		var evec = gsl_matrix_alloc(nparam, nparam);
-		var w    = gsl_eigen_symmv_alloc(nparam);
-		gsl_eigen_symmv(Heigen, eval, evec, w);
-		gsl_eigen_symmv_sort(eval, evec, GSL_EIGEN_SORT_ABS_ASC);
-		let lambda_min = gsl_vector_get(eval, 0);
-		let lambda_max = gsl_vector_get(eval, nparam - 1);
-		if (lambda_min != 0.)
-			info(outstream, "condition number %g\n", fabs(lambda_max / lambda_min));
-		else
-			info(outstream, "cov is singular\n");
-
-		gsl_eigen_symmv_free(w);
-		gsl_matrix_free(evec);
-		gsl_vector_free(eval);
-		gsl_matrix_free(Heigen);
-	}
-
-	/* print requested upper and lower parameter limits */
-	info(outstream, "dobjfn %g Z %g alpha %g\n", delta.dobjfn, delta.z, delta.alpha);
-	info(outstream, OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_SFORMAT "\n",
-		"PARAMETER", "LOWER", "VALUE", "UPPER ");
-	let offs = pmx.data._offset1 ? 1 : 0;
-	forvector_ptr(p, limit) {
-		char name[128];
-		switch (p->param.type) {
-		case PARAM_THETA:
-			snprintf(name, sizeof(name), "THETA(%i)", p->param.index + offs);
-			break;
-		case PARAM_SIGMA:
-			snprintf(name, sizeof(name), "SIGMA(%i)", p->param.index + offs);
-			break;
-		case PARAM_OMEGA:
-			snprintf(name, sizeof(name), "OMEGA(%i,%i)", p->param.index + offs, p->param.index + offs);
-			break;
-		default:
-			assert(0);
-		}
-		info(outstream, OPENPMX_SFORMAT OPENPMX_FFORMAT OPENPMX_FFORMAT OPENPMX_FFORMAT "\n", 
-			name, p->lower, p->param.value, p->upper);
-	}
+	/* output the limits */
+	covlimits_output(&encode, cov, &delta, &popmodel, &begin, outstream, extstream, &args, pmx.data._offset1);
 
 	/* print correlations */
-	print_correlations(corr, labels, outstream);
-	gsl_matrix_free(corr);
+	print_correlations(cov, labels, outstream);
 
-	/* create the covariance object for the sources state */
-	var covariance = &source->state->covariance;
-	pmx_covariance_free(covariance);
-	*covariance = (COVARIANCE) {
-		.type = args.type,
-		.limit = limit.ptr,
-		.nlimit = limit.size,
-		.dobjfn = args.dobjfn,
-	};
-	/* we DONT free the limit vector because we have taken the pointer
-	 * into the covariance object. The memory gets freed when the 
-	 * pmx_estimate() is repeated or the state is released */
-
-	/* fallthrough to more cleanup */
-
-failed:
+cleanup:
     if (cov)
 		gsl_matrix_free(cov);
     if (outstream)
@@ -1704,34 +1116,4 @@ failed:
 		encode_labels_free(labels);
 
 	pmx_release_state(&pmx);
-}
-
-void pmx_covariance_free(COVARIANCE* cov)
-{
-	free((void*)cov->limit);
-	cov->limit = 0;
-	cov->nlimit = 0;
-}
-
-COVLIMIT pmx_covariance_limit(OPENPMX* const pmx, const PARAM* const param)
-{
-	let state = pmx->state;
-	if (!state || state->covariance.limit == 0) 
-		return (COVLIMIT) { 0 };
-
-	const int offs = pmx->data._offset1 ? 1 : 0;
-	let covariance = &state->covariance;
-	forcount(i, covariance->nlimit) {
-		let limit = &covariance->limit[i];
-		let p = &limit->param;
-		if (p->type == param->type && 
-			p->index == param->index - offs) {
-
-			/* internally, index is always 0-based, convert for user */
-			var ret = covariance->limit[i];
-			ret.param.index += offs;
-			return ret;
-		}
-	}
-	return (COVLIMIT) { 0 };
 }

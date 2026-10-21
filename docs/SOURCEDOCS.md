@@ -237,13 +237,7 @@ They are combined into the sandwich estimator `Cov = Rinv * S * Rinv`, or
 used alone (`Sinv` or `Rinv`, scaled because the objfn is -2LL). 
 Quadratic smoothing can then refine the result. The covariance type is
 chosen with `COVARIANCE_S_MATRIX`, `COVARIANCE_R_MATRIX`,
-`COVARIANCE_SANDWICH` or the default `COVARIANCE_SANDWICH_QUADRATIC`.
-
-  Results go to `<filename>.cov` and `<filename>.cov.ext` when the
-  source has a filename.
-- `pmx_covariance_limit(pmx, param)`: looks up the stored `COVLIMIT`
-  for a given parameter type and index. If no covariance has
-  been calculated an empty `COVLIMIT` is returned.
+`COVARIANCE_SANDWICH` which is the default.
 
 ## Reporting
 
@@ -623,9 +617,6 @@ Within the `$ADVAN(...)` block an advancer must be indicated.
 This file implements a function that allows likelihood profiling.
 It is available in openpmxtran as `profile()`.
 
-If .maxeval=1 and .append=true then we go into "test only" mode which 
-only adds a point to the profile. Then the other fields are ignored.
-
 If .dobjfn is 0. then it will be set to the chi-squared distribution 
 for alpha 0.01 and 1 degree of freedom. This is approximately 6.63.
 
@@ -635,9 +626,18 @@ limits.
 
 The default number of root finding evaluations is 10.
 
-If doing profile calculations (not test only) then the .value is 
-changed to the current best guess as to the point that the profile
-likelihood crosses the .dobjfn threshold.
+If .value is 0 and .lower < .upper then two profiles are run, one to
+the .lower bound and one to the .upper bound. On return .lower is the
+crossing point from the lower profile and .upper is the crossing point
+from the upper profile. The .value is set to the source estimate. 
+Otherwise a single profile is run to .value. If a bound does not 
+cross the .dobjfn threshold then the limit on that side is open and 
+is returned as -INFINITY (lower) or +INFINITY (upper).
+
+pmx_profile_add() evaluates the profile at the single value in args->param.value and
+append the point to the profile file. The profiled parameter is fixed
+and the others are re-estimated starting from the source fit. Only
+args->param and args->estimate are used.
 
 
 # src/reload.c

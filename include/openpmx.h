@@ -248,6 +248,8 @@ typedef struct {
 OPENPMX pmx_copy(const OPENPMX* const openpmx);
 void pmx_release_state(OPENPMX* openpmx);
 
+void pmx_copy_idata(OPENPMX* const dest, const OPENPMX* const source);
+
 /*---------------------------------------------------------------------*/
 /* prediction */
 /*---------------------------------------------------------------------*/
@@ -273,6 +275,7 @@ typedef struct {
 	double step_refine;
 	double step_final;
 	int maxeval;
+	bool laplace;
 } STAGE1CONFIG;
 
 void pmx_evaluate(OPENPMX* pmx, STAGE1CONFIG* const evalconfig);
@@ -330,30 +333,32 @@ typedef struct {
 		PARAM_SIGMA,
 	} type;
 	int index;
+	double lower;
 	double value; 
+	double upper;
 } PARAM;
 
 /*---------------------------------------------------------------------*/
 /* profile */
 /*---------------------------------------------------------------------*/
 typedef struct {
-	const char* name;
-	bool append;
-	PARAM param;		/* value: bracketing value, output: final value */
+	PARAM param;		/* input: bracketing value, output: final value */
 	double dobjfn;		/* input: targeted profile */
 	double dobjfn_tol;
-	int maxeval;		/* input: maximum evaluations */
+	int maxeval;		/* input: maximum root-finding evaluations */
 	ESTIMCONFIG estimate;
 } PROFILECONFIG;
 
 OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args);
+OPENPMX pmx_profile_add(const OPENPMX* const source, PROFILECONFIG* const args);
+
+void pmx_profile_clean(const OPENPMX* const openpmx, const PARAM* const param);
 
 /*---------------------------------------------------------------------*/
 /* covariance */
 /*---------------------------------------------------------------------*/
 typedef struct {
 	enum {
-		COVARIANCE_SANDWICH_QUADRATIC = 0,
 		COVARIANCE_SANDWICH,
 		COVARIANCE_S_MATRIX,
 		COVARIANCE_R_MATRIX,
@@ -362,26 +367,13 @@ typedef struct {
 	double step_size;
 	bool details;
 	STAGE1CONFIG stage1;
-	struct {
-		int nsample;
-	} quadratic;
-	struct {
-		const char* filename;
-		int nsample;
-		double dobjfn;
-	} diagnostics;
+	
+	/* output of limits */
+	PARAM* limit;
+	int nlimit;			/* input: number limit entries; output: written limit entries */
 } COVARIANCECONFIG;
 
 void pmx_covariance(OPENPMX* const pmx, COVARIANCECONFIG* const args);
-
-typedef struct {
-	PARAM param;
-	double lower;
-	double upper;
-} COVLIMIT;
-COVLIMIT pmx_covariance_limit(OPENPMX* const pmx, const PARAM* const param);
-
-/*---------------------------------------------------------------------*/
 
 #ifdef __cplusplus
 }

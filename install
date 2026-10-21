@@ -199,7 +199,7 @@ SOURCEFILES="pmxstate.c options.c ievaluate.c predict.c stage1.c
 			 models/sufentanil_gepts.c
 			 models/remimazolam_eleveld.c
 			 utils/vector.c utils/various.c
-			 utils/getdelim.c utils/errctx.c
+			 utils/getdelim.c utils/errctx.c utils/filecontent.c
 			 bobyqa/bobyqa.c"
 OBJECTFILES=""
 for FILE in ${SOURCEFILES}; do

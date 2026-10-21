@@ -10,6 +10,7 @@ extfile <- paste0(filename, ".ext")
 phifile <- paste0(filename, ".phi")
 covfile <- paste0(filename, ".covariates")
 yhatfile <- paste0(filename, ".yhat")
+profilefile <- paste0(filename, ".profile.iter")
 pdffile <- paste0(filename, ".pdf")
 
 # read in files
@@ -109,16 +110,11 @@ if (file.exists(yhatfile)) {
 }
 
 profiles <- NA
-profilelist <- list.files(pattern=paste0(filename, ".profile.*.iter"))
-for (profile in profilelist) {
-#	cat(sprintf("read in %s\n", profile))
-	data <- read.table(profile, header=TRUE, na.strings = "")
-	if (is.data.frame(profiles))
-		profiles <- rbind(profiles, data)
-	else 
-		profiles <- data
+if (file.exists(profilefile)) {
+	cat(sprintf("read profile \"%s\"\n", profilefile))
+	profiles <- read.table(profilefile, header=TRUE, stringsAsFactors=FALSE)
+	names(profiles) <- toupper(names(profiles))
 }
-
 
 pdf(pdffile)
 
@@ -428,48 +424,51 @@ if (is.data.frame(profiles)) {
 	par(mfrow=c(2,2), cex=0.9)
 	
 	p <- profiles
-	p$profilegroup <- paste0(p[["type"]], p[["index"]])
+	p$profilegroup <- paste0(p[["TYPE"]], p[["INDEX"]])
 	groups <- unique(p$profilegroup)
+
+	# remove infinities
+	p <- p[is.finite(p$VALUE), ]
 
 	for (i in groups) {
 		cat(sprintf("plot profile %s\n", i))
 		
 		idata <- p[p$profilegroup == i, ]
-		idata <- idata[idata$objfn != 0., ]
-		final <- idata[idata$neval == 0, ]
+		idata <- idata[idata$OBJFN != 0., ]
+		final <- idata[idata$NEVAL == 0, ]
 
-		ox <- order(idata$value)
+		ox <- order(idata$VALUE)
 		idata <- idata[ox, ]
-		
-		minobjfn <- min(idata$objfn)
-		x0 <- idata[idata$objfn - minobjfn < 20., ]
-		xlim <- range(x0$value)
 
-		type <- unique(idata[["type"]])
-		idx <- unique(idata[["index"]])
+		minobjfn <- min(idata$OBJFN)
+		x0 <- idata[idata$OBJFN - minobjfn < 20., ]
+		xlim <- range(x0$VALUE)
+
+		type <- unique(idata[["TYPE"]])
+		idx <- unique(idata[["INDEX"]])
 		plotname <- paste0(type, "(", idx, ")")
 
-		x <- idata[["value"]]
-		y <- idata[["objfn"]]
+		x <- idata[["VALUE"]]
+		y <- idata[["OBJFN"]]
 		plot(x=x, y=y, type="n", xlab=plotname, ylab="Objfn", xlim=xlim, ylim=c(min(y), min(y)+20))
 
-		xl <- seq(from=min(x), to=max(x), length.out=100)
-#		sfunc <- splinefun(x=x, y=y, 
-#						   method="natural",
-#						   ties=mean)
-#		lines(x=xl, y=sfunc(xl), col = "blue")
+		xl <- seq(from=min(x), to=max(x), length.out=1000)
+		sfunc <- splinefun(x=x, y=y, 
+						   method="monoH.FC",
+						   ties=mean)
+		lines(x=xl, y=sfunc(xl), col = "blue")
 
-		sobj <- loess(y ~ x, span=0.7)
-		pred <- predict(sobj, data.frame(x=xl), se=TRUE)
-		upper <- pred$fit + 1.96 * pred$se.fit
-		lower <- pred$fit - 1.96 * pred$se.fit
-		polygon(c(xl, rev(xl)), c(upper, rev(lower)), col=rgb(1,0,0,0.15), border=NA)
+#		sobj <- loess(y ~ x, span=0.1)
+#		pred <- predict(sobj, data.frame(x=xl), se=TRUE)
+#		upper <- pred$fit + 1.96 * pred$se.fit
+#		lower <- pred$fit - 1.96 * pred$se.fit
+#		polygon(c(xl, rev(xl)), c(upper, rev(lower)), col=rgb(1,0,0,0.15), border=NA)
 		
-		lines(xl, pred$fit, col = "blue")
+#		lines(xl, pred$fit, col = "blue")
 
 		points(x=x, y=y)
 		
-		points(x=final[["value"]], y=final[["objfn"]], col="red", pch=16)
+		points(x=final[["VALUE"]], y=final[["OBJFN"]], col="red", pch=16)
 	}
 }
 dummy <- dev.off()
