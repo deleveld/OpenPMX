@@ -228,7 +228,6 @@ typedef struct {
 	POPMODEL* popmodel;
 	OPENPMX* ret;
 	int neval;
-	bool converged;
 	FILE* stream;
 	bool final_proposal;
 } PROFILEPARAMS;
@@ -270,28 +269,36 @@ static double root_function(double x, void* _params)
 
 	iter_write(p->stream, args, objfn, p->objfn_target, p->neval);
 
-	let err = objfn - p->objfn_target;
-	if (!is_left && fabs(err) < args->dobjfn_tol)
-		p->converged = true;
-	return err;
+	return objfn - p->objfn_target;
+}
+
+static double compute_nsig_param(const double old_val, const double new_val)
+{
+	let delta = fabs(new_val - old_val);
+	if (delta == 0.)
+		return DBL_MAX;
+	let scale = fmax(fabs(new_val), fabs(old_val));
+	return fmax(0., -log10(delta / scale));
 }
 
 static bool profile_side(const OPENPMX* const source, 
 						 PROFILECONFIG* const args, 
 						 POPMODEL* const popmodel,
+						 FILE* stream,
 						 OPENPMX* const ret)
 {
-/// If .dobjfn is 0. then it will be set to the chi-squared distribution 
-/// for alpha 0.01 and 1 degree of freedom. This is approximately 6.63.
 #define DEFAULT_ALPHA	0.01
 #define DEFAULT_DF		1
-	if (!(args->dobjfn >= 0.))
-		args->dobjfn = gsl_cdf_chisq_Pinv(1.0 - DEFAULT_ALPHA, DEFAULT_DF);
-/// The default tolerance is 1 objfn units. This is usually enough that a
+/// If .dobjfn is 0. then it will be set to the chi-squared distribution 
+/// for alpha 0.01 and 1 degree of freedom. This is approximately 6.63.
+/// The default tolerance in 3 significant digits. This is usually enough that a
 /// smoothed line through the profile points is close to the confidence
 /// limits.
-	if (!(args->dobjfn_tol >= 0.))
-		args->dobjfn_tol = 1;
+	if (!(args->dobjfn > 0.))
+		args->dobjfn = gsl_cdf_chisq_Pinv(1.0 - DEFAULT_ALPHA, DEFAULT_DF);
+	if (!(args->nsig > 0.))
+		args->nsig = 3;
+		
 /// The default number of root finding evaluations is 10.
 	if (args->maxeval <= 0)
 		args->maxeval = 10;
@@ -309,7 +316,6 @@ static bool profile_side(const OPENPMX* const source,
 		return false;
 	}
 
-	var stream = iter_open(source->filename);
 	var params = (PROFILEPARAMS) {
 		.left = left_value,
 		.right = right_value,
@@ -327,9 +333,9 @@ static bool profile_side(const OPENPMX* const source,
 
 	let type = param_name(&args->param);
 	printf("profile start %s %i lower %g upper %g\n"
-		   "profile objfn %.6f target %.6f dobjfn %.6f tol %g\n", 
+		   "profile objfn %.6f target %.6f dobjfn %.6f nsig %g\n", 
 		   type, args->param.index, fmin(left_value, right_value), fmax(left_value, right_value), 
-		   source->result.objfn, params.objfn_target, args->dobjfn, args->dobjfn_tol);
+		   source->result.objfn, params.objfn_target, args->dobjfn, args->nsig);
 
 	/* gsl_root_fsolver_set() calls root_function at both ends of the
 	 * bracket. The left is taken from the source, so only the right is 
@@ -352,15 +358,24 @@ static bool profile_side(const OPENPMX* const source,
 
 	/* iterate the root finder */
 	bool solver_ok = true;
-	while (!params.converged && params.neval < args->maxeval) {
+	bool converged = false;
+	while (!converged && params.neval < args->maxeval) {
+		/* iterate the root solver */
 		let st = gsl_root_fsolver_iterate(s);
 		if (st != GSL_SUCCESS && st != GSL_CONTINUE) {
 			printf("profile root status no continue (%s)\n", gsl_strerror(st));
 			solver_ok = false;
 			break;
 		}
+
+		/* test for convergence */
+		let lower = profile_value(&params, gsl_root_fsolver_x_lower(s));
+		let upper = profile_value(&params, gsl_root_fsolver_x_upper(s));
+		let nsig = compute_nsig_param(lower, upper);
+		if (nsig > args->nsig) 
+			converged = true;
 	}
-	if (!params.converged && params.neval >= args->maxeval)
+	if (!converged && params.neval >= args->maxeval)
 		printf("profile maxeval (%i) reached\n", args->maxeval);
 
 	/* final estimate, but untested into the output file so the users
@@ -373,15 +388,15 @@ static bool profile_side(const OPENPMX* const source,
 		gsl_root_fsolver_iterate(s);
 	}
 
-	let lower_val	= profile_value(&params, gsl_root_fsolver_x_lower(s));
-	let value 		= profile_value(&params, gsl_root_fsolver_root(s));
-	let upper_val	= profile_value(&params, gsl_root_fsolver_x_upper(s));
-	args->param.lower = fmin(lower_val, upper_val);
+	let lower	= profile_value(&params, gsl_root_fsolver_x_lower(s));
+	let value 	= profile_value(&params, gsl_root_fsolver_root(s));
+	let upper	= profile_value(&params, gsl_root_fsolver_x_upper(s));
+	args->param.lower = fmin(lower, upper);
 	args->param.value = value;
-	args->param.upper = fmax(lower_val, upper_val);		
+	args->param.upper = fmax(lower, upper);		
 
 	printf("profile %s value %g [%g, %g]\n", 
-			params.converged ? "converged" : "failed",
+			converged ? "converged" : "failed",
 			args->param.value,
 			args->param.lower,
 			args->param.upper);
@@ -390,8 +405,6 @@ static bool profile_side(const OPENPMX* const source,
 cleanup:
 	gsl_set_error_handler(oldhandler);
 	gsl_root_fsolver_free(s);
-	if (stream)
-		fclose(stream);
 
 	return true;
 }
@@ -410,34 +423,77 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 	if (errctx.len) 
 		fatal(0, "%s: %s", __func__, errctx.errmsg);
 
+	var stream = iter_open(source->filename);
+
 	var ret = pmx_copy(source);
 	if (args->param.value == 0. && args->param.lower < args->param.upper) {
-		POPMODEL popmodel_upper = popmodel;
-		let value = *param_value(&popmodel, &args->param, param_index(&args->param, source->data._offset1));
+		PROFILECONFIG cfg_lo = *args;
+		PROFILECONFIG cfg_hi = *args;
+		POPMODEL popmodel_lo = popmodel;
+		POPMODEL popmodel_hi = popmodel;
 
-		let lo = args->param.lower;
-		let hi = args->param.upper;
+		let value = *param_value(&popmodel_lo, &cfg_lo.param, param_index(&cfg_lo.param, source->data._offset1));
+		let lo = cfg_lo.param.lower;
+		let hi = cfg_lo.param.upper;
 		
 		/* profile the lower bound */
-		args->param.lower = 0.;
-		args->param.value = lo;
-		args->param.upper = 0.;
-		profile_side(source, args, &popmodel, &ret);
-		let lower_root = args->param.value;
+		cfg_lo.param.lower = 0.;
+		cfg_lo.param.value = lo;
+		cfg_lo.param.upper = 0.;
+		profile_side(source, &cfg_lo, &popmodel_lo, stream, &ret);
+		let lower_root = cfg_lo.param.value;
 
 		/* profile the upper bound */
-		args->param.lower = 0.;
-		args->param.value = hi;
-		args->param.upper = 0.;
-		profile_side(source, args, &popmodel_upper, &ret);
-		let upper_root = args->param.value;
+		cfg_hi.param.lower = 0.;
+		cfg_hi.param.value = hi;
+		cfg_hi.param.upper = 0.;
+		profile_side(source, &cfg_hi, &popmodel_hi, stream, &ret);
+		let upper_root = cfg_hi.param.value;
 
 		/* return both bounds */
 		args->param.lower = lower_root;
 		args->param.value = value;
 		args->param.upper = upper_root;
 	} else
-		profile_side(source, args, &popmodel, &ret);
+		profile_side(source, args, &popmodel, stream, &ret);
+
+	/* extra samples if requested */
+	let param_saved = args->param; /* save old results */
+	var lower = args->param.lower;
+	var upper = args->param.upper;
+	if (args->nextra && 
+		isfinite(lower) && 
+		isfinite(lower) && 
+		isfinite(upper)) {
+		let logscale = (args->param.type == PARAM_OMEGA || args->param.type == PARAM_SIGMA) && 
+						(lower > 0. && upper > 0.);
+		if (logscale) {
+			lower = log(lower);
+			upper = log(upper);
+		}
+		let step = (upper - lower) / (args->nextra + 1);
+
+		var v = lower + step;
+		forcount(i, args->nextra) {
+			
+			/* evaluate profile at the extra value */
+			args->param.lower = 0;
+			args->param.value = (logscale) ? exp(v) : v;
+			args->param.upper = 0;
+			
+			printf("profile extra %s %i value %g\n",
+				   param_name(&args->param), args->param.index, args->param.value);
+			profile_evaluate(&ret, &popmodel, source, args);
+			let objfn = ret.result.objfn;
+			printf("profile add objfn %.6f\n", objfn);
+			iter_write(stream, args, objfn, 0., 1);
+
+			v += step; /* next step */
+		}
+	}
+	args->param = param_saved; /* replace old results */
+	
+	fclose(stream);
 
 	ret.filename = 0; /* dont let filename dangle */
 	pmx_release_state(&ret);

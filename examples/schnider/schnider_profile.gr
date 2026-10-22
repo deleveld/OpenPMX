@@ -30,45 +30,99 @@ $THETA
 	{   -.1,   0,   .1,  ESTIMATE     },
 $OMEGA(0.1, 0.1, 0.1, 0.1, 0., 0.)
 $SIGMA(0.1)
-$FUNCTIONS
-void do_profile(const int type, 
-				const int index, 
-				const double lower, 
-				const double upper, 
-				const char* name)
-{
-	PROFILECONFIG p = {
-		.param = {
-			.type = type,
-			.index = index,
-			.value = lower,
-		},
-		.dobjfn = 15.,
-		.name = name,
-	};
-	profile(&p);
-	double left = p.param.value;
-
-	p.param.value = upper;
-	p.append = true;
-	profile(&p);
-	double right = p.param.value;
-	
-	p.maxeval = 1;
-	for (p.param.value=left; 
-		 p.param.value<=right; 
-		 p.param.value+=(right-left)/10.) 
-		profile(&p);
-}
 $MAIN
 	estimate();
 	
-	do_profile(PARAM_THETA, 1, 1, 40, "V1");
-	do_profile(PARAM_THETA, 2, 5, 100, "V2");
-	do_profile(PARAM_THETA, 3, 100, 400, "V3");
-	do_profile(PARAM_THETA, 4, .1, 4, "CL");
-	do_profile(PARAM_THETA, 5, .1, 4, "Q2");
-	do_profile(PARAM_THETA, 6, .1, 4, "Q3");
-
+	profile_clean();
+	profile(.param = { 
+				.type=PARAM_THETA, 
+				.index = 1,
+				.lower = 1.,
+				.upper = 40. },
+			.nextra = 20,
+			);
+	profile(.param = { 
+				.type=PARAM_THETA, 
+				.index = 2,
+				.lower = 5.,
+				.upper = 100. },
+			.nextra = 20,
+			);
+	profile(.param = { 
+				.type=PARAM_THETA, 
+				.index = 3,
+				.lower = 100.,
+				.upper = 400. },
+			.nextra = 20,
+			); 
+	profile(.param = { 
+				.type=PARAM_THETA, 
+				.index = 4,
+				.lower = 1.,
+				.upper = 3. },
+			.nextra = 20,
+			); 
+	profile(.param = { 
+				.type=PARAM_THETA, 
+				.index = 5,
+				.lower = 1.,
+				.upper = 3. },
+			.nextra = 20,
+			); 
+	profile(.param = { 
+				.type=PARAM_THETA, 
+				.index = 6,
+				.lower = 0.1,
+				.upper = 3. },
+			.nextra = 20,
+			); 
+	profile(.param = { 
+				.type=PARAM_THETA, 
+				.index = 7,
+				.lower = -0.1,
+				.upper = 0.1 },
+			.nextra = 20,
+			); 
+			
+	profile(.param = { 
+				.type=PARAM_OMEGA, 
+				.index = 1,
+				.lower = 1e-6,
+				.upper = 1. },
+			.nextra = 20,
+			);
+	profile(.param = { 
+				.type=PARAM_OMEGA, 
+				.index = 2,
+				.lower = 1e-6,
+				.upper = 1. },
+			.nextra = 20,
+			);
+	profile(.param = { 
+				.type=PARAM_OMEGA, 
+				.index = 3,
+				.lower = 1e-6,
+				.upper = 1. },
+			.nextra = 20,
+			);
+	profile(.param = { 
+				.type=PARAM_OMEGA, 
+				.index = 4,
+				.lower = 1e-6,
+				.upper = 1. },
+			.nextra = 20,
+			);
 	
+/*	do_profile(PARAM_THETA, 2, 5, 100);
+	do_profile(PARAM_THETA, 3, 100, 400);
+	do_profile(PARAM_THETA, 4, .5, 4);
+	do_profile(PARAM_THETA, 5, .1, 4);
+	do_profile(PARAM_THETA, 6, .1, 4);
+	do_profile(PARAM_THETA, 7, -.1, .1);
+	do_profile(PARAM_OMEGA, 1, 1e-6, 1);
+	do_profile(PARAM_OMEGA, 2, 1e-6, 1);
+	do_profile(PARAM_OMEGA, 3, 1e-6, 1);
+	do_profile(PARAM_OMEGA, 4, 1e-6, 1);
+	do_profile(PARAM_SIGMA, 1, 0.045, 0.65);
+*/
 	

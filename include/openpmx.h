@@ -344,7 +344,8 @@ typedef struct {
 typedef struct {
 	PARAM param;		/* input: bracketing value, output: final value */
 	double dobjfn;		/* input: targeted profile */
-	double dobjfn_tol;
+	double nsig;
+	int nextra;
 	int maxeval;		/* input: maximum root-finding evaluations */
 	ESTIMCONFIG estimate;
 } PROFILECONFIG;

@@ -447,10 +447,16 @@ if (is.data.frame(profiles)) {
 		type <- unique(idata[["TYPE"]])
 		idx <- unique(idata[["INDEX"]])
 		plotname <- paste0(type, "(", idx, ")")
+		
+		xlog <- ""
+		if (type == "omega" || type == "sigma")
+			xlog <- "x"
 
 		x <- idata[["VALUE"]]
 		y <- idata[["OBJFN"]]
-		plot(x=x, y=y, type="n", xlab=plotname, ylab="Objfn", xlim=xlim, ylim=c(min(y), min(y)+20))
+		plot(x=x, y=y, type="n", xlab=plotname, ylab="Objfn", xlim=xlim, ylim=c(min(y), min(y)+20), log=xlog)
+		
+		
 
 		xl <- seq(from=min(x), to=max(x), length.out=1000)
 		sfunc <- splinefun(x=x, y=y, 

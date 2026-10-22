@@ -1899,7 +1899,7 @@ char openpmxtran_template[] =
 "#define evaluate(...) 			pmx_evaluate(&openpmx, &(STAGE1CONFIG){ __VA_ARGS__ })\n"
 "#define simulate(...) 			pmx_simulate(&openpmx, &(SIMCONFIG){ __VA_ARGS__ })\n"
 "#define covariance(...) 		pmx_covariance(&openpmx, &(COVARIANCECONFIG){ __VA_ARGS__ })\n"
-"#define profile(...) 			pmx_profile(&openpmx, __VA_ARGS__ )\n"
+"#define profile(...) 			pmx_profile(&openpmx, &(PROFILECONFIG){ __VA_ARGS__ } )\n"
 "#define profile_add(...) 		pmx_profile_add(&openpmx, __VA_ARGS__ )\n"
 "#define profile_clean(...) 	pmx_profile_clean(&openpmx, &(PARAM){ __VA_ARGS__ })\n"
 "\n"
