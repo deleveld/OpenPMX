@@ -31,86 +31,115 @@ $THETA
 $OMEGA(0.1, 0.1, 0.1, 0.1, 0., 0.)
 $SIGMA(0.1)
 $MAIN
-	estimate();
+//	ESTIMCONFIG estim = { .stage1.laplace=true };
+	ESTIMCONFIG estim = { };
+
+	pmx_estimate(&openpmx, &estim);
 	
+	COVARIANCECONFIG covconfig = { 
+		.type=COVARIANCE_S_MATRIX, 
+		.stage1 = estim.stage1 
+	};
+	pmx_covariance(&openpmx, &covconfig);
+
 	profile_clean();
+	int nextra = 0;
 	profile(.param = { 
 				.type=PARAM_THETA, 
 				.index = 1,
 				.lower = 1.,
 				.upper = 40. },
-			.nextra = 20,
+			.estimate = estim,
+			.nextra = nextra, 
 			);
 	profile(.param = { 
 				.type=PARAM_THETA, 
 				.index = 2,
 				.lower = 5.,
 				.upper = 100. },
-			.nextra = 20,
+			.estimate = estim,
+			.nextra = nextra,
 			);
 	profile(.param = { 
 				.type=PARAM_THETA, 
 				.index = 3,
 				.lower = 100.,
 				.upper = 400. },
-			.nextra = 20,
+			.estimate = estim,
+			.nextra = nextra, 
 			); 
 	profile(.param = { 
 				.type=PARAM_THETA, 
 				.index = 4,
 				.lower = 1.,
 				.upper = 3. },
-			.nextra = 20,
+			.estimate = estim,
+			.nextra = nextra,
 			); 
 	profile(.param = { 
 				.type=PARAM_THETA, 
 				.index = 5,
 				.lower = 1.,
 				.upper = 3. },
-			.nextra = 20,
+			.estimate = estim,
+			.nextra = nextra,
 			); 
 	profile(.param = { 
 				.type=PARAM_THETA, 
 				.index = 6,
 				.lower = 0.1,
 				.upper = 3. },
-			.nextra = 20,
+			.estimate = estim,
+			.nextra = nextra,
 			); 
 	profile(.param = { 
 				.type=PARAM_THETA, 
 				.index = 7,
 				.lower = -0.1,
 				.upper = 0.1 },
-			.nextra = 20,
+			.estimate = estim,
+			.nextra = nextra,
 			); 
 			
 	profile(.param = { 
 				.type=PARAM_OMEGA, 
 				.index = 1,
-				.lower = 1e-6,
+				.lower = 1e-3,
 				.upper = 1. },
-			.nextra = 20,
+			.estimate = estim,
+			.nextra = nextra,
 			);
 	profile(.param = { 
 				.type=PARAM_OMEGA, 
 				.index = 2,
 				.lower = 1e-6,
 				.upper = 1. },
-			.nextra = 20,
+			.estimate = estim,
+			.nextra = nextra,
 			);
 	profile(.param = { 
 				.type=PARAM_OMEGA, 
 				.index = 3,
 				.lower = 1e-6,
 				.upper = 1. },
-			.nextra = 20,
+			.estimate = estim,
+			.nextra = nextra,
 			);
 	profile(.param = { 
 				.type=PARAM_OMEGA, 
 				.index = 4,
 				.lower = 1e-6,
 				.upper = 1. },
-			.nextra = 20,
+			.estimate = estim,
+			.nextra = nextra,
+			);
+	profile(.param = { 
+				.type=PARAM_SIGMA, 
+				.index = 1,
+				.lower = 0.0547787 - 0.01,
+				.upper = 0.0547787 + 0.01 },
+			.estimate = estim,
+			.nextra = nextra,
 			);
 	
 /*	do_profile(PARAM_THETA, 2, 5, 100);

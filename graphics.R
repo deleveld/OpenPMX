@@ -11,6 +11,7 @@ phifile <- paste0(filename, ".phi")
 covfile <- paste0(filename, ".covariates")
 yhatfile <- paste0(filename, ".yhat")
 profilefile <- paste0(filename, ".profile.iter")
+covlimitfile <- paste0(filename, ".cov.limits")
 pdffile <- paste0(filename, ".pdf")
 
 # read in files
@@ -114,6 +115,13 @@ if (file.exists(profilefile)) {
 	cat(sprintf("read profile \"%s\"\n", profilefile))
 	profiles <- read.table(profilefile, header=TRUE, stringsAsFactors=FALSE)
 	names(profiles) <- toupper(names(profiles))
+}
+
+covlimits <- NA
+if (file.exists(covlimitfile)) {
+	cat(sprintf("read cov limits \"%s\"\n", covlimitfile))
+	covlimits <- read.table(covlimitfile, header=TRUE, stringsAsFactors=FALSE)
+	names(covlimits) <- toupper(names(covlimits))
 }
 
 pdf(pdffile)
@@ -424,59 +432,95 @@ if (is.data.frame(profiles)) {
 	par(mfrow=c(2,2), cex=0.9)
 	
 	p <- profiles
+	p <- p[!duplicated(p), ]
 	p$profilegroup <- paste0(p[["TYPE"]], p[["INDEX"]])
 	groups <- unique(p$profilegroup)
 
 	# remove infinities
 	p <- p[is.finite(p$VALUE), ]
 
+	# load covlimits 
+	covlim <- covlimits
+	if (is.data.frame(covlim)) 
+		covlim$profilegroup <- paste0(covlim[["TYPE"]], covlim[["INDEX"]])
+
 	for (i in groups) {
 		cat(sprintf("plot profile %s\n", i))
 		
 		idata <- p[p$profilegroup == i, ]
+		bounds <- idata[idata$OBJFN == 0. & idata$TARGET != 0., "VALUE"]
 		idata <- idata[idata$OBJFN != 0., ]
 		final <- idata[idata$NEVAL == 0, ]
+		
+		covdata <- NA
+		covlower <- NA
+		covupper <- NA
+		if (is.data.frame(covlim)) {
+			covdata <- covlim[covlim$profilegroup == i, ]
+			covlower <- covdata$LOWER
+			covupper <- covdata$UPPER
+		}
+		# scan rows are written with TARGET=0, only the search rows carry the real target
+		target <- max(unique(idata$TARGET[idata$TARGET != 0.]))
 
 		ox <- order(idata$VALUE)
 		idata <- idata[ox, ]
 
 		minobjfn <- min(idata$OBJFN)
 		x0 <- idata[idata$OBJFN - minobjfn < 20., ]
-		xlim <- range(x0$VALUE)
 
 		type <- unique(idata[["TYPE"]])
 		idx <- unique(idata[["INDEX"]])
 		plotname <- paste0(type, "(", idx, ")")
-		
+
+		# transform smoothed line
 		xlog <- ""
 		if (type == "omega" || type == "sigma")
 			xlog <- "x"
+		tr  <- if (xlog == "x") log else identity
+		itr <- if (xlog == "x") exp else identity
+
+		range_lower <- tr(min(bounds, covlower, na.rm=TRUE))
+		range_upper <- tr(max(bounds, covupper, na.rm=TRUE))
+		range <- range_upper - range_lower
+		xlim <- itr(c(range_lower - 0.2 * range, range_upper + 0.2*range))
 
 		x <- idata[["VALUE"]]
 		y <- idata[["OBJFN"]]
 		plot(x=x, y=y, type="n", xlab=plotname, ylab="Objfn", xlim=xlim, ylim=c(min(y), min(y)+20), log=xlog)
-		
-		
 
-		xl <- seq(from=min(x), to=max(x), length.out=1000)
-		sfunc <- splinefun(x=x, y=y, 
-						   method="monoH.FC",
-						   ties=mean)
-		lines(x=xl, y=sfunc(xl), col = "blue")
-
-#		sobj <- loess(y ~ x, span=0.1)
-#		pred <- predict(sobj, data.frame(x=xl), se=TRUE)
-#		upper <- pred$fit + 1.96 * pred$se.fit
-#		lower <- pred$fit - 1.96 * pred$se.fit
-#		polygon(c(xl, rev(xl)), c(upper, rev(lower)), col=rgb(1,0,0,0.15), border=NA)
+		# exact limits found by the root finder (OBJFN==0 marker rows)
+		lower <- tr(min(bounds))
+		upper <- tr(max(bounds))
+		rect(xleft=itr(lower), xright=itr(upper), ybottom=minobjfn-20, ytop=target, col="lightsteelblue", border=NA)
 		
-#		lines(xl, pred$fit, col = "blue")
+		covlegend <- ""
+		if (!is.na(covlower) && !is.na(covupper)) {
+			rect(xleft=covlower, xright=covupper, ybottom=minobjfn-20, ytop=target, col=NA, border="red")
+#			abline(v=covlower, col="red", lw=1)
+#			abline(v=covupper, col="red", lw=1)
+			covlegend <- sprintf("cov [%.3g, %.3g]", covlower, covupper)
+		}
+
+		# make a smoothed line
+		sfunc <- splinefun(x=tr(x), y=y, method="monoH.FC", ties=mean)
+		xl <- itr(seq(tr(xlim[1]), tr(xlim[2]), length.out=100))
+		yl <- sfunc(tr(xl))
+		lines(x=xl, y=yl, col = "blue")
 
 		points(x=x, y=y)
+		value <- final[["VALUE"]]
+		points(x=value, y=final[["OBJFN"]], col="red", pch=16)
 		
-		points(x=final[["VALUE"]], y=final[["OBJFN"]], col="red", pch=16)
+		legend("top", 
+			legend=c(sprintf("estimate %.3g", value),
+					 sprintf("profile [%.3g, %.3g]", itr(lower), itr(upper)),
+					 covlegend),
+			bty="n", cex=0.9)
+		
+		grid()
+		box()
 	}
 }
 dummy <- dev.off()
 cat("done\n")
-

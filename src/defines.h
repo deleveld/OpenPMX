@@ -30,6 +30,7 @@ extern "C" {
 #define OPENPMX_YHATFILE 				".yhat"
 #define OPENPMX_TABLEFILE				".txt"
 #define OPENPMX_COVFILE					".cov"
+#define OPENPMX_COVLIMITS				".cov.limits"
 #define OPENPMX_PROFILE					".profile.iter"
 
 #define OPENPMX_SFORMAT 				" %12s"

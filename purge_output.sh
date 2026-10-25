@@ -13,8 +13,8 @@ find . -type f \( \
     -name "*.yhat" -o \
     -name "*.phi" -o \
     -name "*.iter" -o \
-    -name "*.gr.c" \
-    -name "*.covcheck" \
+    -name "*.gr.c" -o \
+    -name "*.covcheck" -o \
     -name "*.o" \
 \) -exec rm -v {} +
 

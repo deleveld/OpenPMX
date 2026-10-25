@@ -782,9 +782,6 @@ sorted by absolute size. If diagnostics are requested then a summary of
 the predicted and observed change in objective function is also written here.
 * `<controlfile>.cov.ext`: the parameters and objective function value of each evaluation made.
 
-The calculated limits are also stored with the model, and can be retrieved in
-C code using `pmx_covariance_limit()`.
-
 ```c
 $MAIN
 	estimate();
@@ -813,11 +810,30 @@ for poorly determined or strongly non-linear parameters.
 This should follow an `estimate()` so that the final parameters and individual `ETA`
 values are available as starting values. If there is no valid objective function value from a previous
 `estimate()` or `evaluate()` then an error is written and nothing is calculated. 
+An error is also written if the parameter type is invalid, `.dobjfn` is negative, 
+the index is out of bounds, or the parameter is part of an `$OMEGASAME()` block.
 
-Each call searches in one direction. The `.param.value` is the bracketing value on
-the other side of the estimate and the objective function there must be higher than the 
-target, otherwise the root can not be bracketed and the profile exits with an error. 
-Call `profile()` twice, once on each side of the estimate, to get both limits.
+##### Search modes
+
+- **Two-sided**: `.param.lower` and `.param.upper` are given and `.param.value` is 0 (not set). 
+  A search is made towards each bound. On return `.param.lower` and `.param.upper` hold 
+  the two crossing points and `.param.value` is the estimate.
+- **One-sided**: `.param.value` is given. A single search is made from the estimate 
+  towards `.param.value`, so whether this is an upper or lower limit follows from 
+  which side of the estimate the value lies. On return `.param.value` is the best 
+  estimate of the crossing point and `.param.lower`, `.param.upper` are the final 
+  bracket around it.
+
+In both modes `.dobjfn`, `.nsig` and `.maxeval` are set on return to the values used, 
+so defaults that were applied can be read back.
+
+The objective function at each bound (or at `.param.value`) must be higher than the
+target, otherwise the root can not be bracketed. This is not an error: the limit on that side is 
+reported as open (`-Inf` for a lower limit, `+Inf` for an upper limit), 
+`profile bound ... failed` is shown on the console, and a row with `OBJFN` of 0 is written 
+to the profile file. Choose a bound further from the estimate to find the limit.
+If a bound or the estimate is not finite, or the bound equals the estimate, a warning 
+is given and nothing is estimated.
 
 Configuration is passed in a `PROFILECONFIG` object:
 
@@ -825,12 +841,13 @@ Configuration is passed in a `PROFILECONFIG` object:
 |---|---|---|---|
 | `.param.type` | enum | — | Parameter to profile: `PARAM_THETA`, `PARAM_OMEGA` or `PARAM_SIGMA` (required) |
 | `.param.index` | `int` | — | Index of the parameter. For `PARAM_OMEGA` this is the diagonal element (required) |
-| `.param.value` | `double` | — | Bracketing value on the side of the estimate to be searched (required). Must differ from the estimate |
-| `.name` | `string` | `"left"` or `"right"` | Label for the side being profiled. The default is `"left"` if `.param.value` is below the estimate and `"right"` if above |
-| `.append` | `bool` | `false` | Append to the profile output file instead of overwriting it |
-| `.dobjfn` | `double` | `~6.63` | Increase in objective function to search for. The default is the chi-squared quantile for alpha 0.01 with 1 degree of freedom |
-| `.dobjfn_tol` | `double` | `1.0` | The root is accepted when the objective function is within this distance of the target |
-| `.maxeval` | `int` | `10` | Maximum number of profile points evaluated (each is a full `estimate()`) |
+| `.param.value` | `double` | — | Bound to search towards in one-sided mode. Must be 0 (not set) for two-sided mode |
+| `.param.lower` | `double` | — | Lower bound to search towards in two-sided mode |
+| `.param.upper` | `double` | — | Upper bound to search towards in two-sided mode |
+| `.dobjfn` | `double` | `~6.63` | Increase in objective function to search for. If 0 the default is the chi-squared quantile for alpha 0.01 with 1 degree of freedom. For 95% use `3.84`. Negative values are an error |
+| `.nsig` | `double` | `1.5` | The root is accepted when the lower and upper bracket agree to this many significant digits |
+| `.maxeval` | `int` | `10` | Maximum number of profile points evaluated per search (each is a full `estimate()`) |
+| `.nextra` | `int` | `0` | After both limits are found, this number of extra points are evaluated between the lower and upper limit and written to the profile file. For `PARAM_THETA` they are uniformly spaced, for `PARAM_OMEGA` and `PARAM_SIGMA` they are logarithmically spaced. Only useful in two-sided mode, and skipped if either limit is open |
 | `.estimate.*` | — | see `ESTIMCONFIG` | Options for the estimation done at each profile point |
 
 The parameter can not be a part of an `$OMEGASAME()` block. Off-diagonal elements 
@@ -838,59 +855,69 @@ of `OMEGA` can not be profiled.
 
 At each profile point the profiled parameter is fixed, the other parameters start
 from the estimate, and the `ETA` values start from their values in the estimate. The
-root finder (Brent) works on a transformed scale between the estimate and
-`.param.value`, so that the objective function is closer to linear in the search 
-variable. The default tolerance is usually sufficient for a smooth line through the 
-profile points to be close to the confidence limit.
+root finder (Brent) works on a normalised scale between the estimate and
+the bound, with a square-root transformation so that the objective function is closer 
+to linear in the search variable. The estimate itself is not re-evaluated, so the 
+first evaluation of each search is at the bound. The default tolerance is usually 
+sufficient for a smooth line through the profile points to be close to the confidence limit.
 
 The search stops when:
 
-1. The objective function at a point is within `.dobjfn_tol` of the target. This is considered successful convergence.
-2. `.maxeval` points have been evaluated. 
-3. The root finder can not continue.
+1. The lower and upper bracket agree to `.nsig` significant digits (`profile converged`). 
+2. `.maxeval` points have been evaluated (`profile maxeval reached`, then `profile failed`). 
+3. The root finder can not continue, for example when the bracket is too wide and the function
+is not monotonic within the bounds (`profile failed`).
 
 After the search, the best interpolated value for the crossing point is reported 
 without doing another estimation. The console shows `profile converged` or 
-`profile failed` and the value.
+`profile failed` with the value and the final bracket as `value V lower L upper U`.
 
-The profile is written to `<controlfile>.profile.<type>.<index>.<name>.iter`, 
-with one row for each evaluated point and columns `type`, `index`, `value`, `objfn`, `target` and `neval`.
-The last row contains the interpolated crossing point, with `objfn` and `neval` set to `0`. 
-If an `.iter` file already exists it is overwritten unless `.append=true`. 
-The files of the estimation at each point are written with the base name 
-`<controlfile>.profile.<type>.<index>.<name>`. If the model has no filename then
-no files are written.
+##### Profile file
 
-##### Test only mode
+All model evaluation results are appended to `<filename>.profile.iter`, so results 
+accumulate over repeated calls. These can be used to display the profile graphically.
+The file has one row for each evaluated point and columns `TYPE` (`theta`, `omega` or `sigma`), 
+`INDEX`, `VALUE`, `OBJFN`, `TARGET` and `NEVAL`. The rows with `OBJFN` of 0 are the 
+predicted locations of the root (or an open limit). Extra points from `.nextra` and 
+points from `profile_add()` have a `TARGET` of 0. If the model has no filename then
+no file is written.
 
-If `.maxeval=1` and `.append=true` then a single point is evaluated at `.param.value` 
-and added to the profile file. No root finding is done and the other options are ignored. 
-This is useful to add points to a profile, for example to draw the 
+The file can be removed by `profile_clean()`. Specific parameters can be removed, for 
+example `profile_clean(.type=PARAM_THETA, .index=1)` removes all profile 
+information for THETA(1).
+
+##### Add only mode
+
+If `profile_add()` is called then the profile is evaluated at a single point at `.param.value` 
+and added to the profile file. The profiled parameter is fixed and the others are 
+re-estimated from the estimate. No root finding is done and only `.param` and 
+`.estimate.*` are used. This is useful to add points to a profile, for example to draw the 
 shape of the profile beyond the confidence limit.
 
 ```c
 $MAIN
 	estimate();
-	// 99% likelihood-profile confidence limits for THETA 2
-	profile(.param.type=PARAM_THETA, .param.index=2, .param.value=0.5);
-	profile(.param.type=PARAM_THETA, .param.index=2, .param.value=2.0);
+	// 99% likelihood-profile confidence limits for THETA 2, two-sided
+	profile(.param.type=PARAM_THETA, .param.index=2,
+			.param.lower=0.5, .param.upper=2.0);
 ```
 
 ```c
 $MAIN
 	estimate();
-	// 95% limit, with more points and a tighter tolerance, appended to an existing profile
+	// one-sided 95% upper limit for OMEGA 1, with more evaluations and tighter tolerance
 	profile(.param.type=PARAM_OMEGA, .param.index=1, .param.value=0.5,
-			.name="upper", .append=true,
-			.dobjfn=3.84, .dobjfn_tol=0.1, .maxeval=20);
+			.dobjfn=3.84, .nsig=4, .maxeval=20);
 ```
 
 ```c
 $MAIN
 	estimate();
-	// add a single point to the profile
-	profile(.param.type=PARAM_SIGMA, .param.index=1, .param.value=0.3,
-			.append=true, .maxeval=1);
+	// two-sided limits plus 8 extra points between them for plotting
+	profile(.param.type=PARAM_SIGMA, .param.index=1,
+			.param.lower=0.05, .param.upper=0.5, .nextra=8);
+	// add a single point beyond the upper limit
+	profile_add(.param.type=PARAM_SIGMA, .param.index=1, .param.value=0.6);
 ```
 
 #### `predict();`

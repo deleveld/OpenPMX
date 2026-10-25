@@ -743,10 +743,21 @@ typedef struct {
 /* Critical p-value threshold
  * Split alpha in half to account for both the left and right tails
  * also calculate the delta objfn */
-static DELTA dobjfn_from_alpha(const double alpha)
+static DELTA delta_from_alpha(const double alpha)
 {
 	let z = gsl_cdf_ugaussian_Qinv(alpha / 2.0);
 	let dobjfn = z * z;
+	return (DELTA) {
+		.alpha = alpha,
+		.z = z,
+		.dobjfn = dobjfn,
+	};
+}
+
+static DELTA delta_from_dobjfn(const double dobjfn)
+{
+	let z = sqrt(dobjfn);
+	let alpha = 2.0 * gsl_cdf_ugaussian_Q(z);
 	return (DELTA) {
 		.alpha = alpha,
 		.z = z,
@@ -764,10 +775,12 @@ static COVARIANCECONFIG covariance_args_resolve(COVARIANCECONFIG* const userargs
 		args = *userargs;
 		args.stage1 = stage1config_default(&userargs->stage1);
 	}
-	*delta = dobjfn_from_alpha(0.01);
-	
-	if (args.dobjfn <= 0.)
-		args.dobjfn = delta->dobjfn;
+	if (args.dobjfn > 0.)
+		*delta = delta_from_dobjfn(args.dobjfn);
+	else
+		*delta = delta_from_alpha(0.01);
+	args.dobjfn = delta->dobjfn;
+
 	if (args.step_size <= 0.)
 		args.step_size = 0.1;
 	if (userargs)
@@ -858,6 +871,19 @@ static void covext_append_limit_row(FILE* extstream,
 }
 
 
+static const char* param_name(const PARAM* const param)
+{
+	switch (param->type) {
+		case PARAM_THETA:
+			return "theta";
+		case PARAM_OMEGA:
+			return "omega";
+		case PARAM_SIGMA:
+			return "sigma";
+		default:
+			return "unknown";
+	}
+}
 /* This is dependent on the order of the parameter offsets in the
  * ENCODE object. It would perhaps be better if there was a way to 
  * indicate the relationship between the transformed and 
@@ -867,6 +893,7 @@ static void covlimits_output(ENCODE* const encode,
 							 const DELTA* delta,
 							 const POPMODEL* const popmodel, 
 							 struct timespec* begin,
+							 const char* source_filename,
 							 FILE* outstream, 
 							 FILE* extstream,
 							 COVARIANCECONFIG* args,
@@ -938,28 +965,30 @@ static void covlimits_output(ENCODE* const encode,
 
 	/* print requested upper and lower parameter limits */
 	info(outstream, "dobjfn %g Z %g alpha %g\n", delta->dobjfn, delta->z, delta->alpha);
-	info(outstream, OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_SFORMAT "\n",
-		"PARAMETER", "LOWER", "VALUE", "UPPER ");
+	
+	FILE* limitfile = 0;
+	char filename[PATH_MAX];
+	snprintf(filename, sizeof(filename), "%s" OPENPMX_COVLIMITS, source_filename);
+	limitfile = fopen(filename, "w");
+	
+	info(outstream, OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT "\n",
+		"TYPE", "INDEX", "LOWER", "VALUE", "UPPER");
+	if (limitfile)
+		fprintf(limitfile, OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT "\n",
+			"TYPE", "INDEX", "LOWER", "VALUE", "UPPER");
+
 	let offs = offset1 ? 1 : 0;
 	forcount(i, nlimit) {
 		let p = &limit[i];
-		char name[128];
-		switch (p->type) {
-		case PARAM_THETA:
-			snprintf(name, sizeof(name), "THETA(%i)", p->index + offs);
-			break;
-		case PARAM_SIGMA:
-			snprintf(name, sizeof(name), "SIGMA(%i)", p->index + offs);
-			break;
-		case PARAM_OMEGA:
-			snprintf(name, sizeof(name), "OMEGA(%i,%i)", p->index + offs, p->index + offs);
-			break;
-		default:
-			assert(0);
-		}
-		info(outstream, OPENPMX_SFORMAT OPENPMX_FFORMAT OPENPMX_FFORMAT OPENPMX_FFORMAT "\n", 
-			name, p->lower, p->value, p->upper);
+		let param_index = p->index + offs;
+		info(outstream, OPENPMX_SFORMAT OPENPMX_IFORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT "\n", 
+			param_name(p), param_index, p->lower, p->value, p->upper);
+		if (limitfile)
+			fprintf(limitfile, OPENPMX_SFORMAT OPENPMX_IFORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT "\n", 
+					param_name(p), param_index, p->lower, p->value, p->upper);
 	}
+	if (limitfile)
+		fclose(limitfile);
 	
 	/* write back results to user, each limit and number used */
 	int i;
@@ -1100,7 +1129,7 @@ void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
 	}
 
 	/* output the limits */
-	covlimits_output(&encode, cov, &delta, &popmodel, &begin, outstream, extstream, &args, pmx.data._offset1);
+	covlimits_output(&encode, cov, &delta, &popmodel, &begin, source->filename, outstream, extstream, &args, pmx.data._offset1);
 
 	/* print correlations */
 	print_correlations(cov, labels, outstream);

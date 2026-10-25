@@ -223,6 +223,7 @@ typedef struct {
 	const double left;
 	const double right;
 	const double objfn_target;
+	double best_target_err;
 	const OPENPMX* const source;
 	PROFILECONFIG* args;
 	POPMODEL* popmodel;
@@ -269,16 +270,10 @@ static double root_function(double x, void* _params)
 
 	iter_write(p->stream, args, objfn, p->objfn_target, p->neval);
 
-	return objfn - p->objfn_target;
-}
+	let err = objfn - p->objfn_target;
+	p->best_target_err = min(p->best_target_err, fabs(err));
 
-static double compute_nsig_param(const double old_val, const double new_val)
-{
-	let delta = fabs(new_val - old_val);
-	if (delta == 0.)
-		return DBL_MAX;
-	let scale = fmax(fabs(new_val), fabs(old_val));
-	return fmax(0., -log10(delta / scale));
+	return err;
 }
 
 static bool profile_side(const OPENPMX* const source, 
@@ -291,16 +286,18 @@ static bool profile_side(const OPENPMX* const source,
 #define DEFAULT_DF		1
 /// If .dobjfn is 0. then it will be set to the chi-squared distribution 
 /// for alpha 0.01 and 1 degree of freedom. This is approximately 6.63.
-/// The default tolerance in 3 significant digits. This is usually enough that a
-/// smoothed line through the profile points is close to the confidence
-/// limits.
+/// The default tolerance is that the objective function is matched to
+/// an error of 0.5. This is usually enough that a smooth line through 
+/// the profile points is close to the confidence limits. Note that after 
+/// convergence another braketing step is taken and to the objective
+/// function error at the final value is probably closer that 0.5.
 	if (!(args->dobjfn > 0.))
 		args->dobjfn = gsl_cdf_chisq_Pinv(1.0 - DEFAULT_ALPHA, DEFAULT_DF);
-	if (!(args->nsig > 0.))
-		args->nsig = 3;
+	if (!(args->tol > 0.))
+		args->tol = 0.5;
 		
 /// The default number of root finding evaluations is 10.
-	if (args->maxeval <= 0)
+	if  (!(args->maxeval > 0.))
 		args->maxeval = 10;
 
 	let left_value = *param_value(popmodel, &args->param, param_index(&args->param, source->data._offset1));
@@ -320,6 +317,7 @@ static bool profile_side(const OPENPMX* const source,
 		.left = left_value,
 		.right = right_value,
 		.objfn_target = source->result.objfn + args->dobjfn,
+		.best_target_err = DBL_MAX,
 		.source = source,
 		.args = args,
 		.popmodel = popmodel,
@@ -333,9 +331,9 @@ static bool profile_side(const OPENPMX* const source,
 
 	let type = param_name(&args->param);
 	printf("profile start %s %i lower %g upper %g\n"
-		   "profile objfn %.6f target %.6f dobjfn %.6f nsig %g\n", 
+		   "profile objfn %.6f target %.6f dobjfn %.6f tol %g\n", 
 		   type, args->param.index, fmin(left_value, right_value), fmax(left_value, right_value), 
-		   source->result.objfn, params.objfn_target, args->dobjfn, args->nsig);
+		   source->result.objfn, params.objfn_target, args->dobjfn, args->tol);
 
 	/* gsl_root_fsolver_set() calls root_function at both ends of the
 	 * bracket. The left is taken from the source, so only the right is 
@@ -368,11 +366,9 @@ static bool profile_side(const OPENPMX* const source,
 			break;
 		}
 
-		/* test for convergence */
-		let lower = profile_value(&params, gsl_root_fsolver_x_lower(s));
-		let upper = profile_value(&params, gsl_root_fsolver_x_upper(s));
-		let nsig = compute_nsig_param(lower, upper);
-		if (nsig > args->nsig) 
+		/* converge if any bound is close to the target, the next
+		 * evaluation would further improve acccuracy */
+		if (params.best_target_err < args->tol)
 			converged = true;
 	}
 	if (!converged && params.neval >= args->maxeval)
@@ -393,9 +389,9 @@ static bool profile_side(const OPENPMX* const source,
 	let upper	= profile_value(&params, gsl_root_fsolver_x_upper(s));
 	args->param.lower = fmin(lower, upper);
 	args->param.value = value;
-	args->param.upper = fmax(lower, upper);		
+	args->param.upper = fmax(lower, upper);
 
-	printf("profile %s value %g [%g, %g]\n", 
+	printf("profile %s value %g lower %g upper %g\n", 
 			converged ? "converged" : "failed",
 			args->param.value,
 			args->param.lower,
@@ -418,21 +414,32 @@ cleanup:
 /// is returned as -INFINITY (lower) or +INFINITY (upper).
 OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 {
+	var ret = pmx_copy(source);
+	var stream = iter_open(source->filename);
+
 	ERRCTX errctx = { 0 };
 	var popmodel = profile_popmodel_init(source, args, &errctx); 
 	if (errctx.len) 
-		fatal(0, "%s: %s", __func__, errctx.errmsg);
+		fatal(stream, "%s: %s", __func__, errctx.errmsg);
 
-	var stream = iter_open(source->filename);
-
-	var ret = pmx_copy(source);
+	/* check that value is valid */
+	let value = *param_value(&popmodel, &args->param, param_index(&args->param, source->data._offset1));
+	if (!isfinite(value)) {
+		warning(stream, "%s: profile parameter not valid\n", __func__);
+		if (stream)
+			fclose(stream);
+		ret.filename = 0; /* dont let filename dangle */
+		pmx_release_state(&ret);
+		return ret;
+	}
+	
+	/* do both upper and lower bounds */
 	if (args->param.value == 0. && args->param.lower < args->param.upper) {
 		PROFILECONFIG cfg_lo = *args;
 		PROFILECONFIG cfg_hi = *args;
 		POPMODEL popmodel_lo = popmodel;
 		POPMODEL popmodel_hi = popmodel;
 
-		let value = *param_value(&popmodel_lo, &cfg_lo.param, param_index(&cfg_lo.param, source->data._offset1));
 		let lo = cfg_lo.param.lower;
 		let hi = cfg_lo.param.upper;
 		
@@ -450,20 +457,22 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 		profile_side(source, &cfg_hi, &popmodel_hi, stream, &ret);
 		let upper_root = cfg_hi.param.value;
 
-		/* return both bounds */
+		/* return both bounds and other results */
 		args->param.lower = lower_root;
 		args->param.value = value;
 		args->param.upper = upper_root;
+		args->maxeval     = cfg_lo.maxeval;
+		
+	/* do only a single bound, figure out whether it should be upper or lower */
 	} else
 		profile_side(source, args, &popmodel, stream, &ret);
 
 	/* extra samples if requested */
-	let param_saved = args->param; /* save old results */
 	var lower = args->param.lower;
 	var upper = args->param.upper;
 	if (args->nextra && 
 		isfinite(lower) && 
-		isfinite(lower) && 
+		isfinite(value) && 
 		isfinite(upper)) {
 		let logscale = (args->param.type == PARAM_OMEGA || args->param.type == PARAM_SIGMA) && 
 						(lower > 0. && upper > 0.);
@@ -473,27 +482,30 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 		}
 		let step = (upper - lower) / (args->nextra + 1);
 
+		POPMODEL popmodel_extra = popmodel;
+		PROFILECONFIG cfg_extra = *args;
 		var v = lower + step;
 		forcount(i, args->nextra) {
 			
 			/* evaluate profile at the extra value */
-			args->param.lower = 0;
-			args->param.value = (logscale) ? exp(v) : v;
-			args->param.upper = 0;
+			cfg_extra.param.lower = 0;
+			cfg_extra.param.value = (logscale) ? exp(v) : v;
+			cfg_extra.param.upper = 0;
 			
-			printf("profile extra %s %i value %g\n",
-				   param_name(&args->param), args->param.index, args->param.value);
-			profile_evaluate(&ret, &popmodel, source, args);
+			printf("profile extra %s %i value %g %i/%i\n",
+				   param_name(&cfg_extra.param), cfg_extra.param.index, cfg_extra.param.value,
+				   i + 1, args->nextra);
+			profile_evaluate(&ret, &popmodel_extra, source, &cfg_extra);
 			let objfn = ret.result.objfn;
 			printf("profile add objfn %.6f\n", objfn);
-			iter_write(stream, args, objfn, 0., 1);
+			iter_write(stream, &cfg_extra, objfn, 0., 1);
 
 			v += step; /* next step */
 		}
 	}
-	args->param = param_saved; /* replace old results */
 	
-	fclose(stream);
+	if (stream)
+		fclose(stream);
 
 	ret.filename = 0; /* dont let filename dangle */
 	pmx_release_state(&ret);

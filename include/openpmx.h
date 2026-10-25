@@ -342,11 +342,11 @@ typedef struct {
 /* profile */
 /*---------------------------------------------------------------------*/
 typedef struct {
-	PARAM param;		/* input: bracketing value, output: final value */
+	PARAM param;		/* input: bracketing values, output: final value */
 	double dobjfn;		/* input: targeted profile */
-	double nsig;
-	int nextra;
+	double tol;
 	int maxeval;		/* input: maximum root-finding evaluations */
+	int nextra;
 	ESTIMCONFIG estimate;
 } PROFILECONFIG;
 
