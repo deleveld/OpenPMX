@@ -25,7 +25,7 @@ OpenPMX is a collection of numerical routines for estimation and simulation of m
 If you just want to use the latest stable version then you should look at the [Releases](https://github.com/deleveld/OpenPMX/releases).
 This repository contains the work-in-progress (WIP) development version and could concievably be broken. 
 
-A free-to-use install of a stable release is available at [OpenPMX free online](https://openpx.com/).
+A free-to-use install of a stable release is available at [OpenPMX free online](https://openpmx.com).
 
 ### Features
 
