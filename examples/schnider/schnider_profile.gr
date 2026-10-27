@@ -14,7 +14,7 @@ $IMODEL(V1, V2, V3, CL, Q2, Q3)
 	V1 = THETA(1) * SIZE * exp(ETA(1));
 	V2 = THETA(2) * SIZE * exp(ETA(2) + THETA(7)*(AGE-35)); /* a comment */
 	V3 = THETA(3) * SIZE * exp(ETA(3));
-	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4));
+	CL = THETA(4) * pow(SIZE, 0.75) * exp(ETA(4) + THETA(8)*(M1F2-1));
 	Q2 = THETA(5) * pow(V2/THETA(2), 0.75) * exp(ETA(5));
 	Q3 = THETA(6) * pow(V3/THETA(3), 0.75) * exp(ETA(6));
 $PREDICT(IPRED)
@@ -28,6 +28,7 @@ $THETA
 	{   0.1,   2,   5,  ESTIMATE     },
 	{   0.1,   1,   5,  ESTIMATE     },
 	{   -.1,   0,   .1,  ESTIMATE     },
+	{   -.5,   0,   .5,  ESTIMATE     },
 $OMEGA(0.1, 0.1, 0.1, 0.1, 0., 0.)
 $SIGMA(0.1)
 $MAIN
@@ -36,12 +37,14 @@ $MAIN
 
 	pmx_estimate(&openpmx, &estim);
 	
+	double dobjfn = 3.84;
 	COVARIANCECONFIG covconfig = { 
-		.type=COVARIANCE_S_MATRIX, 
-		.stage1 = estim.stage1 
+		.stage1 = estim.stage1,
+		.dobjfn = dobjfn,
 	};
 	pmx_covariance(&openpmx, &covconfig);
 
+//	dobjfn = 0.;
 	profile_clean();
 	int nextra = 0;
 	profile(.param = { 
@@ -51,6 +54,7 @@ $MAIN
 				.upper = 40. },
 			.estimate = estim,
 			.nextra = nextra, 
+			.dobjfn = dobjfn,
 			);
 	profile(.param = { 
 				.type=PARAM_THETA, 
@@ -59,6 +63,7 @@ $MAIN
 				.upper = 100. },
 			.estimate = estim,
 			.nextra = nextra,
+			.dobjfn = dobjfn,
 			);
 	profile(.param = { 
 				.type=PARAM_THETA, 
@@ -67,6 +72,7 @@ $MAIN
 				.upper = 400. },
 			.estimate = estim,
 			.nextra = nextra, 
+			.dobjfn = dobjfn,
 			); 
 	profile(.param = { 
 				.type=PARAM_THETA, 
@@ -75,6 +81,7 @@ $MAIN
 				.upper = 3. },
 			.estimate = estim,
 			.nextra = nextra,
+			.dobjfn = dobjfn,
 			); 
 	profile(.param = { 
 				.type=PARAM_THETA, 
@@ -83,6 +90,7 @@ $MAIN
 				.upper = 3. },
 			.estimate = estim,
 			.nextra = nextra,
+			.dobjfn = dobjfn,
 			); 
 	profile(.param = { 
 				.type=PARAM_THETA, 
@@ -91,6 +99,7 @@ $MAIN
 				.upper = 3. },
 			.estimate = estim,
 			.nextra = nextra,
+			.dobjfn = dobjfn,
 			); 
 	profile(.param = { 
 				.type=PARAM_THETA, 
@@ -99,6 +108,16 @@ $MAIN
 				.upper = 0.1 },
 			.estimate = estim,
 			.nextra = nextra,
+			.dobjfn = dobjfn,
+			); 
+	profile(.param = { 
+				.type=PARAM_THETA, 
+				.index = 8,
+				.lower = -0.5,
+				.upper = 0.5 },
+			.estimate = estim,
+			.nextra = nextra,
+			.dobjfn = dobjfn,
 			); 
 			
 	profile(.param = { 
@@ -108,30 +127,34 @@ $MAIN
 				.upper = 1. },
 			.estimate = estim,
 			.nextra = nextra,
+			.dobjfn = dobjfn,
 			);
 	profile(.param = { 
 				.type=PARAM_OMEGA, 
 				.index = 2,
-				.lower = 1e-6,
+				.lower = 1e-3,
 				.upper = 1. },
 			.estimate = estim,
 			.nextra = nextra,
+			.dobjfn = dobjfn,
 			);
 	profile(.param = { 
 				.type=PARAM_OMEGA, 
 				.index = 3,
-				.lower = 1e-6,
+				.lower = 1e-3,
 				.upper = 1. },
 			.estimate = estim,
 			.nextra = nextra,
+			.dobjfn = dobjfn,
 			);
 	profile(.param = { 
 				.type=PARAM_OMEGA, 
 				.index = 4,
-				.lower = 1e-6,
+				.lower = 1e-3,
 				.upper = 1. },
 			.estimate = estim,
 			.nextra = nextra,
+			.dobjfn = dobjfn,
 			);
 	profile(.param = { 
 				.type=PARAM_SIGMA, 
@@ -140,18 +163,5 @@ $MAIN
 				.upper = 0.0547787 + 0.01 },
 			.estimate = estim,
 			.nextra = nextra,
+			.dobjfn = dobjfn,
 			);
-	
-/*	do_profile(PARAM_THETA, 2, 5, 100);
-	do_profile(PARAM_THETA, 3, 100, 400);
-	do_profile(PARAM_THETA, 4, .5, 4);
-	do_profile(PARAM_THETA, 5, .1, 4);
-	do_profile(PARAM_THETA, 6, .1, 4);
-	do_profile(PARAM_THETA, 7, -.1, .1);
-	do_profile(PARAM_OMEGA, 1, 1e-6, 1);
-	do_profile(PARAM_OMEGA, 2, 1e-6, 1);
-	do_profile(PARAM_OMEGA, 3, 1e-6, 1);
-	do_profile(PARAM_OMEGA, 4, 1e-6, 1);
-	do_profile(PARAM_SIGMA, 1, 0.045, 0.65);
-*/
-	

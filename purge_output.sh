@@ -14,7 +14,9 @@ find . -type f \( \
     -name "*.phi" -o \
     -name "*.iter" -o \
     -name "*.gr.c" -o \
-    -name "*.covcheck" -o \
+    -name "*.bin" -o \
+    -name "*.covlimits" -o \
+    -name "*.profie.iter" -o \
     -name "*.o" \
 \) -exec rm -v {} +
 

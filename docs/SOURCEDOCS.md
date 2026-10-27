@@ -617,27 +617,33 @@ Within the `$ADVAN(...)` block an advancer must be indicated.
 This file implements a function that allows likelihood profiling.
 It is available in openpmxtran as `profile()`.
 
-If .dobjfn is 0. then it will be set to the chi-squared distribution 
+If `.dobjfn` is 0. then it will be set to the chi-squared distribution 
 for alpha 0.01 and 1 degree of freedom. This is approximately 6.63.
-
-The default tolerance is 1 objfn units. This is usually enough that a
-smoothed line through the profile points is close to the confidence
-limits.
+The default tolerance is that the objective function is matched to
+an error of 0.5. This is usually enough that a smooth line through 
+the profile points is close to the confidence limits. Note that after 
+convergence another braketing step is taken (but not evaluated) and
+to the objective function error at the final value is probably smaller
+thas 0.5.
 
 The default number of root finding evaluations is 10.
 
-If .value is 0 and .lower < .upper then two profiles are run, one to
-the .lower bound and one to the .upper bound. On return .lower is the
-crossing point from the lower profile and .upper is the crossing point
-from the upper profile. The .value is set to the source estimate. 
-Otherwise a single profile is run to .value. If a bound does not 
-cross the .dobjfn threshold then the limit on that side is open and 
+If `.value` is 0 and `.lower` < `.upper` then two profiles are run, one to
+the lower bound and one to the upper bound. On return `.lower` is the
+crossing point from the lower profile and `.upper` is the crossing point
+from the upper profile. The `.value` is set to the source estimate. 
+Otherwise a single profile is run to `.value.` If a bound does not 
+cross the `.dobjfn` threshold then the limit on that side is open and 
 is returned as -INFINITY (lower) or +INFINITY (upper).
 
-pmx_profile_add() evaluates the profile at the single value in args->param.value and
-append the point to the profile file. The profiled parameter is fixed
-and the others are re-estimated starting from the source fit. Only
-args->param and args->estimate are used.
+pmx_profile_add() evaluates the profile at the single value in
+`param.value` and appends the point to the profile file. The
+profiled parameter is fixed and the others are re-estimated starting
+from the source fit. Only `.param` and `.estimate` are used.
+
+This `profile_clean(...)` in openpmxtran function deletes the table
+points in the profile. It can be only for a specific parameter type
+and index, or the entire file (the default). 
 
 
 # src/reload.c

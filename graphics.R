@@ -124,7 +124,7 @@ if (file.exists(covlimitfile)) {
 	names(covlimits) <- toupper(names(covlimits))
 }
 
-pdf(pdffile)
+pdf(pdffile, width = 11.69, height = 8.27)  # A4 landscape
 
 get_config_setting <- function(name_val, sub_val, sub_type, default)
 {
@@ -142,7 +142,7 @@ get_config_setting <- function(name_val, sub_val, sub_type, default)
 # parameter vs. iteration
 if (is.data.frame(ext)) {
 	cat(sprintf("plot ext\n"))
-	par(mfrow=c(2,2), cex=0.9)
+	par(mfrow=c(2,3), cex=1)
 	for (iname in names(ext)) {
 		
 		v <- ext[["ITERATION"]]
@@ -247,13 +247,13 @@ if (is.data.frame(cov) && is.data.frame(phi)) {
 					legend=legend_text,
 					col=legend_col,
 					lw=legend_lw,
-					bty="n", cex=0.8)
+					bty="n", cex=1)
 		}
 	}
 
 	for (cname in names(cov)) {
 		n_plots <- 0
-		par(mfrow=c(2,2), cex=0.9)
+		par(mfrow=c(2,3), cex=1)
 
 		cat(sprintf("plot cov %s\n", cname))
 
@@ -318,7 +318,7 @@ if (is.data.frame(yhatdata)) {
 
 		for (dname in dvid_types) {
 			n_plots <- 0
-			par(mfrow=c(2,2), cex=0.9)
+			par(mfrow=c(2,3), cex=1)
 
 			logy <- ""
 			logxy <- ""
@@ -365,6 +365,8 @@ if (is.data.frame(yhatdata)) {
 				points(x=x, y=y, col=pointcol)
 				abline(coef = c(0,1))
 				grid()
+
+				frame()
 
 				if ("TIME" %in% pnames) {
 					time <- yhatdata[valid, "TIME"]
@@ -429,7 +431,7 @@ if (is.data.frame(yhatdata)) {
 # yhat vs. yhat var for each dvtype
 if (is.data.frame(profiles)) {
 
-	par(mfrow=c(2,2), cex=0.9)
+	par(mfrow=c(2,3), cex=1)
 	
 	p <- profiles
 	p <- p[!duplicated(p), ]
@@ -451,22 +453,27 @@ if (is.data.frame(profiles)) {
 		bounds <- idata[idata$OBJFN == 0. & idata$TARGET != 0., "VALUE"]
 		idata <- idata[idata$OBJFN != 0., ]
 		final <- idata[idata$NEVAL == 0, ]
-		
+
+		minobjfn <- min(idata$OBJFN)
+		pheight <- max(final$TARGET - minobjfn)
+
 		covdata <- NA
 		covlower <- NA
 		covupper <- NA
+		cheight <- 0
 		if (is.data.frame(covlim)) {
 			covdata <- covlim[covlim$profilegroup == i, ]
 			covlower <- covdata$LOWER
 			covupper <- covdata$UPPER
+			cheight <- max(covlim$DOBJFN)
 		}
+		dheight <- max(pheight, cheight)
+
 		# scan rows are written with TARGET=0, only the search rows carry the real target
 		target <- max(unique(idata$TARGET[idata$TARGET != 0.]))
 
 		ox <- order(idata$VALUE)
 		idata <- idata[ox, ]
-
-		minobjfn <- min(idata$OBJFN)
 		x0 <- idata[idata$OBJFN - minobjfn < 20., ]
 
 		type <- unique(idata[["TYPE"]])
@@ -487,18 +494,16 @@ if (is.data.frame(profiles)) {
 
 		x <- idata[["VALUE"]]
 		y <- idata[["OBJFN"]]
-		plot(x=x, y=y, type="n", xlab=plotname, ylab="Objfn", xlim=xlim, ylim=c(min(y), min(y)+20), log=xlog)
+		plot(x=x, y=y, type="n", xlab=plotname, ylab="Objective function", xlim=xlim, ylim=c(minobjfn, minobjfn+dheight*3), log=xlog)
 
 		# exact limits found by the root finder (OBJFN==0 marker rows)
 		lower <- tr(min(bounds))
 		upper <- tr(max(bounds))
-		rect(xleft=itr(lower), xright=itr(upper), ybottom=minobjfn-20, ytop=target, col="lightsteelblue", border=NA)
+		rect(xleft=itr(lower), xright=itr(upper), ybottom=minobjfn-20, ytop=minobjfn+pheight, col="lightsteelblue", border="lightsteelblue")
 		
 		covlegend <- ""
 		if (!is.na(covlower) && !is.na(covupper)) {
-			rect(xleft=covlower, xright=covupper, ybottom=minobjfn-20, ytop=target, col=NA, border="red")
-#			abline(v=covlower, col="red", lw=1)
-#			abline(v=covupper, col="red", lw=1)
+			rect(xleft=covlower, xright=covupper, ybottom=minobjfn-20, ytop=minobjfn+cheight, col=NA, border="blue")
 			covlegend <- sprintf("cov [%.3g, %.3g]", covlower, covupper)
 		}
 
@@ -506,17 +511,17 @@ if (is.data.frame(profiles)) {
 		sfunc <- splinefun(x=tr(x), y=y, method="monoH.FC", ties=mean)
 		xl <- itr(seq(tr(xlim[1]), tr(xlim[2]), length.out=100))
 		yl <- sfunc(tr(xl))
-		lines(x=xl, y=yl, col = "blue")
+		lines(x=xl, y=yl, col="red")
 
-		points(x=x, y=y)
+		points(x=x, y=y, pch=21, col="red", bg="white", cex=0.8)
 		value <- final[["VALUE"]]
-		points(x=value, y=final[["OBJFN"]], col="red", pch=16)
-		
+		points(x=value, y=final[["OBJFN"]], col="black", pch=16)
+
 		legend("top", 
 			legend=c(sprintf("estimate %.3g", value),
 					 sprintf("profile [%.3g, %.3g]", itr(lower), itr(upper)),
 					 covlegend),
-			bty="n", cex=0.9)
+			bty="n", cex=1)
 		
 		grid()
 		box()

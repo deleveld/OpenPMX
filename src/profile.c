@@ -284,13 +284,14 @@ static bool profile_side(const OPENPMX* const source,
 {
 #define DEFAULT_ALPHA	0.01
 #define DEFAULT_DF		1
-/// If .dobjfn is 0. then it will be set to the chi-squared distribution 
+/// If `.dobjfn` is 0. then it will be set to the chi-squared distribution 
 /// for alpha 0.01 and 1 degree of freedom. This is approximately 6.63.
 /// The default tolerance is that the objective function is matched to
 /// an error of 0.5. This is usually enough that a smooth line through 
 /// the profile points is close to the confidence limits. Note that after 
-/// convergence another braketing step is taken and to the objective
-/// function error at the final value is probably closer that 0.5.
+/// convergence another braketing step is taken (but not evaluated) and
+/// to the objective function error at the final value is probably smaller
+/// thas 0.5.
 	if (!(args->dobjfn > 0.))
 		args->dobjfn = gsl_cdf_chisq_Pinv(1.0 - DEFAULT_ALPHA, DEFAULT_DF);
 	if (!(args->tol > 0.))
@@ -405,12 +406,12 @@ cleanup:
 	return true;
 }
 
-/// If .value is 0 and .lower < .upper then two profiles are run, one to
-/// the .lower bound and one to the .upper bound. On return .lower is the
-/// crossing point from the lower profile and .upper is the crossing point
-/// from the upper profile. The .value is set to the source estimate. 
-/// Otherwise a single profile is run to .value. If a bound does not 
-/// cross the .dobjfn threshold then the limit on that side is open and 
+/// If `.value` is 0 and `.lower` < `.upper` then two profiles are run, one to
+/// the lower bound and one to the upper bound. On return `.lower` is the
+/// crossing point from the lower profile and `.upper` is the crossing point
+/// from the upper profile. The `.value` is set to the source estimate. 
+/// Otherwise a single profile is run to `.value.` If a bound does not 
+/// cross the `.dobjfn` threshold then the limit on that side is open and 
 /// is returned as -INFINITY (lower) or +INFINITY (upper).
 OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 {
@@ -435,10 +436,10 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 	
 	/* do both upper and lower bounds */
 	if (args->param.value == 0. && args->param.lower < args->param.upper) {
-		PROFILECONFIG cfg_lo = *args;
-		PROFILECONFIG cfg_hi = *args;
-		POPMODEL popmodel_lo = popmodel;
-		POPMODEL popmodel_hi = popmodel;
+		var cfg_lo = *args;
+		var cfg_hi = *args;
+		var popmodel_lo = popmodel;
+		var popmodel_hi = popmodel;
 
 		let lo = cfg_lo.param.lower;
 		let hi = cfg_lo.param.upper;
@@ -482,8 +483,8 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 		}
 		let step = (upper - lower) / (args->nextra + 1);
 
-		POPMODEL popmodel_extra = popmodel;
-		PROFILECONFIG cfg_extra = *args;
+		var popmodel_extra = popmodel;
+		var cfg_extra = *args;
 		var v = lower + step;
 		forcount(i, args->nextra) {
 			
@@ -512,10 +513,10 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 	return ret;
 }
 
-/// pmx_profile_add() evaluates the profile at the single value in args->param.value and
-/// append the point to the profile file. The profiled parameter is fixed
-/// and the others are re-estimated starting from the source fit. Only
-/// args->param and args->estimate are used.
+/// pmx_profile_add() evaluates the profile at the single value in
+/// `param.value` and appends the point to the profile file. The
+/// profiled parameter is fixed and the others are re-estimated starting
+/// from the source fit. Only `.param` and `.estimate` are used.
 OPENPMX pmx_profile_add(const OPENPMX* const source, PROFILECONFIG* const args)
 {
 	ERRCTX errctx = { 0 };
@@ -546,6 +547,9 @@ OPENPMX pmx_profile_add(const OPENPMX* const source, PROFILECONFIG* const args)
 	return ret;
 }
 
+/// This `profile_clean(...)` in openpmxtran function deletes the table
+/// points in the profile. It can be only for a specific parameter type
+/// and index, or the entire file (the default). 
 void pmx_profile_clean(const OPENPMX* const openpmx, const PARAM* const param)
 {
 	if (!openpmx || !openpmx->filename || strlen(openpmx->filename) == 0)

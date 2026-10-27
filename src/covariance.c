@@ -789,13 +789,13 @@ static COVARIANCECONFIG covariance_args_resolve(COVARIANCECONFIG* const userargs
 }
 
 static PARAM covlimit_make(ENCODE* const encode,
-							  const gsl_matrix* const cov,
-							  const int j,
-							  const double z,
-							  const int type,
-							  const int index,
-							  const double value,
-							  const double* const decoded) /* points into encode->popmodel */
+						   const gsl_matrix* const cov,
+						   const int j,
+						   const double z,
+						   const int type,
+						   const int index,
+						   const double value,
+						   const double* const decoded) /* points into encode->popmodel */
 {
 	decode_popmodel_limit(encode, cov, j, z);
 	let upper = *decoded;
@@ -966,29 +966,25 @@ static void covlimits_output(ENCODE* const encode,
 	/* print requested upper and lower parameter limits */
 	info(outstream, "dobjfn %g Z %g alpha %g\n", delta->dobjfn, delta->z, delta->alpha);
 	
-	FILE* limitfile = 0;
+	FILE* limitstream = 0;
 	char filename[PATH_MAX];
 	snprintf(filename, sizeof(filename), "%s" OPENPMX_COVLIMITS, source_filename);
-	limitfile = fopen(filename, "w");
+	limitstream = fopen(filename, "w");
 	
-	info(outstream, OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT "\n",
-		"TYPE", "INDEX", "LOWER", "VALUE", "UPPER");
-	if (limitfile)
-		fprintf(limitfile, OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT "\n",
-			"TYPE", "INDEX", "LOWER", "VALUE", "UPPER");
-
+	openpmx_printf(outstream, limitstream, 0,
+			OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT "\n",
+			"TYPE", "INDEX", "LOWER", "VALUE", "UPPER", "DOBJFN");
 	let offs = offset1 ? 1 : 0;
 	forcount(i, nlimit) {
 		let p = &limit[i];
 		let param_index = p->index + offs;
-		info(outstream, OPENPMX_SFORMAT OPENPMX_IFORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT "\n", 
-			param_name(p), param_index, p->lower, p->value, p->upper);
-		if (limitfile)
-			fprintf(limitfile, OPENPMX_SFORMAT OPENPMX_IFORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT "\n", 
-					param_name(p), param_index, p->lower, p->value, p->upper);
+		
+		openpmx_printf(outstream, limitstream, 0,
+				OPENPMX_SFORMAT OPENPMX_IFORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT "\n", 
+				param_name(p), param_index, p->lower, p->value, p->upper, args->dobjfn);
 	}
-	if (limitfile)
-		fclose(limitfile);
+	if (limitstream)
+		fclose(limitstream);
 	
 	/* write back results to user, each limit and number used */
 	int i;
