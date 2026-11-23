@@ -508,9 +508,9 @@ static int reload_popparam(OPENPMX* dest, const RELOADCONFIG* const args, POPMOD
 
 	/* success path */ 
 	/* actually copy over the population parameters, even the limits */
-	memcpy(dest->theta, src.theta, s.ntheta*sizeof(THETATYPE));
-	memcpy(dest->omega, src.omega, s.nblock*sizeof(OMEGABLOCKSTYPE));
-	memcpy(dest->sigma, src.sigma, s.nsigma*sizeof(double));
+	memcpyvar(dest->theta, src.theta, s.ntheta);
+	memcpyvar(dest->omega, src.omega, s.nblock);
+	memcpyvar(dest->sigma, src.sigma, s.nsigma);
 	
 	/* overwrite other parameters with invalid values */
 	int i;

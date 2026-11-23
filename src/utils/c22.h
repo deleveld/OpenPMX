@@ -58,6 +58,13 @@ char(&countof_helper(T(&)[N]))[N];
 #define mallocvar(t, n)	((t*)malloc((size_t)(n) * sizeof(t)))
 #define callocvar(t, n) ((t*)calloc((size_t)(n), sizeof(t)))
 
+#define memcpyvar(dest, src, n) do {        \
+    typeof((dest) + 0) _d = (dest);         \
+    typeof((src) + 0) _s = (src);           \
+    (void)(&_d == &_s);                     \
+    memcpy(_d, _s, (n) * sizeof(*(dest)));  \
+} while (0)
+
 /* Type-safe container_of macro */
 #define container_of(ptr, type, member) ({          	\
     const typeof(((type *)0)->member) *__mptr = (ptr);	\

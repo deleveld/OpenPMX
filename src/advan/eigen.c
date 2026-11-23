@@ -547,7 +547,7 @@ static void advancer_eigen_threecomp_advance_interval(ADVAN* advan,
 		/* update the system matrix for the eigen advance */
 		let n = self->n;
 		assert(n == advan->advanfuncs->nstate);
-		memcpy(self->sysmat_data, sysmat_data, n * n * sizeof(double));
+		memcpyvar(self->sysmat_data, sysmat_data, n * n);
 
 		/* resetting the last_recalc_initcount should be done in the 
 		 * advancer_eigen_advance_interval() function, dont do it here */
@@ -678,7 +678,7 @@ static void advancer_eigen_twocomp_advance_interval(ADVAN* advan,
 		/* update the system matrix for the eigen advance */
 		let n = self->n;
 		assert(n == advan->advanfuncs->nstate);
-		memcpy(self->sysmat_data, sysmat_data, n * n * sizeof(double));
+		memcpyvar(self->sysmat_data, sysmat_data, n * n);
 
 		/* resetting the last_recalc_initcount should be done in the 
 		 * advancer_eigen_advance_interval() function, dont do it here */
@@ -801,7 +801,7 @@ static void advancer_eigen_onecomp_depot_advance_interval(ADVAN* advan,
 		/* update the system matrix for the eigen advance */
 		let n = self->n;
 		assert(n == advan->advanfuncs->nstate);
-		memcpy(self->sysmat_data, sysmat_data, n * n * sizeof(double));
+		memcpyvar(self->sysmat_data, sysmat_data, n * n);
 
 		/* resetting the last_recalc_initcount should be done in the 
 		 * advancer_eigen_advance_interval() function, dont do it here */
@@ -930,7 +930,7 @@ static void advancer_eigen_twocomp_depot_advance_interval(ADVAN* advan,
 		/* update the system matrix for the eigen advance */
 		let n = self->n;
 		assert(n == advan->advanfuncs->nstate);
-		memcpy(self->sysmat_data, sysmat_data, n * n * sizeof(double));
+		memcpyvar(self->sysmat_data, sysmat_data, n * n);
 
 		/* resetting the last_recalc_initcount should be done in the 
 		 * advancer_eigen_advance_interval() function, dont do it here */

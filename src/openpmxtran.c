@@ -49,6 +49,7 @@
 #include "utils/vector.c"
 #include "utils/errctx.c"
 #include "utils/getdelim.c"
+#include "utils/filecontent.c"
 
 #define OPENPMX_FUNCTIONS_MAX		10
 #define OPENPMX_FILE_RECORDS_MAX	10
@@ -56,7 +57,7 @@
 static int strip_enclosing(char* s, const char terminal_begin, const char terminal_end)
 {
 	let len = strlen(s);
-	if (len == 0)
+	if (len < 2)
 		return 1;
 
 	/* check at end */
@@ -76,7 +77,8 @@ static int strip_enclosing(char* s, const char terminal_begin, const char termin
 	return 0;
 }
 
-static void strip_comments_robust(char *s)
+/* returns non-zero if a block comment was left unterminated */
+static int strip_comments_robust(char *s)
 {
 	typedef enum { 
 		NORMAL, 
@@ -176,6 +178,7 @@ static void strip_comments_robust(char *s)
 			case POTENTIAL_COMMENT_END:
 				if (*src == '/') {
 					state = NORMAL;
+					*dst++ = ' '; // a comment acts as whitespace, so tokens are not pasted
 				} else if (*src == '*') {
 					// Sequence like ***/ - stay in POTENTIAL_END
 				} else {
@@ -189,9 +192,11 @@ static void strip_comments_robust(char *s)
 	}
 
 	// Clean up if the file ends on a trailing slash
-	if (state == POTENTIAL_COMMENT_START) *dst++ = '/';
+	if (state == POTENTIAL_COMMENT_START) 
+		*dst++ = '/';
 
 	*dst = '\0';
+	return (state == IN_COMMENT_MULTI || state == POTENTIAL_COMMENT_END);
 }
 
 static VECPTR split_blocks(char *buf)
@@ -228,16 +233,30 @@ typedef struct {
 static block_content extract_args_content(char *payload, ERRCTX* errctx)
 {
 	// '(' must appear as first char in payload
-	char *open = payload;
+	var open = payload;
+	while (isspace((unsigned char)*open))
+		open++;
 	if (*open != '(') {
 		errctx_add(errctx, "%s: missing '('\n", __func__);
 		return (block_content) { 0 };
 	}
 
 	// Walk forward to find the closing ')', error on any nested '('
-	char *close = open + 1;
-	while (*close && *close != ')' && *close != '(')
+	var close = open + 1;
+	bool in_string = false;
+	while (*close) {
+		if (in_string) {
+			if (*close == '\\' && close[1])
+				close++;
+			else if (*close == '"')
+				in_string = false;
+		} else if (*close == '"') {
+			in_string = true;
+		} else if (*close == ')' || *close == '(') {
+			break;
+		}
 		close++;
+	}
 	if (*close == '(') {
 		errctx_add(errctx, "%s: unexpected nested '('\n", __func__);
 		return (block_content) { 0 };
@@ -437,6 +456,15 @@ static void handle_theta(RESULT* result, char* payload, ERRCTX* errctx)
 	result->theta.code = payload;
 }
 
+/* allow whitespace between the keyword and '(' but leave raw C code untouched */
+static char* skip_space_before_paren(char* payload)
+{
+	char* s = payload;
+	while (isspace((unsigned char)*s))
+		s++;
+	return (*s == '(') ? s : payload;
+}
+
 static void _handle_omega_helper(RESULT* result,
 								 char* payload,
 								 const OMEGA_TYPE omega_type,
@@ -465,10 +493,12 @@ static void _handle_omega_helper(RESULT* result,
 	let err = get_delim_tokens(text.args, &result->omega[n].args, GET_DELIM_SEP_ANY);
 	if (err) {
 		errctx_add(errctx, "%s: parse error \"%s\"\n", __func__, payload);
+		vector_free(result->omega[n].args);
 		return;
 	}
 	if (strlen(text.content)) {
 		errctx_add(errctx, "%s: parse error \"%s\"\n", __func__, text.content);
+		vector_free(result->omega[n].args);
 		return;
 	}
 	result->omega[n].code = 0;
@@ -482,6 +512,7 @@ block_done:
 /// variances are treated as fixed. 
 static void handle_omega(RESULT* result, char* payload, ERRCTX* errctx) 
 {
+	payload = skip_space_before_paren(payload);
 	/* if there is a direct C-code initializer, then that C-code is
 	 * output for this block and OMEGA_DIAG is overridden */
 	
@@ -493,6 +524,7 @@ static void handle_omega(RESULT* result, char* payload, ERRCTX* errctx)
 /// Negative variances along the diagonal are treated as fixed. 
 static void handle_omegablock(RESULT* result, char* payload, ERRCTX* errctx) 
 {
+	payload = skip_space_before_paren(payload);
 	if (payload[0] != '(') {
 		errctx_add(errctx, "%s: $OMEGABLOCK not followed by '('\n", __func__);
 		return; 
@@ -506,7 +538,8 @@ static void handle_omegablock(RESULT* result, char* payload, ERRCTX* errctx)
 /// inter-occasion variability, i.e. multiple etas with variances and
 /// covariances matching those of lower indicies.
 static void handle_omegasame(RESULT* result, char* payload, ERRCTX* errctx) 
-{ 
+{
+	payload = skip_space_before_paren(payload); 
 	if (payload[0] != '(') {
 		errctx_add(errctx, "%s: $OMEGASAME not followed by '('\n", __func__);
 		return; 
@@ -520,6 +553,7 @@ static void handle_omegasame(RESULT* result, char* payload, ERRCTX* errctx)
 /// Negative variances are treated as fixed. 
 static void handle_sigma(RESULT* result, char* payload, ERRCTX* errctx) 
 {
+	payload = skip_space_before_paren(payload);
 	char* input;
 
 	/* allow the direct C initialization of an omega block */
@@ -550,10 +584,12 @@ static void handle_sigma(RESULT* result, char* payload, ERRCTX* errctx)
 /// initialization. 
 static void handle_functions(RESULT* result, char* payload, ERRCTX* errctx) 
 {
-	(void)errctx;
-	
 	strip_firstlast_space(payload);
 	let n = result->nfunctions;
+	if (n >= OPENPMX_FUNCTIONS_MAX) {
+		errctx_add(errctx, "%s: too many $FUNCTIONS blocks\n", __func__);
+		return;
+	}
 	result->functions[n].code = payload;
 	++result->nfunctions;
 }
@@ -570,6 +606,17 @@ static void handle_main(RESULT* result, char* payload, ERRCTX* errctx)
 	result->main.code = payload;
 }
 
+/* a $FILE name must be a plain filename: no directories, no drive letters */
+static bool is_plain_filename(const char* name)
+{
+	if (!*name || streq(name, ".") || streq(name, ".."))
+		return false;
+	for (var c = name; *c; c++)
+		if (*c == '/' || *c == '\\' || *c == ':' || iscntrl((unsigned char)*c))
+			return false;
+	return true;
+}
+
 /// Sections defined by `$FILE(...)` are written to the control filename
 /// appended by '.' and then the name given. For the `graphics.R` script
 /// this can be used to provide a configuration file for modifying the
@@ -581,7 +628,16 @@ static void handle_file(RESULT* result, char* payload, ERRCTX* errctx)
 		return;
 
 	strip_enclosing(text.args, '"', '"');
+	if (!is_plain_filename(text.args)) {
+		errctx_add(errctx, "%s: invalid $FILE name \"%s\"\n", __func__, text.args);
+		return;
+	}
+
 	let n = result->nfiles;
+	if (n >= OPENPMX_FILE_RECORDS_MAX) {
+		errctx_add(errctx, "%s: too many $FILE blocks\n", __func__);
+		return;
+	}
 	result->files[n].name = text.args;
 	result->files[n].content = text.content;
 	++result->nfiles;
@@ -681,10 +737,9 @@ static RESULT result_construct(VECPTR* blocks, ERRCTX* errctx)
 	return ret;
 
 failed:
+	result_destroy(&ret);
 	return (RESULT) { 0 };
 }
-
-#include "utils/filecontent.c"
 
 typedef struct {
 	VECPTR header;
@@ -702,7 +757,7 @@ static double checked_atof(const char* str, ERRCTX* errctx)
 	char *end;
 	errno = 0;
 	let val = strtod(str, &end);
-	if (errno != 0 || end == str || *end != '\0') {
+	if (end == str || *end != '\0' || !isfinite(val)) {
 		errctx_add(errctx, "%s: invalid data \"%s\"\n", __func__, str);
 		return 0;
 	}
@@ -720,6 +775,12 @@ static DATAINFO datainfo_create(FILECONTENT* dataptr, ERRCTX* errctx)
 		errctx_add(errctx, "%s: data file is empty\n", __func__);
 		return ret;
 	}
+
+	/* skip UTF-8 BOM */
+	if ((unsigned char)line[0] == 0xEF &&
+		(unsigned char)line[1] == 0xBB &&
+		(unsigned char)line[2] == 0xBF)
+		line += 3;
 
 	/* get first line, terminate it so we can read tokens */
 	char* next_newline = strchr(line, '\n');
@@ -752,9 +813,19 @@ static DATAINFO datainfo_create(FILECONTENT* dataptr, ERRCTX* errctx)
 
 		vector_resize(v, 0);
 		strip_firstlast_space(line);
-		get_delim_tokens(line, &v, sep);
 
-		/* strict size check - fails on blank lines or count mismatch */
+		/* skip blank lines (e.g. trailing newlines) */
+		if (!*line) {
+			line = next_newline ? next_newline + 1 : NULL;
+			continue;
+		}
+		let rowerr = get_delim_tokens(line, &v, sep);
+		if (rowerr) {
+			errctx_add(errctx, "%s: parse error in data row %i\n", __func__, linenum);
+			goto failed;
+		}
+
+		/* strict size check - fails on count mismatch */
 		if (v.size != ret.header.size) {
 			errctx_add(errctx, "%s: data row %i has %i elements, header has %i\n",
 					   __func__, linenum, v.size, ret.header.size);
@@ -777,7 +848,7 @@ static DATAINFO datainfo_create(FILECONTENT* dataptr, ERRCTX* errctx)
 	}
 
 	/* final check - ensure at least one row of data exists */
-	if (linenum < 2) {
+	if (ret.elems.size == 0) {
 		errctx_add(errctx, "%s: no data rows after header\n", __func__);
 		goto failed;
 	}
@@ -791,12 +862,23 @@ failed:
 	return (DATAINFO) { 0 };
 }
 
+/* validate a numeric token and emit it as a decimal C literal, so that
+ * leading zeros are not interpreted as octal and huge integers are not
+ * truncated */
+static void write_number(FILE* fp, const char* str, ERRCTX* errctx)
+{
+	let val = checked_atof(str, errctx);
+	if (errctx->len)
+		return;
+	fprintf(fp, "%.17g", val);
+}
+
 static int checked_atoi(const char* str, ERRCTX* errctx)
 {
 	char *end;
 	errno = 0;
 	let val = strtol(str, &end, 10);
-	if (errno != 0 || end == str || *end != '\0') {
+	if (errno != 0 || end == str || *end != '\0' || val < INT_MIN || val > INT_MAX) {
 		errctx_add(errctx, "%s: invalid value \"%s\"\n", __func__, str);
 		return 0;
 	}
@@ -824,7 +906,13 @@ static void template_filename(FILE* fp,
 {
 	(void)datainfo;
 	(void)errctx;
-	fprintf(fp, "\"%s\"\n", result->filename);
+	fputc('"', fp);
+	for (const char* c = result->filename; *c; c++) {
+		if (*c == '\\' || *c == '"')
+			fputc('\\', fp);
+		fputc(*c, fp);
+	}
+	fputs("\"\n", fp);
 }
 
 static void template_record_array(FILE* fp, 
@@ -846,15 +934,14 @@ static void template_record_array(FILE* fp,
 
 /// Within the datafile a `.` as a data entry is replaced by NAN.
 		if (streq(v, ".") || streq(v, "NA")) {
-			v = "NAN";
+			fprintf(fp, "NAN");
 
 		} else {
-			(void)checked_atof(v, errctx);
+			write_number(fp, v, errctx);
 			if (errctx->len)
 				return;
 		}
-
-		fprintf(fp, "%s, ", v);
+		fprintf(fp, ", ");
 		
 		++ncols;
 		if (ncols == header->size) {
@@ -872,6 +959,8 @@ static void template_imodel_fields_declare(FILE* fp,
 {
 	(void)datainfo;
 	(void)errctx;
+	if (result->imodel.args.size == 0)
+		fprintf(fp, "\tchar _unused; /* no empty structs in ISO C */\n");
 	forvector_val(v, result->imodel.args) 
 		fprintf(fp, "\tdouble %s;\n", v);
 }
@@ -901,15 +990,8 @@ static void template_imodel_code(FILE* fp,
 
 	write_code(fp, result->imodel.code, "\t/* no imodel code */\n");
 
-	/* suppress warnings that no theta was used if there are no thetas
-	 * available */
-	if (!result->theta.code || strlen(result->theta.code) == 0)
-		fprintf(fp, "\t(void)_theta; /* no thetas */\n");
-
-	/* suppress warnings that no omega was used if there are no omegas
-	 * available */
-	if (result->nomega == 0)
-		fprintf(fp, "\t(void)_eta; /* no omegas */\n");
+	/* suppress unused warnings if the code does not use THETA or ETA */
+	fprintf(fp, "\t(void)_theta;\n\t(void)_eta;\n");
 }
 
 static void template_imodel_fields_set(FILE* fp, 
@@ -979,8 +1061,24 @@ static void template_predparams_fields_declare(FILE* fp,
 	(void)datainfo;
 	(void)errctx;
 	
+	if (result->predict.args.size == 0)
+		fprintf(fp, "\tchar _unused; /* no empty structs in ISO C */\n");
 	forvector_val(v, result->predict.args) 
 		fprintf(fp, "\tdouble %s;\n", v);
+}
+
+/* locals in imodel_predict: initialized so that paths which do not set a
+ * variable write back NAN instead of uninitialized memory */
+static void template_predparams_fields_declare_init(FILE* fp, 
+													const RESULT* const result, 
+													const DATAINFO* const datainfo, 
+													ERRCTX* errctx)
+{
+	(void)datainfo;
+	(void)errctx;
+	
+	forvector_val(v, result->predict.args) 
+		fprintf(fp, "\tdouble %s = NAN;\n", v);
 }
 
 static void template_predict_code(FILE* fp, 
@@ -1100,7 +1198,7 @@ static void template_advan_init(FILE* fp,
 
 	let method = result->advan.method;
 	if (!method) {
-		errctx_add(errctx, "%s: invalid advan \"%s\"\n", __func__, method);
+		errctx_add(errctx, "%s: missing advan method\n", __func__);
 		return;
 	}
 
@@ -1110,12 +1208,12 @@ static void template_advan_init(FILE* fp,
 
 static const char *my_strcasestr(const char *haystack, const char *needle)
 {
-	size_t needle_len = strlen(needle);
+	let needle_len = strlen(needle);
 	if (needle_len == 0)
 		return haystack;
 	for (; *haystack; haystack++) {
-		const char *h = haystack;
-		const char *n = needle;
+		var h = haystack;
+		var n = needle;
 		while (*n && tolower((unsigned char)*h) == tolower((unsigned char)*n)) {
 			h++;
 			n++;
@@ -1128,23 +1226,26 @@ static const char *my_strcasestr(const char *haystack, const char *needle)
 
 static bool keyword_present(const char *s, const char *kw)
 {
-    const char *hit = my_strcasestr(s, kw);
-    if (!hit)
-		return false;
-    char after = hit[strlen(kw)];
-    return !isalnum((unsigned char)after) && after != '_';
+	let n = strlen(kw);
+	for (var hit = my_strcasestr(s, kw); hit; hit = my_strcasestr(hit + 1, kw)) {
+		let before = (hit == s) ? ' ' : hit[-1];
+		let after = hit[n];
+		if (!isalnum((unsigned char)before) && before != '_' &&
+			!isalnum((unsigned char)after) && after != '_')
+			return true;
+	}
+	return false;
 }
 
 /**
- * Parses NONMEM style (val FIXED) or (val, val, val). Returns false on
- * syntax errors like consecutive commas. Outputs to the provided FILE*.
- * The input line is modified in place (null terminators are inserted to
- *  delimit numeric tokens).
+ * Parses NONMEM style (val FIXED) or (lower, init, upper). Reports syntax
+ * errors like consecutive commas through errctx. Outputs to the provided
+ * FILE*. The input line is modified in place (null terminators are
+ * inserted to delimit each group).
  */
 static void transform_pmx_line(FILE *fp, char *line, ERRCTX* errctx)
 {
-	char *p = line;
-
+	var p = line;
 	while (*p != '\0') {
 		// 1. Skip leading whitespace to find the start of a group
 		while (isspace((unsigned char)*p))
@@ -1158,20 +1259,36 @@ static void transform_pmx_line(FILE *fp, char *line, ERRCTX* errctx)
 			return;
 		}
 
-		// --- Parsing inside the (...) 
+		// 3. Find the end of this group and terminate it there so that every
+		// search below (including the FIXED keyword) is bounded to this group
+		char *close = strchr(p, ')');
+		if (!close) {
+			errctx_add(errctx, "%s: Missing closing parenthesis\n", __func__);
+			return;
+		}
+		*close = '\0';
+
+		// --- Parsing inside the (...)
 		char *cursor = p + 1;
-		const char *val_starts[3] = {NULL};
-		int val_lens[3] = {0};
+		double vals[3] = { 0 };
 		int found = 0;
 		bool is_fixed = (keyword_present(cursor, "FIXED") || keyword_present(cursor, "FIX"));
 
 		for (int i = 0; i < 3; i++) {
 			while (isspace((unsigned char)*cursor))
 				cursor++;
-			
+
+			if (*cursor == '\0') {
+				if (found == 0)
+					errctx_add(errctx, "%s: no values found\n", __func__);
+				else
+					errctx_add(errctx, "%s: missing value after comma\n", __func__);
+				return;
+			}
+
 			// Check for illegal characters/comments inside the parens
-			if (*cursor != '-' && *cursor != '.' && !isdigit((unsigned char)*cursor) && 
-				*cursor != ',' && *cursor != ')' && !isalpha((unsigned char)*cursor)) {
+			if (*cursor != '-' && *cursor != '+' && *cursor != '.' && !isdigit((unsigned char)*cursor) &&
+				*cursor != ',' && !isalpha((unsigned char)*cursor)) {
 				errctx_add(errctx, "%s: Illegal character '%c' inside group\n", __func__, *cursor);
 				return;
 			}
@@ -1184,18 +1301,17 @@ static void transform_pmx_line(FILE *fp, char *line, ERRCTX* errctx)
 			char *token_start = cursor;
 			char *endptr;
 			errno = 0;
-			(void)strtod(cursor, &endptr);
+			let val = strtod(cursor, &endptr);
 			if (cursor == endptr) {
 				errctx_add(errctx, "%s: no digit parsed at \"%s\"\n", __func__, cursor);
-				break;
+				return;
 			}
-			if (errno == ERANGE) {
-				errctx_add(errctx, "%s: out of double range \"%s\"\n", __func__, cursor);
-				break;
+			if (errno == ERANGE || !isfinite(val)) {
+				errctx_add(errctx, "%s: not a finite number or out of double range \"%s\"\n", __func__, token_start);
+				return;
 			}
 
-			val_starts[found] = token_start;
-			val_lens[found] = (int)(endptr - token_start);
+			vals[found] = val;
 			found++;
 
 			cursor = endptr;
@@ -1203,30 +1319,33 @@ static void transform_pmx_line(FILE *fp, char *line, ERRCTX* errctx)
 				cursor++;
 			if (*cursor == ',')
 				cursor++;
-			else if (*cursor == ')' || isalpha((unsigned char)*cursor))
+			else if (*cursor == '\0' || isalpha((unsigned char)*cursor))
 				break;
 		}
-		if (found == 0) {
-			errctx_add(errctx, "%s: no values found\n", __func__);
+
+		// Anything left must be the FIX/FIXED keyword, not extra values
+		while (isspace((unsigned char)*cursor))
+			cursor++;
+		if (*cursor != '\0' && (!isalpha((unsigned char)*cursor) || !is_fixed)) {
+			errctx_add(errctx, "%s: unexpected \"%s\" after theta values\n", __func__, cursor);
+			return;
+		}
+
+		// A bare (init) or (lower, init) has no sensible meaning here
+		if (found == 2 || (found == 1 && !is_fixed)) {
+			errctx_add(errctx, "%s: theta needs (lower, init, upper) or (value FIXED)\n", __func__);
 			return;
 		}
 
 		// Output logic...
-		if (found > 0) {
-			fprintf(fp, "    {%.*s, %.*s, %.*s, %s },\n",
-					val_lens[0], val_starts[0],
-					(found >= 2) ? val_lens[1] : val_lens[0], (found >= 2) ? val_starts[1] : val_starts[0],
-					(found >= 3) ? val_lens[2] : val_lens[0], (found >= 3) ? val_starts[2] : val_starts[0],
-					is_fixed ? "FIXED" : "ESTIMATE");
-		}
+		fprintf(fp, "    {%.17g, %.17g, %.17g, %s },\n",
+				vals[0],
+				(found >= 2) ? vals[1] : vals[0],
+				(found >= 3) ? vals[2] : vals[0],
+				is_fixed ? "FIXED" : "ESTIMATE");
 
-		// 3. Close the group and update p
-		char *close = strchr(cursor, ')');
-		if (!close) {
-			errctx_add(errctx, "%s: Missing closing parenthesis\n", __func__);
-			return;
-		}
-		p = close + 1; // Move p to just after the ')' for the next loop iteration
+		// 4. Move p to just after the ')' for the next loop iteration
+		p = close + 1;
 	}
 }
 
@@ -1240,6 +1359,10 @@ static void template_theta_init(FILE* fp,
 	/* NONMEM style initializer */
 	if (result->theta.nonmem_init) {
 		var codecopy = strdup(result->theta.code);
+		if (!codecopy) {
+			errctx_add(errctx, "%s: out of memory\n", __func__);
+			return;
+		}
 		transform_pmx_line(fp, codecopy, errctx);
 		free(codecopy);
 
@@ -1261,12 +1384,20 @@ static void _omega_args_to_code(FILE* fp, const int type, const VECPTR* args, ER
 	if (type == OMEGA_DIAG) {
 		type_name = "OMEGA_DIAG";
 		ndim = args->size;
+		if (ndim < 1) {
+			errctx_add(errctx, "%s: empty omega block\n", __func__);
+			return;
+		}
 		
 	} else if (type == OMEGA_BLOCK) {
 		type_name = "OMEGA_BLOCK";
 		/* calculate block dimensions */
 		/* https://www.wolframalpha.com/input?i2d=true&i=solve+k%5C%2844%29+n%3Dk*Divide%5B%5C%2840%29k%2B1%5C%2841%29%2C2%5D */
 		let n = args->size;
+		if (n < 1) {
+			errctx_add(errctx, "%s: empty omega block\n", __func__);
+			return;
+		}
 		ndim = (int)floor((sqrt(8 * n + 1) - 1) / 2);
 
 		/* double check that the size is consistant */
@@ -1280,7 +1411,7 @@ static void _omega_args_to_code(FILE* fp, const int type, const VECPTR* args, ER
 	} else if (type == OMEGA_SAME) {
 		type_name = "OMEGA_SAME";
 		if (args->size != 1) {
-			errctx_add(errctx, "%s: omegasame too many arguments (%i)\n", __func__, args->size);
+			errctx_add(errctx, "%s: omegasame needs exactly one argument (%i given)\n", __func__, args->size);
 			return;
 		}
 		
@@ -1288,6 +1419,10 @@ static void _omega_args_to_code(FILE* fp, const int type, const VECPTR* args, ER
 		ndim = checked_atoi(args->ptr[0], errctx);
 		if (errctx->len) {
 			errctx_add(errctx, "%s: invalid omegasame \"%s\"\n", __func__, args->ptr[0]);
+			return;
+		}
+		if (ndim < 1) {
+			errctx_add(errctx, "%s: omegasame size must be positive (%i)\n", __func__, ndim);
 			return;
 		}
 		print_values = false;
@@ -1300,8 +1435,10 @@ static void _omega_args_to_code(FILE* fp, const int type, const VECPTR* args, ER
 	fprintf(fp, "\t\t{ %s, %i, { ", type_name, ndim);
 	if (print_values) {
 		forvector(j, *args) {
-			let v = args->ptr[j];
-			fprintf(fp, "%s, ", v);
+			write_number(fp, args->ptr[j], errctx);
+			if (errctx->len)
+				return;
+			fprintf(fp, ", ");
 		}
 	}
 	fprintf(fp, " } },\n");
@@ -1334,12 +1471,15 @@ static void template_sigma_init(FILE* fp,
 								const DATAINFO* const datainfo, 
 								ERRCTX* errctx)
 {
-	(void)errctx;
 	(void)datainfo;
 
 	fprintf(fp, "\t\t");
-	forvector_val(v, result->sigma.args)
-		fprintf(fp, "%s, ", v);
+	forvector_val(v, result->sigma.args) {
+		write_number(fp, v, errctx);
+		if (errctx->len)
+			return;
+		fprintf(fp, ", ");
+	}
 	fprintf(fp, "\n");
 }
 
@@ -1395,6 +1535,7 @@ static void expand_template(const char* grfilename,
 		{ "{{IMODEL_DIFFEQN_CODE}}",			template_diffeqn_code },
 		{ "{{IMODEL_FIELDS_DEFINE}}",			template_imodel_fields_define },
 		{ "{{PREDPARAMS_FIELDS_DECLARE}}", 		template_predparams_fields_declare },
+		{ "{{PREDPARAMS_FIELDS_DECLARE_INIT}}",	template_predparams_fields_declare_init },
 		{ "{{PREDICT_CODE}}", 					template_predict_code },
 		{ "{{PREDPARAMS_FIELDS_SET}}",			template_predparams_fields_set },
 		{ "{{RECORD_FIELDS_WRITABLE_DEFINE}}",	template_record_fields_writeable_define },
@@ -1452,16 +1593,16 @@ static void expand_template(const char* grfilename,
 
 done:
 	/* cleanup */
-	if (fp)
-		fclose(fp);
+	if (fp && fclose(fp) != 0 && !errctx->len)
+		errctx_add(errctx, "%s: error writing to \"%s\"\n", __func__, c_filename);
 
-	/* if error cleanup the output C file */
-	if (errctx->len)
+	/* if error cleanup the output C file, but only one we created */
+	if (fp && errctx->len)
 		unlink(c_filename);
 }
 
 /* validate variable names */
-int is_valid_identifier(const char *s)
+static int is_valid_identifier(const char *s)
 {
     if (s == NULL || *s == '\0')
         return 0;
@@ -1491,6 +1632,9 @@ static const char *keywords[] =
     "switch","typedef","union","unsigned","void","volatile","while","_Alignas",
     "_Alignof","_Atomic","_Bool","_Complex","_Generic","_Imaginary","_Noreturn",
     "_Static_assert","_Thread_local",
+	/* C23 / GNU keywords */
+    "alignas","alignof","asm","bool","constexpr","false","nullptr","static_assert",
+    "thread_local","true","typeof","typeof_unqual",
 };
 
 static int is_keyword(const char *s)
@@ -1508,6 +1652,23 @@ static int cmp_str(const void *a, const void *b)
 	const char *sa = *(const char **)a;
 	const char *sb = *(const char **)b;
 	return strcmp(sa, sb);
+}
+
+static const char *reserved_names[] =
+{
+	"Y", "YHAT", "YHATVAR", "PRED", "OBJ", "INEVAL", "THETA", "ETA", "A", "T",
+	"loglik", "NAN", "DADT", "ERR", "EPS", 
+	/* macros from the standard headers the generated code includes */
+	"INFINITY", "HUGE_VAL", "HUGE_VALF", "HUGE_VALL", "M_PI", "M_E",
+	"NULL", "EOF", "errno",
+};
+
+static int is_reserved(const char *s)
+{
+	for (size_t i = 0; i < sizeof(reserved_names)/sizeof(reserved_names[0]); i++)
+		if (strcmp(s, reserved_names[i]) == 0)
+			return 1;
+	return 0;
 }
 
 typedef VECTOR(const char*) CONSTVECPTR;
@@ -1542,20 +1703,15 @@ static void check_names(const RESULT* const result, const DATAINFO* const datain
 			errctx_add(errctx, "%s: \"%s\" is a C keyword\n", __func__, v);
 			goto done;
 		}
+		if (v[0] == '_') {
+			errctx_add(errctx, "%s: name \"%s\" must not start with an underscore\n", __func__, v);
+			goto done;
+		}
 	}
 
 	/* look for reserved names everywhere */
     forvector_val(v, allnames) {
-		if ((strcmp(v, "Y") == 0) ||
-			(strcmp(v, "YHAT") == 0) ||
-			(strcmp(v, "YHATVAR") == 0) ||
-			(strcmp(v, "PRED") == 0) ||
-			(strcmp(v, "OBJ") == 0) ||
-			(strcmp(v, "INEVAL") == 0) ||
-			(strcmp(v, "THETA") == 0) ||
-			(strcmp(v, "ETA") == 0) ||
-			(strcmp(v, "A") == 0) ||
-			(strcmp(v, "NAN") == 0)) {
+		if (is_reserved(v)) {
 			errctx_add(errctx, "%s: name \"%s\" is reserved\n", __func__, v);
 			goto done;
 		}
@@ -1581,10 +1737,11 @@ static void write_files(const RESULT* result, ERRCTX* errctx)
 		
 		fputs(result->files[i].content, f);
 		fputc('\n', f);
-		if (ferror(f)) 
+		int werr = ferror(f);
+		if (fclose(f) != 0)
+			werr = 1;
+		if (werr)
 			errctx_add(errctx, "%s: error writing to file \"%s\"\n", __func__, fname);
-
-		fclose(f);
 	}
 }
 
@@ -1609,7 +1766,10 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "%s: %s", filename, errctx.errmsg);
 		exit(EXIT_FAILURE);
 	}
-	strip_comments_robust(controltext.mutptr);
+	if (strip_comments_robust(controltext.mutptr)) {
+		fprintf(stderr, "%s: %s: unterminated /* comment\n", filename, grfilename);
+		exit(EXIT_FAILURE);
+	}
 
 	/* split into blocks with $... */
 	var blocks = split_blocks(controltext.mutptr);
@@ -1623,13 +1783,15 @@ int main(int argc, char* argv[])
 	result.filename = grfilename;
 
 	/* make sure data file is not given twice */
-	if (result.data.file && datafilename) {
+	/* an empty $DATA() means no filename was given there */
+	let dollar_data_file = (result.data.file && *result.data.file) ? result.data.file : NULL;
+	if (dollar_data_file && datafilename) {
 		fprintf(stderr, "%s: data file in $DATA() and also on command line\n", filename);
 		exit(EXIT_FAILURE);
 	}
 	var datafile_to_use = datafilename;
 	if (!datafile_to_use)
-		datafile_to_use = result.data.file;
+		datafile_to_use = dollar_data_file;
 	if (!datafile_to_use) {
 		fprintf(stderr, "%s: no data file\n", filename);
 		exit(EXIT_FAILURE);
@@ -1729,6 +1891,7 @@ char openpmxtran_template[] =
 "	const double* _theta = _advanstate->current.popparam->theta;\n"
 "	const double* _eta = _advanstate->current.popparam->eta;\n"
 "	const RECORD* const _record = _advanstate->current.record;\n"
+"	(void)_imodel;\n"
 "\n"
 "	/* allow access to RECORD fields */\n"
 "{{RECORD_FIELDS_DEFINE}}\n"
@@ -1778,6 +1941,7 @@ char openpmxtran_template[] =
 "	const double* const _theta = _popparam->theta;\n"
 "	const double* const _eta = _popparam->eta;\n"
 "	(void)_record;\n"
+"	(void)_imodel;\n"
 "	(void)_theta;\n"
 "	(void)_eta;\n"
 "	(void)_state;\n"
@@ -1812,6 +1976,7 @@ char openpmxtran_template[] =
 "	(void) _record;\n"
 "	(void) _predparams;\n"
 "	(void) _popparam;\n"
+"	(void) _imodel;\n"
 "	double Y = NAN;\n"
 "	double loglik = 0.;\n"
 "\n"
@@ -1822,7 +1987,7 @@ char openpmxtran_template[] =
 "{{IMODEL_FIELDS_DEFINE}}\n"
 "\n"
 "	/* declare PREDICTVARS fields */\n"
-"{{PREDPARAMS_FIELDS_DECLARE}}\n"
+"{{PREDPARAMS_FIELDS_DECLARE_INIT}}\n"
 "\n"
 "#define THETA(i) 	((const double)_popparam->theta[(i)-1])\n"
 "#define ETA(i) 	((const double)_popparam->eta[(i)-1])\n"
@@ -1899,6 +2064,7 @@ char openpmxtran_template[] =
 "#define evaluate(...) 			pmx_evaluate(&openpmx, &(STAGE1CONFIG){ __VA_ARGS__ })\n"
 "#define simulate(...) 			pmx_simulate(&openpmx, &(SIMCONFIG){ __VA_ARGS__ })\n"
 "#define covariance(...) 		pmx_covariance(&openpmx, &(COVARIANCECONFIG){ __VA_ARGS__ })\n"
+"#define vpc(...) 				pmx_vpc(&openpmx, &(VPCCONFIG){ __VA_ARGS__ })\n"
 "#define profile(...) 			pmx_profile(&openpmx, &(PROFILECONFIG){ __VA_ARGS__ } )\n"
 "#define profile_add(...) 		pmx_profile_add(&openpmx, __VA_ARGS__ )\n"
 "#define profile_clean(...) 	pmx_profile_clean(&openpmx, &(PARAM){ __VA_ARGS__ })\n"
@@ -1923,10 +2089,8 @@ char openpmxtran_template[] =
 "	/* feenableexcept(FE_DIVBYZERO | FE_INVALID | FE_OVERFLOW); */\n"
 "\n"
 "	RECORD* data = openpmx.data.writeable;\n"
-"	if (!data)\n"
-"		return;\n"
 "	const int nrecords = openpmx.data.nrecords;\n"
-"	for (int i=0; i<nrecords; i++) {\n"
+"	for (int i=0; data && i<nrecords; i++) {\n"
 "		RECORD r = data[i];\n"
 "		openpmxtran_data_preprocess_callback(&r);\n"
 "		data[i] = r;\n"

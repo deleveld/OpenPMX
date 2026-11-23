@@ -315,12 +315,14 @@ void table_phi_idata(const char* filename,
 
 void table_yhat_idata(const char* filename,
 					  const IDATA* const idata,
+					  const RECORDINFO* const recordinfo,
 					  const bool _offset1)
 {
 	assert(filename);
 	var f = idata_results_fopen(filename, OPENPMX_YHATFILE, "w");
 	assert(f);
 
+	fprintf(f, OPENPMX_HEADER_FORMAT, "YHATDV");
 	fprintf(f, OPENPMX_HEADER_FORMAT, "YHAT");
 	fprintf(f, OPENPMX_HEADER_FORMAT, "YHATVAR");
 	fprintf(f, OPENPMX_HEADER_FORMAT, "PRED");
@@ -336,8 +338,10 @@ void table_yhat_idata(const char* filename,
 
 	forcount(k, idata->nindivid) {
 		let individ = &idata->individ[k];
-
 		forcount(j, individ->nrecord) {
+			let ptr = RECORDINFO_INDEX(recordinfo, individ->record, j);
+			let dv = RECORDINFO_DV(recordinfo, ptr);
+			fprintf(f, OPENPMX_TABLE_FORMAT, dv);
 			fprintf(f, OPENPMX_TABLE_FORMAT, individ->yhat[j]);
 			fprintf(f, OPENPMX_TABLE_FORMAT, individ->yhatvar[j]);
 			fprintf(f, OPENPMX_TABLE_FORMAT, individ->pred[j]);

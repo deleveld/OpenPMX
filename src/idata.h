@@ -111,8 +111,9 @@ void table_phi_idata(const char* filename,
 					 const IDATA* const idata,
 					 const bool _offset1);
 void table_yhat_idata(const char* filename,
-					 const IDATA* const idata,
-					 const bool _offset1);
+					  const IDATA* const idata,
+					  const RECORDINFO* const recordinfo,
+					  const bool _offset1);
 
 #ifdef __cplusplus
 }

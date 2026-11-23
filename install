@@ -65,7 +65,8 @@ detect_platform() {
     case "$OSTYPE" in
         darwin*)  echo "macos" ;;
         msys*)    echo "msys2" ;;
-        linux*)    echo "linux" ;;
+        cygwin*)  echo "msys2" ;;
+        linux*)   echo "linux" ;;
         *)
             if grep -qi microsoft /proc/version 2>/dev/null; then
                 echo "wsl"
@@ -136,7 +137,8 @@ esac
 
 # initialize build flags
 {
-    printf "#define OPENPMX_INSTALL_PLATFORM \"%s\"\n" "${PLATFORM}"
+    printf "#define OPENPMX_INSTALL_PLATFORM_%s\n" "${PLATFORM}"
+    printf "#define OPENPMX_INSTALL_PLATFORM_NAME \"%s\"\n" "${PLATFORM}"
     printf "#define OPENPMX_INSTALL_PATH \"%s\"\n" "${OPENPMXPATH}"
 } >> "${OPENPMXPATH}/src/buildflags.h"
 
@@ -185,7 +187,7 @@ SOURCEFILES="pmxstate.c options.c ievaluate.c predict.c stage1.c
 			 checkout.c popmodel.c encode.c nonzero.c omegainfo.c
 			 linalg.c print.c idata.c table.c scatter.c estimate.c
 			 simulate.c reload.c server_queue.c 
-			 profile.c covariance.c
+			 profile.c covariance.c vpc.c
 			 dataconfig/dataconfig.c
 			 advan/advan.c advan/pred.c
 			 advan/onecomp.c advan/onecomp_depot.c

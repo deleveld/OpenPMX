@@ -18,9 +18,9 @@
 #ifndef OPENPMX_EVALUATE_H
 #define OPENPMX_EVALUATE_H
 
-#include <stdio.h>
-
 #include "openpmx.h"
+
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {

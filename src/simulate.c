@@ -22,6 +22,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "simulate.h"
 #include "scatter.h"
 #include "ievaluate.h"
 #include "omegainfo.h"
@@ -34,12 +35,12 @@
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_blas.h>
 
-static void simulate_with_error_thread(INDIVID* const individ,
-									   const ADVANFUNCS* const advanfuncs,
-									   const POPMODEL* const popmodel,
-									   const NONZERO* const nonzero,
-									   const OPTIONS* const options,
-									   const SCATTEROPTIONS* const scatteroptions)
+void simulate_with_error_thread(INDIVID* const individ,
+								const ADVANFUNCS* const advanfuncs,
+								const POPMODEL* const popmodel,
+								const NONZERO* const nonzero,
+								const OPTIONS* const options,
+								const SCATTEROPTIONS* const scatteroptions)
 {
 	(void) nonzero;
 	(void) options;
@@ -76,9 +77,9 @@ static void simulate_with_error_thread(INDIVID* const individ,
 
 /// For simulation random observation residuals are chosen according to
 /// sigma. 
-static void idata_resample_err(const IDATA* const idata,
-							   const POPMODEL* const popmodel,
-							   gsl_rng * const rng)
+void idata_resample_err(const IDATA* const idata,
+						const POPMODEL* const popmodel,
+						gsl_rng * const rng)
 {
 	let ndata = idata->ndata;
 	let nsigma = popmodel->nsigma;
@@ -97,9 +98,9 @@ static void idata_resample_err(const IDATA* const idata,
 
 /// For simulation random ETA values are chosen according to the omega
 /// matrix.
-static void idata_resample_eta(IDATA* const idata,
-							   const POPMODEL* const popmodel,
-							   gsl_rng * const rng)
+void idata_resample_eta(IDATA* const idata,
+						const POPMODEL* const popmodel,
+						gsl_rng * const rng)
 {
 	/* we need to know which rows and cols we need to resample */
 	/* we cant do full matrix because some rows and coloums could be zero
@@ -192,23 +193,20 @@ static void idata_predict_dv(IDATA* const idata,
 	if (writeable != readabledata)
 		fatal(0, "writeable data does not match readable data\n");
 
-	var offsetDV = recordinfo->offsetDV;
-	var offsetEVID = recordinfo->offsetEVID;
+	let offsetDV = recordinfo->offsetDV;
 	let pred = idata->individ[0].pred;
-	assert(offsetEVID >= 0);
+	assert(offsetDV >= 0);
 
 	/* write back from pred (obs *with* noise) into DV
 	 * and zero pred after this */
 	let ndata = recordinfo->ndata;
-	var recordsize = dataconfig->recordfields.size;
+	let recordsize = dataconfig->recordfields.size;
+	RECORD* record = writeable;
 	forcount(i, ndata) {
-		var ptr = (double*)((char*)writeable + recordsize * i);
-		var ptrevid = (double*)((char*)ptr + offsetEVID);
-		if (*ptrevid == 0) {
-			var ptrdv = (double*)((char*)ptr + offsetDV);
-			*ptrdv = pred[i];
-		}
+		if (RECORDINFO_EVID(recordinfo, record) == 0)
+			*(double*)((char*)record + offsetDV) = pred[i];
 		pred[i] = 0.;
+		record = (RECORD*)((char*)record + recordsize);
 	}
 }
 

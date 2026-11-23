@@ -271,7 +271,8 @@ static double root_function(double x, void* _params)
 	iter_write(p->stream, args, objfn, p->objfn_target, p->neval);
 
 	let err = objfn - p->objfn_target;
-	p->best_target_err = min(p->best_target_err, fabs(err));
+	if (!is_left)
+		p->best_target_err = min(p->best_target_err, fabs(err));
 
 	return err;
 }
@@ -297,9 +298,9 @@ static bool profile_side(const OPENPMX* const source,
 	if (!(args->tol > 0.))
 		args->tol = 0.5;
 		
-/// The default number of root finding evaluations is 10.
+/// The default number of root finding evaluations is 5.
 	if  (!(args->maxeval > 0.))
-		args->maxeval = 10;
+		args->maxeval = 5;
 
 	let left_value = *param_value(popmodel, &args->param, param_index(&args->param, source->data._offset1));
 	let right_value = args->param.value;
@@ -339,11 +340,12 @@ static bool profile_side(const OPENPMX* const source,
 	/* gsl_root_fsolver_set() calls root_function at both ends of the
 	 * bracket. The left is taken from the source, so only the right is 
 	 * really evaluated. */
-	var s = gsl_root_fsolver_alloc(gsl_root_fsolver_brent);
-	if (!s)
-		fatal(0, "%s: profile root solver alloc failed\n", __func__);
-
 	let oldhandler = gsl_set_error_handler_off();
+	var s = gsl_root_fsolver_alloc(gsl_root_fsolver_brent);
+	if (!s) {
+		gsl_set_error_handler(oldhandler);
+		fatal(0, "%s: profile root solver alloc failed\n", __func__);
+	}
 	let status = gsl_root_fsolver_set(s, &F, 0., 1.);
 	if (status != GSL_SUCCESS) {
 		let open = (status != GSL_EINVAL) ? NAN
@@ -403,6 +405,9 @@ cleanup:
 	gsl_set_error_handler(oldhandler);
 	gsl_root_fsolver_free(s);
 
+	/* false is only returned early, when nothing was estimated. A failed
+	 * or unconverged profile still returns true, its value (best guess,
+	 * +-INFINITY or NAN) is already in args->param */
 	return true;
 }
 
@@ -410,6 +415,9 @@ cleanup:
 /// the lower bound and one to the upper bound. On return `.lower` is the
 /// crossing point from the lower profile and `.upper` is the crossing point
 /// from the upper profile. The `.value` is set to the source estimate. 
+/// For a theta, if `.value`, `.lower` and `.upper` are all 0 then the
+/// profile bounds are set halfway between the estimate and the limits
+/// of the OPENPMX object and the two profiles are run.
 /// Otherwise a single profile is run to `.value.` If a bound does not 
 /// cross the `.dobjfn` threshold then the limit on that side is open and 
 /// is returned as -INFINITY (lower) or +INFINITY (upper).
@@ -434,8 +442,32 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 		return ret;
 	}
 	
+	/* all zero theta config: two-sided profile from the estimate to
+	 * halfway between the estimate and the limits of the OPENPMX object */
+	var both = args->param.value == 0. && args->param.lower < args->param.upper;
+	if (args->param.type == PARAM_THETA && 
+		args->param.value == 0. && 
+		args->param.lower == 0. && 
+		args->param.upper == 0.) {
+		let i = param_index(&args->param, source->data._offset1);
+		let limit_lo = source->theta[i].lower;
+		let limit_hi = source->theta[i].upper;
+		args->param.lower = 0.5 * (value + limit_lo);
+		args->param.upper = 0.5 * (value + limit_hi);
+		if (!(limit_lo < limit_hi)) {
+			warning(stream, "%s: theta %i has no usable limits in the model\n", 
+					__func__, args->param.index);
+			if (stream)
+				fclose(stream);
+			ret.filename = 0; /* dont let filename dangle */
+			pmx_release_state(&ret);
+			return ret;
+		}
+		both = true;
+	}
+
 	/* do both upper and lower bounds */
-	if (args->param.value == 0. && args->param.lower < args->param.upper) {
+	if (both) {
 		var cfg_lo = *args;
 		var cfg_hi = *args;
 		var popmodel_lo = popmodel;
@@ -448,14 +480,16 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 		cfg_lo.param.lower = 0.;
 		cfg_lo.param.value = lo;
 		cfg_lo.param.upper = 0.;
-		profile_side(source, &cfg_lo, &popmodel_lo, stream, &ret);
+		if (!profile_side(source, &cfg_lo, &popmodel_lo, stream, &ret))
+			cfg_lo.param.value = NAN;
 		let lower_root = cfg_lo.param.value;
 
 		/* profile the upper bound */
 		cfg_hi.param.lower = 0.;
 		cfg_hi.param.value = hi;
 		cfg_hi.param.upper = 0.;
-		profile_side(source, &cfg_hi, &popmodel_hi, stream, &ret);
+		if (!profile_side(source, &cfg_hi, &popmodel_hi, stream, &ret))
+			cfg_hi.param.value = NAN;
 		let upper_root = cfg_hi.param.value;
 
 		/* return both bounds and other results */
@@ -463,6 +497,8 @@ OPENPMX pmx_profile(const OPENPMX* const source, PROFILECONFIG* const args)
 		args->param.value = value;
 		args->param.upper = upper_root;
 		args->maxeval     = cfg_lo.maxeval;
+		args->dobjfn      = cfg_lo.dobjfn;
+		args->tol         = cfg_lo.tol;
 		
 	/* do only a single bound, figure out whether it should be upper or lower */
 	} else
@@ -552,7 +588,7 @@ OPENPMX pmx_profile_add(const OPENPMX* const source, PROFILECONFIG* const args)
 /// and index, or the entire file (the default). 
 void pmx_profile_clean(const OPENPMX* const openpmx, const PARAM* const param)
 {
-	if (!openpmx || !openpmx->filename || strlen(openpmx->filename) == 0)
+	if (!openpmx || !param || !openpmx->filename || strlen(openpmx->filename) == 0)
 		return;
 
 	char filename[PATH_MAX];
@@ -567,13 +603,17 @@ void pmx_profile_clean(const OPENPMX* const openpmx, const PARAM* const param)
 	/* read in the .profile.iter file */
 	ERRCTX errctx = { 0 };
 	var itertext = filecontent_alloc(filename, &errctx);
-	if (errctx.len)
-		fatal(0, "%s: %s", __func__, errctx.errmsg);
+	if (errctx.len) {
+		info(0, "%s: %s", __func__, errctx.errmsg);
+		goto cleanup;
+	}
 
 	/* we dont need a temp file, we can directly re-write the .profile.iter */
 	var fout = fopen(filename, "w");
-	if (!fout) 
+	if (!fout) {
+		info(0, "could not open profile iter file\n");
 		goto cleanup;
+	}
 
 	let target_name = param_name(param);
 	let target_index = param->index; /* we dont have to adjust for _offset */

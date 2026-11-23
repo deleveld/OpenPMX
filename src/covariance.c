@@ -555,7 +555,7 @@ static bool covariance_calculate(const gsl_matrix* const R,
 	/* Need to make benchmarks for this */
 	if (S) {
 		info(outstream, "using S matrix\n");
-		return cov_from_inverse(S, 2., "OPG/BHHH", outstream, cov);
+		return cov_from_inverse(S, 4., "OPG/BHHH", outstream, cov);
 	}
 	if (R) {
 		info(outstream, "using R matrix\n");
@@ -765,27 +765,22 @@ static DELTA delta_from_dobjfn(const double dobjfn)
 	};
 }
 
-/* Fill in defaults for the user arguments. Returns the resolved
- * configuration and, if userargs is given, writes it back so the caller
- * can see what was actually used. */
-static COVARIANCECONFIG covariance_args_resolve(COVARIANCECONFIG* const userargs, DELTA* delta)
+/* Fill in defaults for the user arguments in place. */
+static void covariance_args_resolve(COVARIANCECONFIG* const userargs, DELTA* delta)
 {
-	COVARIANCECONFIG args = { 0 };
-	if (userargs) {
-		args = *userargs;
-		args.stage1 = stage1config_default(&userargs->stage1);
-	}
-	if (args.dobjfn > 0.)
-		*delta = delta_from_dobjfn(args.dobjfn);
-	else
-		*delta = delta_from_alpha(0.01);
-	args.dobjfn = delta->dobjfn;
+    COVARIANCECONFIG temp = *userargs;
+    temp.stage1 = stage1config_default(&temp.stage1);
 
-	if (args.step_size <= 0.)
-		args.step_size = 0.1;
-	if (userargs)
-		*userargs = args;
-	return args;
+    if (temp.dobjfn > 0.)
+        *delta = delta_from_dobjfn(temp.dobjfn);
+    else
+        *delta = delta_from_alpha(0.01);
+    temp.dobjfn = delta->dobjfn;
+
+    if (temp.step_size <= 0.)
+        temp.step_size = 0.1;
+
+    *userargs = temp;
 }
 
 static PARAM covlimit_make(ENCODE* const encode,
@@ -957,21 +952,25 @@ static void covlimits_output(ENCODE* const encode,
 	assert(j == encode->nparam);
 
 	/* we have the upper and lower limits, so append to the .cov.ext file */
-	struct timespec now;
-	clock_gettime(CLOCK_MONOTONIC, &now);
-	let runtime_s = timespec_time_difference(begin, &now) / 1000.;
-	covext_append_limit_row(extstream, popmodel, limit, nlimit, false, runtime_s);
-	covext_append_limit_row(extstream, popmodel, limit, nlimit, true, runtime_s);
-
+	if (extstream) {
+		struct timespec now;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		let runtime_s = timespec_time_difference(begin, &now) / 1000.;
+		covext_append_limit_row(extstream, popmodel, limit, nlimit, false, runtime_s);
+		covext_append_limit_row(extstream, popmodel, limit, nlimit, true, runtime_s);
+	}
+	
 	/* print requested upper and lower parameter limits */
 	info(outstream, "dobjfn %g Z %g alpha %g\n", delta->dobjfn, delta->z, delta->alpha);
 	
 	FILE* limitstream = 0;
 	char filename[PATH_MAX];
-	snprintf(filename, sizeof(filename), "%s" OPENPMX_COVLIMITS, source_filename);
-	limitstream = fopen(filename, "w");
+	if (source_filename) {
+		snprintf(filename, sizeof(filename), "%s" OPENPMX_COVLIMITS, source_filename);
+		limitstream = fopen(filename, "w");
+	}
 	
-	openpmx_printf(outstream, limitstream, 0,
+	openpmx_printf(stdout, limitstream, 0,
 			OPENPMX_SFORMAT OPENPMX_SFORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT OPENPMX_HEADER_FORMAT "\n",
 			"TYPE", "INDEX", "LOWER", "VALUE", "UPPER", "DOBJFN");
 	let offs = offset1 ? 1 : 0;
@@ -979,7 +978,7 @@ static void covlimits_output(ENCODE* const encode,
 		let p = &limit[i];
 		let param_index = p->index + offs;
 		
-		openpmx_printf(outstream, limitstream, 0,
+		openpmx_printf(stdout, limitstream, 0,
 				OPENPMX_SFORMAT OPENPMX_IFORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT OPENPMX_TABLE_FORMAT "\n", 
 				param_name(p), param_index, p->lower, p->value, p->upper, args->dobjfn);
 	}
@@ -999,7 +998,7 @@ static void covlimits_output(ENCODE* const encode,
 	free(limit);
 }
 
-void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
+void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const args)
 {
 	gsl_matrix *cov = 0;
 	FILE* outstream = 0;
@@ -1049,15 +1048,15 @@ void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
 	/* handle args and defaults */
 	var options = options_init(&pmx);
 	DELTA delta;
-	var args = covariance_args_resolve(userargs, &delta);
-	if (userargs)
-		options.estimate.stage1 = args.stage1;
-	if (!isfinite(args.dobjfn) || args.dobjfn <= 0.) {
-		info(outstream, "error: invalid dobjfn (%g), covariance not calculated\n", args.dobjfn);
+	covariance_args_resolve(args, &delta);
+	options.estimate.stage1 = args->stage1;
+
+	if (!isfinite(args->dobjfn) || args->dobjfn <= 0.) {
+		info(outstream, "error: invalid dobjfn (%g), covariance not calculated\n", args->dobjfn);
 		goto cleanup;
 	}
 
-	info(outstream, "nparam %i initial step size %g\n", nparam, args.step_size);
+	info(outstream, "nparam %i initial step size %g\n", nparam, args->step_size);
 	if (extstream)
 		extfile_header(extstream, &popmodel, pmx.data._offset1, false);
 	popmodel_eval_information(&popmodel, 0, 0, false, outstream, extstream, " final");
@@ -1074,7 +1073,7 @@ void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
 			.idata = idata,
 			.advanfuncs = pstate->advanfuncs,
 			.options = &options,
-			.details = args.details,
+			.details = args->details,
 			.warm_etas = &warm_etas,
 			.f0 = f0,
 			.begin = &begin,
@@ -1084,16 +1083,16 @@ void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
 
 		/* S matrix the OPG/BHHH cross-product-of-gradients */
 		var S = (gsl_matrix*)0;
-		if (args.type == COVARIANCE_S_MATRIX ||
-			args.type == COVARIANCE_SANDWICH) {
-			S = pmx_opg_S(&covargs, labels, args.step_size);
+		if (args->type == COVARIANCE_S_MATRIX ||
+			args->type == COVARIANCE_SANDWICH) {
+			S = pmx_opg_S(&covargs, labels, args->step_size);
 		}
 		
 		/* Hessian matrix R */
 		var R = (gsl_matrix*)0;
-		if (args.type == COVARIANCE_R_MATRIX ||
-			args.type == COVARIANCE_SANDWICH) {
-			R = pmx_hessian_R(&covargs, S, args.step_size);
+		if (args->type == COVARIANCE_R_MATRIX ||
+			args->type == COVARIANCE_SANDWICH) {
+			R = pmx_hessian_R(&covargs, S, args->step_size);
 		}
 
 		/* examine S and R for deficiencies */
@@ -1111,6 +1110,7 @@ void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
 		}
 
 		/* cleanup */
+		idata_etas_write(idata, &warm_etas);		
 		idata_etas_free(&warm_etas);
 		if (S)
 			gsl_matrix_free(S);
@@ -1125,12 +1125,13 @@ void pmx_covariance(OPENPMX* const source, COVARIANCECONFIG* const userargs)
 	}
 
 	/* output the limits */
-	covlimits_output(&encode, cov, &delta, &popmodel, &begin, source->filename, outstream, extstream, &args, pmx.data._offset1);
+	covlimits_output(&encode, cov, &delta, &popmodel, &begin, source->filename, outstream, extstream, args, pmx.data._offset1);
 
 	/* print correlations */
 	print_correlations(cov, labels, outstream);
 
 cleanup:
+
     if (cov)
 		gsl_matrix_free(cov);
     if (outstream)

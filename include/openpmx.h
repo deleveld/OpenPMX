@@ -323,7 +323,7 @@ typedef struct {
 void pmx_reload_popparam(OPENPMX* dest, RELOADCONFIG* const args);
 
 /*---------------------------------------------------------------------*/
-/* parameter identification for profile and covariance */
+/* parameter for profile and covariance */
 /*---------------------------------------------------------------------*/
 typedef struct {
 	enum {
@@ -346,7 +346,7 @@ typedef struct {
 	double dobjfn;		/* input: targeted profile */
 	double tol;
 	int maxeval;		/* input: maximum root-finding evaluations */
-	int nextra;
+	int nextra;			/* extra samples between limits */
 	ESTIMCONFIG estimate;
 } PROFILECONFIG;
 
@@ -375,6 +375,39 @@ typedef struct {
 } COVARIANCECONFIG;
 
 void pmx_covariance(OPENPMX* const pmx, COVARIANCECONFIG* const args);
+
+/*---------------------------------------------------------------------*/
+/* visual predictive check */
+/*---------------------------------------------------------------------*/
+#define OPENPMX_VPC_PROB_MAX 8
+
+typedef struct {
+	SIMCONFIG simulate;
+	const char* name;
+	int nsim;				/* default 500 */
+	int nbins;				/* equal-count bins per stratum, default 10 */
+	const char* xfield;		/* binning variable, default "TIME" */
+	const char* stratfield;	/* optional stratification field */
+	enum {
+		VPC_PREDCORRECT = 0,	/* pcVPC (default) */
+		VPC_NOCORRECTION,
+	} correction;
+	double lbound;			/* pcVPC lower bound, default 0 */
+	double prob[OPENPMX_VPC_PROB_MAX];	/* default 0.05, 0.5, 0.95 */
+	int nprob;
+	double ci;				/* simulation interval, default 0.95 */
+
+	/* filter on data type, only use observations where this field equals dvty */
+	struct {
+		const char* field;
+		double value;
+	} dvty;
+} VPCCONFIG;
+
+void pmx_vpc(OPENPMX* pmx, VPCCONFIG* const vpcconfig);
+
+void pmx_vpc_clean(const OPENPMX* const openpmx, const char* name);
+
 
 #ifdef __cplusplus
 }

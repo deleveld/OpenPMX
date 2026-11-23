@@ -32,6 +32,8 @@ extern "C" {
 #define OPENPMX_COVFILE					".cov"
 #define OPENPMX_COVLIMITS				".cov.limits"
 #define OPENPMX_PROFILE					".profile.iter"
+#define OPENPMX_VPC_OUT					".vpc.out"
+#define OPENPMX_VPC_POINTS				".vpc.points"
 
 #define OPENPMX_SFORMAT 				" %12s"
 #define OPENPMX_IFORMAT 				" %12i"

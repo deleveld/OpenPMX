@@ -18,7 +18,11 @@
 /// This file implements at Target-Controlled-Infusion dose controller.
 
 #include <string.h>
+#ifdef OPENPMX_INSTALL_PLATFORM_msys2
+#include <float.h>
+#else
 #include <values.h>
+#endif
 #include <assert.h>
  
 #include "advan/advan.h"

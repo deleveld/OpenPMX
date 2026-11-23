@@ -156,7 +156,7 @@ double individual_fasteval(const IEVALUATE_ARGS* const ievaluate_args)
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { 0 };
+	var advanmem = (ADVAN_MODEL_MEMORY){ 0 };
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 
@@ -220,7 +220,7 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { 0 };
+	var advanmem = (ADVAN_MODEL_MEMORY){ 0 };
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 
@@ -342,7 +342,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { 0 };
+	var advanmem = (ADVAN_MODEL_MEMORY){ 0 };
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 	assert((int)sizeof(advanmem._predictvars) >= advanfuncs->advanconfig->predictfields.size);
@@ -501,7 +501,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 				/* discrete observations are given as log-likelihood for >0 is invalid */
 				} else {
 					if (yhat.loglik > 0.) 
-						fatal(logstream, "predicted log-likelihood (%f) invalid (>0.): ID %f time %f record %i\n", yhat.Y, id, time, i + record_offset);
+						fatal(logstream, "predicted log-likelihood (%f) invalid (>0.): ID %f time %f record %i\n", yhat.loglik, id, time, i + record_offset);
 				}
 			}
 		}
@@ -528,7 +528,7 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 	var advan = (ADVAN*)advan_memory;
 	advanfuncs->construct(advan, advanfuncs);
 
-	ADVAN_MODEL_MEMORY advanmem = { 0 }; /* errarray isnt used here, we use the one from the simulation */
+	var advanmem = (ADVAN_MODEL_MEMORY){ 0 }; /* errarray isnt used here, we use the one from the simulation */
 	var predictvars = (PREDICTVARS*)advanmem._predictvars;
 	var imodel = (IMODEL*)advanmem._imodel;
 

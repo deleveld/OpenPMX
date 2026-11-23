@@ -17,7 +17,7 @@
 
 /// This file implements the high-level checkout functions. The actual
 /// checkout function is individual_checkout() which is implemented in
-/// ievaluate.c. It advances the individual records with ETA zet to 0
+/// ievaluate.c. It advances the individual records with ETA set to 0
 /// and has lots of checks to detect errors. This is important because
 /// the other advancing of the individual records for objective function
 /// calculation, prediction, etc do not have any check to maximize
@@ -26,6 +26,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <assert.h>
 
 #include "checkout.h"
 #include "ievaluate.h"
@@ -53,6 +54,7 @@ static void idata_checkout_thread(INDIVID* const individ,
 	double eta[OPENPMX_OMEGA_MAX];
 	forcount(i, OPENPMX_OMEGA_MAX)
 		eta[i] = NAN;
+	assert(popmodel->nomega <= OPENPMX_OMEGA_MAX);
 	forcount(i, popmodel->nomega)
 		eta[i] = 0.;
 	
@@ -81,7 +83,7 @@ void idata_checkout(const IDATA* const idata,
 	info(logstream, "checkout begin\n");
 	
 	/* check for NAN in any paramaters. */
-	let _offset1 = advanfuncs->recordinfo.dataconfig->_offset1 ? 1 : 0;
+	let _offset1 = advanfuncs->recordinfo._offset1 ? 1 : 0;
 	forcount(i, popmodel->ntheta) {
 		let v = popmodel->theta[i];
 		if (isnan(v)) {

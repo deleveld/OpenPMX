@@ -163,7 +163,7 @@ static bool quiet(const OPTIONS* const options)
 
 static void progress_open(const OPTIONS* const options)
 {
-	if (quiet(options))
+	if (quiet(options) && isatty(fileno(stdout)))
 		printf("\n");
 }
 
@@ -261,7 +261,8 @@ static double stage2_objfn(const long int _xlength,
 	/* update best imodel and inform the user if we improve */
 	update_best_imodel(params);
 
-	return popmodel->result.objfn;
+	let f = popmodel->result.objfn;
+	return isfinite(f) ? f : (DBL_MAX / 2.);   /* or last finite objfn + big */	
 }
 
 /*--------------------------------------------------------------------*/
@@ -297,7 +298,7 @@ static bool bobyqa_error(const int retcode, const char* phase, FILE* stream)
 
 static long bobyqa_npt(const long n)
 {
-	return 2*n+1;				/* reccommended */
+	return 2*n+1;				/* recommended */
 //	return n+2;					/* minimum */
 //	return (n+1)*(n+2)/2;		/* maximum */
 }
@@ -422,10 +423,21 @@ static bool refine(STAGE2_PARAMS* const params,
 		/* setting etas to zero at each restart seems to reduce the 
 		 * risk of local minimums */
 		let idata = params->idata;
+		var keep = idata_etas_alloc(idata);
+		idata_etas_write(idata, &params->best.etas);
+		idata_etas_copy(&keep, idata);
 		idata_etas_reset(&params->best.etas, idata);
 
 		let ok = bobyqa_stage(params, "stage2 refine", rhobeg, rhoend, neval);
 		neval = options->estimate.maxeval - best->result.neval;
+
+		/* best.etas was zeroed above and is only refilled on improvement,
+		 * so if the restart found nothing better put the old etas back */
+		if (!(best->result.objfn < last_best.result.objfn)) {
+			idata_etas_write(idata, &keep);
+			idata_etas_copy(&params->best.etas, idata);
+		}
+		idata_etas_free(&keep);
 		if (!ok)
 			return false;
 
@@ -459,7 +471,7 @@ static bool refine(STAGE2_PARAMS* const params,
 	}
 }
 
-static bool focei(STAGE2_PARAMS* const params)
+static void focei(STAGE2_PARAMS* const params)
 {
 	assert(params);
 	let options = params->options;
@@ -467,36 +479,39 @@ static bool focei(STAGE2_PARAMS* const params)
 
 	if (params->test.nparam == 0) {
 		info(params->outstream, "optim no parameters to estimate\n");
-		return true;
+		return;
 	}
 
 	let maxeval = options->estimate.maxeval;
 	let step_initial = options->estimate.step_initial;
 	let step_refine = options->estimate.step_refine;
 
-/// Model estimation begins with an intial optimization with large 
-/// changes to paramater values with BOBYQA rho values from 
+/// Model estimation begins with an initial optimization with large 
+/// changes to parameter values with BOBYQA rho values from 
 /// step_initial, stopping at step_refine. 
 	progress_open(options);
 	/* warn on error, but try refine anyway */
-	bobyqa_stage(params, "stage2 initial", step_initial, step_refine, maxeval);
+	bobyqa_stage(params, "stage2 initial", step_initial, step_refine,
+				 maxeval - best->result.neval);
 	let neval = maxeval - best->result.neval;
 
 	/* after initialization run find the final step size consistent with
-	 * getting at least nsig */
+	 * getting at least nsig, halving until it is below 1e-8 */
 	var step_final = step_refine / 2.;
 	while (step_final >= 1e-8 &&
 		   converged_nsig(best, step_final) <= options->estimate.nsig)
 		step_final /= 2.;
 	info(params->outstream, "optim rho %g %g\n", step_refine, step_final);
 
-	let converged = neval > 1 && refine(params, step_refine, step_final, neval);
-	if (converged) {
+	if (neval > 1) {
+		let converged = refine(params, step_refine, step_final, neval);
+		if (converged)
+			best->result.type = OBJFN_FINAL;
+		
+		/* replace the best etas at final, not the last ones used */
 		best->result.nsig = converged_nsig(best, step_final);
-//		print_converged_nsig(best, options->estimate.step_final);
 		info(params->outstream, "optim final nsig %.1f\n", best->result.nsig);
 	}
-	return converged;
 }
 
 static void test_initial_objfn(STAGE2_PARAMS* const params)
@@ -506,7 +521,8 @@ static void test_initial_objfn(STAGE2_PARAMS* const params)
 	let options = params->options;
 	let popmodel = &params->test.popmodel;
 
-	/* start from best eta so far, is this going to be 0? */
+	/* nothing is known yet, so start from zero etas */
+	idata_etas_reset(&params->best.etas, idata);
 	idata_etas_write(idata, &params->best.etas);
 
 	/* very first evaluation */
@@ -551,12 +567,16 @@ static void focei_popmodel_stage2(STAGE2_PARAMS* const params)
 	/* call the underlying advan to optimize and find the best imodel */
 	best->result.type = OBJFN_EVALUATE;
 	if (options->estimate.maxeval > 1) {
-		let fullconverge = focei(params); /* TODO: this should be renamed I think */
-		if (fullconverge) 
-			best->result.type = OBJFN_FINAL;
+		focei(params);
 
 		/* at end we encode the best so far */
 		encode_transform(&params->test, best);
+
+		/* the result is always the best model, so put back its etas
+		 * whether or not refinement converged, and re-evaluate there so
+		 * the per-individual results in idata belong to the best model */
+		idata_etas_write(idata, &params->best.etas);
+		encode_evaluate(&params->test, idata, params->advanfuncs, options, true);
 	}
 }
 
@@ -594,7 +614,7 @@ static void outfile_header(FILE* f2,
 	
 	info(f2, "OpenPMX %i.%i.%i hash %s\n", OPENPMX_VERSION_MAJOR, OPENPMX_VERSION_MINOR, OPENPMX_VERSION_RELEASE, OPENPMX_GITHASH);
 	info(f2, "config %s %i %s %s\n", 
-		PARALLEL_NAME, options->nthread, SERVER_NAME, OPENPMX_INSTALL_PLATFORM);
+		PARALLEL_NAME, options->nthread, SERVER_NAME, OPENPMX_INSTALL_PLATFORM_NAME);
 	info(f2, "data records %i observations %i individuals %i\n", dataconfig->nrecords, idata->nobs, idata->nindivid);
 	info(f2, "data table offset %s\n", dataconfig->_offset1 ? "true" : "false");
 
@@ -708,7 +728,7 @@ static void estimate_popmodel(const char* filename,
 
 /// At the end of estimation the phi file is written and a trailer is 
 /// put onto the ext file. Also the yhat file is written with prediction
-/// varaiables including pred, yhat, yhatvar, and the state.
+/// variables including pred, yhat, yhatvar, and the state.
 	/* update results in tables */
 	if (filename) {
 		table_phi_idata(filename, idata, _offset1);
@@ -717,7 +737,10 @@ static void estimate_popmodel(const char* filename,
 		 * large models because it forces another advancing throught the 
 		 * records */
 		idata_predict_pred(idata, advanfuncs, popmodel, options);
-		table_yhat_idata(filename, idata, _offset1);
+		table_yhat_idata(filename,
+						 idata,
+						 &advanfuncs->recordinfo,
+						 _offset1);
 
 		if (params.extstream) {
 			let ineval = idata_ineval(idata, false);

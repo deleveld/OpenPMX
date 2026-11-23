@@ -15,8 +15,8 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef OPENPMX_VARIOUS_H
-#define OPENPMX_VARIOUS_H
+#ifndef OPENPMX_FILECONTENT_H
+#define OPENPMX_FILECONTENT_H
 
 #include "errctx.h"
 

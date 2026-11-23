@@ -93,7 +93,7 @@ static void pthreads_cleanup(void)
 		tpool.stop = true;
 		pthread_cond_broadcast(&tpool.task_is_available);
 		pthread_mutex_unlock(&tpool.mutex);
-//		info(0, "tpool: stop ");
+//		info(0, "tpool stop ");
 		forcount(i, tpool.nrunning) {
 			pthread_join(tpool.running[i], 0);
 //			info(0, " %i", i);
@@ -250,13 +250,13 @@ void scatter_threads(const IDATA* const idata,
 	if (!tpool.init) {
 		tpool.running = callocvar(pthread_t, nworker);
 		if (!tpool.running)
-			fatal(logstream, "tpool: allocation failed");
-		info(logstream, "tpool: start (%i)", nthread);
+			fatal(logstream, "tpool allocation failed");
+		info(logstream, "tpool start (%i)", nthread);
 
 		var ncreated = 0;
 		forcount(i, nworker) {
 			if (pthread_create(&tpool.running[i], NULL, run_threadpool_task, 0) != 0) {
-				warning(logstream, "tpool: create thread failed %d\n", i);
+				warning(logstream, "tpool create thread failed %d\n", i);
 				break;
 			}
 			info(logstream, " %i", i);
@@ -264,7 +264,7 @@ void scatter_threads(const IDATA* const idata,
 		}
 		info(logstream, "\n");
 		if (ncreated == 0)
-			fatal(logstream, "tpool: could not create any threads");
+			fatal(logstream, "tpool could not create any threads");
 		tpool.nrunning = ncreated;
 		tpool.init = true;
 	}
