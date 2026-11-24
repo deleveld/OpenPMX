@@ -736,6 +736,8 @@ if (vpc_plots) {
 		# bin interpolation: config row NAME=DVTY, VALUE=<dvty>, TYPE=vpc.smooth, SETTING=linear
 		# (anything else, or no row: one block per bin)
 		vpcsmooth <- get_config_setting("DVTY", dkey, "vpc.smooth", "none")
+		if (is.na(dkey))
+			vpcsmooth <- get_config_setting("DVTY", "-", "vpc.smooth", "none")
 		strata <- sort(unique(v$STRAT))
 		nstrata <- length(strata)
 		par(mfrow=c(nstrata, 1), oma=c(0, 0, 2, 0))   # strata stacked vertically, room for outer title
@@ -761,12 +763,12 @@ if (vpc_plots) {
 				khi <- itr(vs[[paste0("SIM_", k, "_HI")]])
 				col <- adjustcolor(if (k == "P50") "red" else "blue", 0.25)
 				if (vpcsmooth == "linear" && nrow(vs) >= 3 && !anyNA(c(klo, khi))) {
-					# one polygon: first and last bins stay flat over BINMIN..BINMAX, the bins in
-					# between sit at their bin centres, so edges are linearly interpolated
+					# one polygon with a vertex at every bin centre, edges linearly interpolated;
+					# the first half of the first bin and the second half of the last bin are flat
 					n <- nrow(vs)
 					ctr <- (vs$BINMIN + vs$BINMAX)/2
-					px <- c(vs$BINMIN[1], vs$BINMAX[1], ctr[2:(n-1)], vs$BINMIN[n], vs$BINMAX[n])
-					pidx <- c(1, 1, 2:(n-1), n, n)
+					px <- c(vs$BINMIN[1], ctr, vs$BINMAX[n])
+					pidx <- c(1, 1:n, n)
 					polygon(c(px, rev(px)), c(khi[pidx], rev(klo[pidx])), border=NA, col=col)
 				} else {
 					# bin edges (histogram limits) from the VPC file: neighbouring bins butt up

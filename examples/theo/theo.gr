@@ -17,8 +17,31 @@ $THETA
 	{ 0.1, 1, 5, ESTIMATE },
 $OMEGA
 	{ OMEGA_BLOCK, 3, { .1,
-						0.01, .1,
-						0.01, 0.01, .1 } },
+						0.0, .1,
+						0.0, 0.0, .1 } },
 $SIGMA 1, 1
 $MAIN
 	estimate();
+	covariance();
+	vpc();
+
+	profile_clean();
+	int nextra = 6;
+	profile(.param = { 
+				.type=PARAM_THETA, 
+				.index = 1 },
+			.nextra = nextra, 
+			);
+	profile(.param = { 
+				.type=PARAM_THETA, 
+				.index = 2, },
+			.nextra = nextra, 
+			);
+	profile(.param = { 
+				.type=PARAM_THETA, 
+				.index = 3,},
+			.nextra = nextra, 
+			);
+$FILE("graphics")
+	NAME		VALUE		TYPE		SETTING		
+	DVTY		-			vpc.smooth	linear
