@@ -23,7 +23,7 @@ $PREDICT(IPRED)
 	IPRED = A(1)/V1;
 	Y = log(IPRED) + ERR(1);
 $THETA
-	{   1,   4,   10,  ESTIMATE     },
+	{   1,   2,   10,  ESTIMATE     },
 	{   5,   20,   50,  ESTIMATE     },
 	{   20,   100,   1000,  ESTIMATE     },
 	{   0.1,   2,   5,  ESTIMATE     },
@@ -37,3 +37,4 @@ $MAIN
 	estimate();
 	covariance();
 	vpc(.correction=VPC_NOCORRECTION);
+	npde();

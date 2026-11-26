@@ -2065,6 +2065,7 @@ char openpmxtran_template[] =
 "#define simulate(...) 			pmx_simulate(&openpmx, &(SIMCONFIG){ __VA_ARGS__ })\n"
 "#define covariance(...) 		pmx_covariance(&openpmx, &(COVARIANCECONFIG){ __VA_ARGS__ })\n"
 "#define vpc(...) 				pmx_vpc(&openpmx, &(VPCCONFIG){ __VA_ARGS__ })\n"
+"#define npde(...) 				pmx_npde(&openpmx)\n"
 "#define profile(...) 			pmx_profile(&openpmx, &(PROFILECONFIG){ __VA_ARGS__ } )\n"
 "#define profile_add(...) 		pmx_profile_add(&openpmx, __VA_ARGS__ )\n"
 "#define profile_clean(...) 	pmx_profile_clean(&openpmx, &(PARAM){ __VA_ARGS__ })\n"

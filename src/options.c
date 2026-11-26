@@ -72,10 +72,6 @@ SIMCONFIG simconfig_default(const SIMCONFIG* const simulate)
 	SIMCONFIG ret = { };
 	if (simulate)
 		ret = *simulate;
-
-	if (ret.seed == 0)
-		ret.seed = (unsigned long)200501041406; /* Birthdays of Joyce, Nette and Isabel :) */
-
 	return ret;
 }
 

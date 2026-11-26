@@ -92,6 +92,8 @@ static double encode_covariance_evaluate(ENCODE* const test,
 		.stage1_order = true,
 		.stage1_evaluate = true,
 	};
+	idata_cwres_free(idata); /* probably not necessary because we are doing covariance on a copy */
+	idata_iwres_free(idata); /* probably not necessary because we are doing covariance on a copy */
 	scatter_threads(idata, advanfuncs, popmodel, nonzero, options, &scatteroptions, stage1_thread);
 
 	let objfn = idata_objfn(idata, omegainfo->omega_nonzero_lndet);

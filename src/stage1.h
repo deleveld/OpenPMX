@@ -31,6 +31,20 @@ void stage1_thread(INDIVID* const individ,
 				   const NONZERO* const nonzero,
 				   const OPTIONS* const options,
 				   const SCATTEROPTIONS* const scatteroptions);
+				   
+/* call after stage1_thread, uses individ->eta, DV, yhat and yhatvar */
+/* idata_cwres_alloc() must be called before scatter_threads() to this function */
+void stage1_cwres_thread(INDIVID* const individ,
+						 const ADVANFUNCS* const advanfuncs,
+						 const POPMODEL* const popmodel,
+						 const NONZERO* const nonzero,
+						 const OPTIONS* const options,
+						 const SCATTEROPTIONS* const scatteroptions);
+						 
+/* call after stage1_thread, uses DV, yhat and yhatvar */
+/* idata_iwres_alloc() must be called before this function */
+void stage1_iwres(INDIVID* const individ,
+				  const ADVANFUNCS* const advanfuncs);
 
 #ifdef __cplusplus
 }

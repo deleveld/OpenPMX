@@ -16,6 +16,7 @@ extfile <- paste0(filename, ".ext")               # parameter estimates per iter
 phifile <- paste0(filename, ".phi")               # individual (empirical Bayes) ETAs
 covfile <- paste0(filename, ".covariates")        # covariates per record
 yhatfile <- paste0(filename, ".yhat")             # individual predictions
+npdefile <- paste0(filename, ".npde")             # npde
 profilefile <- paste0(filename, ".profile.iter")  # likelihood profile iterations
 covlimitfile <- paste0(filename, ".cov.limits")   # covariance-step confidence limits
 vpcoutfile <- paste0(filename, ".vpc.out")        # VPC percentile summaries
@@ -146,6 +147,32 @@ if (file.exists(yhatfile)) {
 	}
 }
 
+npdedata <- NA
+if (file.exists(npdefile)) {
+	cat(sprintf("read npde \"%s\"\n", npdefile))
+	npdedata <- read.table(npdefile, header=TRUE, stringsAsFactors=FALSE)
+	names(npdedata) <- toupper(names(npdedata))
+
+#	if (is.data.frame(data)) {
+#		cat(sprintf("bind data and npde\n"))
+#		npdedata <- cbind(data, npdedata)
+#	}
+	# add some coloums from the data
+	if (is.data.frame(data)) {
+		npdedata[["ID"]] <- data[["ID"]]
+		npdedata[["TIME"]] <- data[["TIME"]]
+		dnames <- names(data)
+		if ("DVTY" %in% dnames) {
+			npdedata[["DVTY"]] <- data[["DVTY"]]
+		} else if ("DVID" %in% dnames) {
+			npdedata[["DVID"]] <- data[["DVID"]]
+		}
+	}
+	if (is.data.frame(yhatdata)) {
+		npdedata[["YHAT"]] <- yhatdata[["YHAT"]]
+	}
+}
+
 # Likelihood-profile iterations (one block per parameter)
 profiles <- NA
 if (file.exists(profilefile)) {
@@ -191,10 +218,11 @@ chk("ext",        ext,       "ITERATION")
 chk("phi",        phi,       "ID")
 chk("covariates", cov,       "ID")
 chk("yhat",       yhatdata,  c("ID", "TIME", "YHATDV", "YHAT", "YHATVAR"))
+chk("npde",       npdedata,  c("NPDE"))
 chk("profiles",   profiles,  c("TYPE", "INDEX", "VALUE", "OBJFN", "NEVAL", "TARGET"))
 chk("vpc.out",    vpcout,    c("NAME", "BINMIN", "BINMAX"))
 
-pdf(pdffile, width = 11.69, height = 8.27)  # A4 landscape
+pdf(pdffile, width=11.69, height=8.27)  # A4 landscape
 
 # Look up a user setting in the config table by (NAME, VALUE, TYPE).
 # Returns SETTING if exactly one row matches, else the default.
@@ -478,7 +506,7 @@ if (yhat_diagnostic_plots) {
 				dv <- itr(as.numeric(yhatdata[valid, "YHATDV"]))
 				yhat <- itr(as.numeric(yhatdata[valid, "YHAT"]))
 				lim <- range(c(dv, yhat), na.rm=TRUE)
-
+	
 				# panel 1: DV vs PRED (population prediction), identity line
 				if ("PRED" %in% pnames) {
 					ppred <- itr(yhatdata[valid, "PRED"])
@@ -497,13 +525,26 @@ if (yhat_diagnostic_plots) {
 				# panel 2: DV vs YHAT (individual prediction)
 				x <- yhat
 				y <- dv
-				lim <- range(c(x, y))
-				plot(x=x, y=y, type="n", xlab="YHAT", ylab="DV", xlim=lim, ylim=lim, log=logxy)
+				plot(x=x, y=y, type="n", xlab="YHAT", ylab="DV", xlim=lim, ylim=lim)
 				points(x=x, y=y, col=pointcol)
 				abline(coef = c(0,1))
 				grid()
 
-				frame()   # panel 3 intentionally blank: puts the time plots on the second row
+				# panel 3: CWRES vs YHAT (individual prediction)
+				if ("CWRES" %in% pnames) {
+					cwres <- itr(yhatdata[valid, "CWRES"])
+
+					x <- yhat
+					y <- cwres
+					ylim <- range(c(cwres, -cwres), na.rm=TRUE)
+
+					plot(x=x, y=y, type="n", xlab="YHAT", ylab="CWRES", xlim=lim, ylim=ylim)
+					points(x=x, y=y, col=pointcol)
+					abline(coef = c(0,0))
+					grid()
+					
+				} else 
+					frame() 
 
 				if ("TIME" %in% pnames) {
 					time <- yhatdata[valid, "TIME"]
@@ -550,7 +591,156 @@ if (yhat_diagnostic_plots) {
 					for (i in unique(id)) 
 						plot_lines(i, id, x, y2)
 					grid()
+					
+					# panel 5: CWRES vs time
+					if ("CWRES" %in% pnames) {
+						cwres <- itr(yhatdata[valid, "CWRES"])
+
+						x <- time
+						y <- cwres
+						ylim <- range(c(cwres, -cwres), na.rm=TRUE)
+						plot(x=x, y=y, type="n", xlab="TIME", ylab="CWRES", xlim=timelim, ylim=ylim)
+						points(x=x, y=y, col=pointcol)
+						abline(coef = c(0,0))
+						grid()
+						
+					} else 
+						frame() 
+					
 				}
+				# page title for this data type: configured name or generic label
+				# (note: %i assumes numeric DVTY codes)
+				if (n_plots == 0) {
+					t <- get_config_setting("DVTY", dname, "name", NA);
+					if (!is.na(t))
+						title(t, outer=TRUE, line=-1)
+					else
+						title(sprintf("data type %i", dname), outer=TRUE, line=-1)
+				}
+				n_plots <- n_plots + 1
+				if (n_plots >= prod(par("mfrow")))
+					n_plots <- 0
+			}
+		}
+	}
+}
+
+cat("check npde\n")
+npde_diagnostic_plots <- TRUE
+if (!is.data.frame(npdedata) || NROW(npdedata) == 0) {
+	cat("... no npde data\n")
+	npde_diagnostic_plots <- FALSE
+}
+if (npde_diagnostic_plots) {
+	cat(sprintf("plot npde diagnostics\n"))
+	pnames <- names(npdedata)
+
+	# do we have a DVTY
+	# observation type column: DVTY, else DVID, else a single type
+	if ("DVTY" %in% pnames)
+		preddvid <- npdedata[["DVTY"]]
+	else if ("DVID" %in% pnames)
+		preddvid <- npdedata[["DVID"]]
+	else 
+		preddvid <- rep(1, nrow(npdedata))
+	dvid_types <- unique(na.omit(preddvid))
+
+	pointcol = "grey"
+
+	if ("NPDE" %in% pnames) {
+
+		# NPDE == NA marks rows that are not real observations (dose rows etc.)
+		timevalid <- npdedata[["NPDE"]] != 0
+		timelim <- range(npdedata[timevalid, "TIME"], na.rm=TRUE)  # common time axis for all types
+		
+		for (dname in dvid_types) {
+			n_plots <- 0
+			par(mfrow=c(2,3), cex=1)
+
+			# scale of this data type (itr maps the data to the natural scale)
+			sc <- get_scale("DVTY", dname)
+			itr <- sc$itr
+			logy <- sc$ylog
+			logxy <- sc$xylog
+
+			valid <- !is.na(npdedata[["NPDE"]]) & preddvid == dname
+			if (!all(valid == FALSE)) {
+				cat(sprintf("plot npde dvid %i\n", dname))
+
+				npde <- as.numeric(npdedata[valid, "NPDE"])
+				lim <- range(c(npde, -npde), na.rm=TRUE)
+
+				# panel 1: NPDE density vs. standard normal N(0, 1)
+				npde_clean <- npde[is.finite(npde)]
+				if (length(npde_clean) >= 2) {
+					npde_mean <- mean(npde_clean)
+					npde_sd <- sd(npde_clean)
+					d_npde <- density(npde_clean)
+
+					d_xlim <- range(c(d_npde$x, -4, 4), na.rm=TRUE)
+					x_grid <- seq(d_xlim[1], d_xlim[2], length.out=200)
+					y_norm <- dnorm(x_grid, mean=0, sd=1)
+					d_ylim <- c(0, max(c(d_npde$y, y_norm), na.rm=TRUE) * 1.35)
+
+					col <- adjustcolor("blue", 0.25)
+					plot(x=d_npde$x, y=d_npde$y, type="n",
+						 xlab="NPDE", ylab="Density", xlim=d_xlim, ylim=d_ylim)
+					polygon(c(x_grid[1], x_grid, x_grid[length(x_grid)]),
+							c(0, y_norm, 0),
+							col=col, border=NA)
+					abline(v=0, lty=3, col="grey50")
+					lines(x=d_npde$x, y=d_npde$y, col="black", lwd=2)
+					grid()
+
+					col <- adjustcolor("blue", 0.25)
+					legend("topright",
+						   legend=c(
+							   sprintf("NPDE (%.3g, %.3g)", npde_mean, npde_sd),
+							   "N(0, 1)"),
+						   border=c(NA, NA),
+						   col=c("black", col),
+						   lty=c(1, 1),
+						   lwd=c(2, 8),
+						   bty="n", cex=0.95)
+				} else {
+					frame()
+				}
+
+				# panel 2: Normal Q-Q plot of NPDE vs. N(0, 1)
+				if (length(npde_clean) >= 2) {
+					npde_sorted <- sort(npde_clean)
+					q_theo <- qnorm(ppoints(length(npde_sorted)))
+					qq_lim <- range(c(q_theo, npde_sorted), na.rm=TRUE)
+
+					plot(x=q_theo, y=npde_sorted, type="n",
+						 xlab="Theoretical Quantiles N(0, 1)", ylab="Sample Quantiles (NPDE)",
+						 xlim=qq_lim, ylim=qq_lim)
+					points(x=q_theo, y=npde_sorted, col=pointcol)
+					abline(0, 1, col="black")
+					grid()
+				} else {
+					frame()
+				}
+
+				frame()
+
+				x <- as.numeric(npdedata[valid, "TIME"])
+				y <- npde
+				plot(x=x, y=y, type="n", xlab="TIME", ylab="NPDE", xlim=timelim, ylim=lim)
+				points(x=x, y=y, col=pointcol)
+				abline(coef = c(0,0))
+				grid()
+
+				if ("YHAT" %in% pnames) {
+					x <- itr(npdedata[valid, "YHAT"])
+					y <- npde
+					plot(x=x, y=y, type="n", xlab="YHAT", ylab="NPDE", ylim=lim)
+					points(x=x, y=y, col=pointcol)
+					abline(coef = c(0,0))
+					grid()
+				} else
+					frame()
+
 				# page title for this data type: configured name or generic label
 				# (note: %i assumes numeric DVTY codes)
 				if (n_plots == 0) {
@@ -704,18 +894,18 @@ if (likelihood_profile_plots) {
 # VPC plots: one page per VPC name (first column), strata stacked on the page
 # Prediction-corrected VPC: observed percentiles (black lines) are drawn over
 # simulated confidence bands (red = median, blue = other percentiles).
-cat("check VPC plots\n")
+cat("check vpc plots\n")
 vpc_plots <- TRUE
 if (!is.data.frame(vpcout) || NROW(vpcout) == 0) {
-	cat("... no VPC out data\n")
+	cat("... no vpc out data\n")
 	vpc_plots <- FALSE
 }
 if (!is.data.frame(vpcpoints) || NROW(vpcpoints) == 0) {
-	cat("... no VPC points data\n")
+	cat("... no vpc points data\n")
 	vpc_plots <- FALSE
 }
 if (vpc_plots) {
-	cat("plot VPCs\n")
+	cat("plot vpc\n")
 
 	# percentiles present in the file, from the OBS_P<x> columns
 	# (so the script adapts to whichever percentiles were computed)
@@ -735,9 +925,9 @@ if (vpc_plots) {
 		logy <- sc$ylog
 		# bin interpolation: config row NAME=DVTY, VALUE=<dvty>, TYPE=vpc.smooth, SETTING=linear
 		# (anything else, or no row: one block per bin)
-		vpcsmooth <- get_config_setting("DVTY", dkey, "vpc.smooth", "none")
 		if (is.na(dkey))
 			vpcsmooth <- get_config_setting("DVTY", "-", "vpc.smooth", "none")
+		vpcsmooth <- get_config_setting("DVTY", dkey, "vpc.smooth", vpcsmooth)
 		strata <- sort(unique(v$STRAT))
 		nstrata <- length(strata)
 		par(mfrow=c(nstrata, 1), oma=c(0, 0, 2, 0))   # strata stacked vertically, room for outer title

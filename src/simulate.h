@@ -41,8 +41,9 @@ void simulate_with_error_thread(INDIVID* const individ,
 								const SCATTEROPTIONS* const scatteroptions);
 
 void idata_resample_err(const IDATA* const idata,
+						const ADVANFUNCS* const advanfuncs,
 						const POPMODEL* const popmodel,
-						gsl_rng * const rng);
+							gsl_rng * const rng);
 void idata_resample_eta(IDATA* const idata,
 						const POPMODEL* const popmodel,
 						gsl_rng * const rng);

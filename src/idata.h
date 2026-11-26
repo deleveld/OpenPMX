@@ -39,7 +39,10 @@ typedef struct {
 	double* const yhatvar;
 	double* const pred;
 	PREDICTVARS* const predictvars;
-	double* isimerr;	/* only for simulation */
+	double* simerr;	/* only for simulation */
+	double* cwres;	/* only after cwres generation */
+	double* iwres;	/* only after iwres generation */
+	double* npde;	/* only after npde generation */
 
 	/* objective function */
 	double obs_min2ll;
@@ -77,6 +80,12 @@ typedef struct {
 	double* const pred;
 	PREDICTVARS* const predictvars;
 	double* simerr; */
+
+	/* results of simulations */
+	struct {
+		double* dv;
+		int nsim;
+	} sim;
 } IDATA;
 
 IDATA idata_construct(const RECORDINFO* const recordinfo,
@@ -104,8 +113,20 @@ void idata_etas_copy(IDATAETAS* const val, const IDATA* const idata);
 void idata_etas_write(IDATA* const idata, const IDATAETAS* const val);
 void idata_etas_free(const IDATAETAS* const val);
 
-double* idata_alloc_simerr(const IDATA* const idata);
-void idata_free_simerr(const IDATA* const idata);
+double* idata_simerr_alloc(const IDATA* const idata);
+void idata_simerr_free(const IDATA* const idata);
+
+double* idata_cwres_alloc(const IDATA* const idata);
+void idata_cwres_free(const IDATA* const idata);
+
+double* idata_iwres_alloc(const IDATA* const idata);
+void idata_iwres_free(const IDATA* const idata);
+
+double* idata_npde_alloc(const IDATA* const idata);
+void idata_npde_free(const IDATA* const idata);
+
+double* idata_sim_alloc(IDATA* const idata, const int nsim);
+void idata_sim_free(IDATA* const idata);
 
 void table_phi_idata(const char* filename,
 					 const IDATA* const idata,

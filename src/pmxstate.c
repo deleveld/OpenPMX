@@ -15,17 +15,17 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <assert.h>
-#include <float.h>
-#include <unistd.h>
-#include <string.h>
-
 #include "openpmx.h"
 #include "scatter.h"
 #include "utils/c22.h"
 #include "advan/advan.h"
 #include "print.h"
 #include "pmxstate.h"
+
+#include <assert.h>
+#include <float.h>
+#include <unistd.h>
+#include <string.h>
 
 #include <gsl/gsl_rng.h>
 
@@ -81,13 +81,21 @@ void pmx_ensure_state_rng(OPENPMX* const pmx, const OPTIONS* const options)
 	pmx_ensure_state(pmx);
 	var pstate = pmx->state;
 
+	/* set seed if missing */
+	var seed = options->simulate.seed;
+	if (seed == 0 && !pstate->rng)
+		seed = (unsigned long)200501041406; /* Birthdays of Joyce, Nette and Isabel :) */
+
 	/* allocate random number generator */
-	if (!pstate->rng) {
-		var seed = options->simulate.seed;
+	if (!pstate->rng) 
 		pstate->rng = gsl_rng_alloc(gsl_rng_mt19937);
-		gsl_rng_set(pstate->rng, seed);
-	}
 	assert(pstate->rng);
+
+	/* change seed if needed */
+	if (seed) {
+		gsl_rng_set(pstate->rng, seed);
+		info(0, "sim seed %lu\n", seed);
+	}
 }
 
 void pmx_copy_idata(OPENPMX* const dest, const OPENPMX* const source)

@@ -60,7 +60,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# find out about the platform and the path 
+# find out about the platform and the path
 detect_platform() {
     case "$OSTYPE" in
         darwin*)  echo "macos" ;;
@@ -78,15 +78,21 @@ detect_platform() {
 }
 PLATFORM=$(detect_platform)
 OPENPMXPATH=$(cd "$(dirname "${0}")" && pwd)
-printf "install %s %s %s\n" "${TARGET}" "${SERVER}" "${PLATFORM}" 
+printf "install %s %s %s\n" "${TARGET}" "${SERVER}" "${PLATFORM}"
 printf "path %s\n" "${OPENPMXPATH}"
 
-# cleaup previous build
+# Windows executables need .exe
+EXEEXT=""
+if [ "${PLATFORM}" = "msys2" ]; then
+	EXEEXT=".exe"
+fi
+
+# cleanup previous build
 mkdir -p "${OPENPMXPATH}/build" "${OPENPMXPATH}/bin" "${OPENPMXPATH}/lib"
 rm -vf "${OPENPMXPATH}"/build/*.o
-rm -vf "${OPENPMXPATH}"/bin/openpmxtran
+rm -vf "${OPENPMXPATH}/bin/openpmxtran" "${OPENPMXPATH}/bin/openpmxtran.exe"
 rm -vf "${OPENPMXPATH}"/lib/*.a
-rm -vf "${OPENPMXPATH}/openpmx"
+rm -vf "${OPENPMXPATH}/openpmx" "${OPENPMXPATH}/openpmx.exe"
 rm -vf "${OPENPMXPATH}/src/buildflags.h"
 if [ "${TARGET}" = "clean" ]; then
 	EXITMESSAGE="clean success"
@@ -99,22 +105,17 @@ LIBNAME="openpmx"
 CFLAGS="-g -O2 -W -Wall -Wextra -march=native -mtune=native"
 CLIBFLAGS="-Wfloat-conversion -Wformat -Werror=format-security -Wno-override-init -Wwrite-strings -Isrc"
 LFLAGS=""
+LDLIBS="-lgsl -lgslcblas -lm"
 AR="ar rcs lib/lib${LIBNAME}.a"
 
 # adjust flags for different platforms
 case "${PLATFORM}" in
     macos*)
-        # macOS-specific flags
-        # Remove -march=native as it's not well supported on Apple Silicon
-        # Use -fPIC for position independent code
         CLIBFLAGS="${CLIBFLAGS} -fPIC"
-        # Detect architecture
         ARCH=$(uname -m)
         if [ "$ARCH" = "arm64" ]; then
-            # Apple Silicon
             CFLAGS="${CFLAGS} -mcpu=apple-m1"
         else
-            # Intel Mac
             CFLAGS="${CFLAGS} -march=native"
         fi
         LFLAGS="${LFLAGS} -flto"
@@ -146,7 +147,8 @@ esac
 case "${TARGET}" in
     openmp)
         CFLAGS="${CFLAGS} -fopenmp"
-        LFLAGS="${LFLAGS} -fopenmp -lgomp"
+        LFLAGS="${LFLAGS} -fopenmp"
+        LDLIBS="${LDLIBS} -lgomp"
         printf "#define OPENPMX_PARALLEL_OPENMP\n" >> "${OPENPMXPATH}/src/buildflags.h"
         ;;
     pthread)
@@ -180,14 +182,14 @@ esac
 
 # compile openpmxtran
 printf "compile openpmxtran\n"
-(cd "${OPENPMXPATH}" && ${CC} ${CFLAGS} "src/openpmxtran.c" -o "bin/openpmxtran" ${LFLAGS} -lm)
+(cd "${OPENPMXPATH}" && ${CC} ${CFLAGS} "src/openpmxtran.c" -o "bin/openpmxtran${EXEEXT}" ${LFLAGS} -lm)
 
 # compile source code to object files
 SOURCEFILES="pmxstate.c options.c ievaluate.c predict.c stage1.c
 			 checkout.c popmodel.c encode.c nonzero.c omegainfo.c
 			 linalg.c print.c idata.c table.c scatter.c estimate.c
-			 simulate.c reload.c server_queue.c 
-			 profile.c covariance.c vpc.c
+			 simulate.c reload.c server_queue.c
+			 profile.c covariance.c vpc.c npde.c
 			 dataconfig/dataconfig.c
 			 advan/advan.c advan/pred.c
 			 advan/onecomp.c advan/onecomp_depot.c
@@ -216,23 +218,26 @@ done
 printf "build library\n"
 (cd "${OPENPMXPATH}" && ${AR} ${OBJECTFILES})
 
-# write the final launcher script
-printf "write openpmx script\n"
-{
-    printf "#!/bin/bash\n"
-    printf "set -euo pipefail\n"
-    printf "########################################################################\n"
-    printf "# OpenPMX build options\n"
-    printf "CC=%s\n" "${CC}"
-    printf "CFLAGS=\"%s\"\n" "${CFLAGS}"
-    printf "LFLAGS=\"%s\"\n" "${LFLAGS}"
-    printf "OPENPMXPATH=\"%s\"\n" "${OPENPMXPATH}"
-    printf "PLATFORM=\"%s\"\n" "${PLATFORM}"
-    cat "${OPENPMXPATH}/src/_openpmx_template"
-} > "${OPENPMXPATH}/openpmx"
+# compile the C launcher (replaces the old bash script)
+printf "compile openpmx launcher\n"
 
-chmod a+x "${OPENPMXPATH}/openpmx"
+# escape backslashes and double quotes so a value can be embedded in a C
+# string literal (the msys2 LFLAGS contain double quotes)
+cstr() {
+	local s="${1//\\/\\\\}"
+	printf '"%s"' "${s//\"/\\\"}"
+}
+
+# compile launcher
+LAUNCHER_CFLAGS="-g -O2 -Wall"
+(cd "${OPENPMXPATH}" && ${CC} ${LAUNCHER_CFLAGS} \
+	-DOPENPMX_CC="$(cstr "${CC}")" \
+	-DOPENPMX_CFLAGS="$(cstr "${CFLAGS}")" \
+	-DOPENPMX_LFLAGS="$(cstr "${LFLAGS}")" \
+	-DOPENPMX_LDLIBS="$(cstr "${LDLIBS}")" \
+	-DOPENPMX_PATH="$(cstr "${OPENPMXPATH}")" \
+	"src/openpmx_launcher.c" \
+	-o "openpmx${EXEEXT}")
 
 # exit with success message
 EXITMESSAGE="success"
-

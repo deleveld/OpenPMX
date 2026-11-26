@@ -70,7 +70,7 @@ void simulate_with_error_thread(INDIVID* const individ,
 						individ->yhat,
 						individ->yhatvar,
 						individ->pred,
-						individ->isimerr);
+						individ->simerr);
 	individ->ineval += 1;
 	timespec_duration(&t3, &individ->eval_msec);
 }
@@ -78,21 +78,32 @@ void simulate_with_error_thread(INDIVID* const individ,
 /// For simulation random observation residuals are chosen according to
 /// sigma. 
 void idata_resample_err(const IDATA* const idata,
+						const ADVANFUNCS* const advanfuncs,
 						const POPMODEL* const popmodel,
 						gsl_rng * const rng)
 {
 	let ndata = idata->ndata;
 	let nsigma = popmodel->nsigma;
 
-	/* fill in err values */
-	var simerr = idata_alloc_simerr(idata);
+	var recordinfo = &advanfuncs->recordinfo;
+	let dataconfig = recordinfo->dataconfig;
+	let recordsize = dataconfig->recordfields.size;
+	let sigma = popmodel->sigma;
+
+	/* fill in err values, only observations get random error */
+	var simerr = idata_simerr_alloc(idata);
+	const RECORD* record = dataconfig->records;
 	forcount(i, ndata) {
-		let sigma = popmodel->sigma;
-		forcount(j, nsigma) {
-			let stddev = sqrt(sigma[j]);
-			let v = gsl_ran_gaussian(rng, stddev);
-			simerr[i * nsigma + j] = v;
+		if (RECORDINFO_EVID(recordinfo, record) == 0) {
+			forcount(j, nsigma) {
+				let stddev = sqrt(sigma[j]);
+				simerr[i * nsigma + j] = gsl_ran_gaussian(rng, stddev);
+			}
+		} else {
+			forcount(j, nsigma)
+				simerr[i * nsigma + j] = 0.;
 		}
+		record = (const RECORD*)((const char*)record + recordsize);
 	}
 }
 
@@ -118,6 +129,7 @@ void idata_resample_eta(IDATA* const idata,
 
 		individ->obs_min2ll = 0.;
 		individ->obs_lndet = 0.;
+		individ->obs_logp = 0.;
 		individ->eta_min2ll = 0.;
 		individ->icov_lndet = 0.;
 		individ->iobjfn = 0.;
@@ -175,14 +187,17 @@ static void idata_predict_dv(IDATA* const idata,
 							 const POPMODEL* popmodel,
 							 const OPTIONS* const options)
 {
-	/* make sure error has been allocated. If error has not been resampled yet,
-	 * then the initial value (zero) will be used */
-	idata_alloc_simerr(idata);
+	/* make sure error has been allocated. */
+	assert(idata->individ[0].simerr);
 
 	/* simulation writes into pred (with error) and yhat (without error) */
 	SCATTEROPTIONS scatteroptions = { };
 	scatter_threads(idata, advanfuncs, popmodel, 0, options, &scatteroptions, simulate_with_error_thread);
+}
 
+static void idata_writeback_dv(IDATA* const idata,
+							   const ADVANFUNCS* const advanfuncs)
+{
 	/* make sure data is writable */
 	var recordinfo = &advanfuncs->recordinfo;
 	var dataconfig = recordinfo->dataconfig;
@@ -215,20 +230,69 @@ void pmx_simulate(OPENPMX* pmx, const SIMCONFIG* const simconfig)
 	pmx_ensure_state(pmx);
 	var pstate = pmx->state;
 
+	var options = options_init(pmx);
+	var nsim = 0;
+	if (simconfig) {
+		options.simulate = simconfig_default(simconfig);
+		nsim = simconfig->nsim;
+	}
+
+	if (nsim < 0) 
+		fatal(0, "sim output nsim < 0\n");
+
 	ERRCTX errctx = { 0 };
 	var popmodel = popmodel_init(pmx->theta, pmx->omega, pmx->sigma, &errctx);
 	if (errctx.len)
 		fatal(0, "%s", errctx.errmsg);
 	
-	var options = options_init(pmx);
-	if (simconfig)
-		options.simulate = simconfig_default(simconfig);
-
 	pmx_ensure_state_rng(pmx, &options);
 
-	idata_resample_eta(&pstate->idata, &popmodel, pstate->rng);
-	idata_resample_err(&pstate->idata, &popmodel, pstate->rng);
+	/// If nsim == 0 then only one simulation is done and the results
+	/// written back to the dataset DV.
+	var idata = &pstate->idata;
+	var advanfuncs = pstate->advanfuncs;
+	if (nsim == 0) {
+		info(0, "simulate begin modify DV\n");
 
-	idata_predict_dv(&pstate->idata, pstate->advanfuncs, &popmodel, &options);
+		idata_sim_free(idata);
+		idata_resample_eta(idata, &popmodel, pstate->rng);
+		idata_resample_err(idata, advanfuncs, &popmodel, pstate->rng);
+		idata_predict_dv(idata, advanfuncs, &popmodel, &options);
+		
+		/* write-back into dataset */
+		idata_writeback_dv(idata, advanfuncs);
+
+	/// If nsim > 0 then only many copies of the simulation are done and
+	/// the result DV values saved in the individual data.
+	} else {
+		var t = 0.;
+		var next_time = 0.;
+		struct timespec begin;
+		clock_gettime(CLOCK_MONOTONIC, &begin);
+
+		info(0, "sim begin %i\n", nsim);
+
+		var recordinfo = &advanfuncs->recordinfo;
+		let ndata = recordinfo->ndata;
+		var dv = idata_sim_alloc(idata, nsim);
+		forcount(i, nsim) {
+			struct timespec now;
+			clock_gettime(CLOCK_MONOTONIC, &now);
+			t = timespec_time_difference(&begin, &now) / 1000.;
+			if (i == 0 || t >= next_time) {
+				info(0, "time %.3f simulate %i\n", next_time, i+1);
+				next_time = t + 1.;
+			} 
+			idata_resample_eta(idata, &popmodel, pstate->rng);
+			idata_resample_err(idata, advanfuncs, &popmodel, pstate->rng);
+			idata_predict_dv(idata, advanfuncs, &popmodel, &options);
+
+			/* collect DV in pointer and zero pred */
+			let pred = idata->individ[0].pred;
+			memcpyvar(&dv[i * ndata], pred, ndata);
+			memset(pred, 0, ndata*sizeof(double));
+		}
+		info(0, "time %.3f simulate %i\n", t, nsim);
+	}
+	info(0, "sim end\n");
 }
-

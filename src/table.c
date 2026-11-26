@@ -55,7 +55,9 @@ typedef struct {
 	const IMODEL* imodel;
 	const PREDICTVARS* predictvars;
 	const RECORD* record;
-	const double* err;
+	const double* simerr;
+	const double* cwres;
+	const double* iwres;
 } TABLE;
 
 #ifndef NAME_MAX
@@ -67,10 +69,7 @@ static void table_close(TABLE* const table)
 	assert(table);
 	
 	/* close the stream if there is one and if we opened it */
-	if (table->stream &&
-		table->stream != stdout &&
-		table->stream != stderr &&
-		(!table->tableconfig || !table->tableconfig->stream))
+	if (table->stream && table->stream != stdout)
 		fclose(table->stream);
 	table->stream = 0;
 
@@ -101,35 +100,11 @@ static TABLE table_open(const IDATA* const idata,
 	FILE* stream = 0;
 	
 	if (tableconfig) {
-/// If a .filename is defined in the TABLECONFIG then the output is
-/// written to that filename.  
-		/* write to user define filename */
-		if (tableconfig->filename) {
-			if (tableconfig->name) {
-				errctx_add(errctx, "%s: table has both filename \"%s\" and name \"%s\"\n",
-						   __func__, tableconfig->filename, tableconfig->name);
-				goto done_file_open;
-			}
-			if (tableconfig->stream) {
-				errctx_add(errctx, "%s: table has both filename \"%s\" and stream\n",
-						   __func__, tableconfig->filename);
-				goto done_file_open;
-			}
-			stream = fopen(tableconfig->filename, "w");
-			if (!stream) {
-				errctx_add(errctx, "%s: open table file failed \"%s\"\n", __func__, tableconfig->filename);
-				goto done_file_open;
-			}
 /// If a .name is defined in the TABLECONFIG then the output is
 /// written to a filename which is the name in the PMX object extended
 /// with the given name.   
-		} else if (tableconfig->name) {
+		if (tableconfig->name) {
 			char fname[PATH_MAX + NAME_MAX];
-			if (tableconfig->stream) {
-				errctx_add(errctx, "%s: table has both name \"%s\" and stream\n",
-						   __func__, tableconfig->name);
-				goto done_file_open;
-			}
 			snprintf(fname, sizeof(fname), "%s%s%s",
 				pmx_filename ? pmx_filename : "",
 				pmx_filename ? "." : "",
@@ -140,11 +115,6 @@ static TABLE table_open(const IDATA* const idata,
 						   __func__, fname);
 				goto done_file_open;
 			}
-/// if a .stream (FILE*) is provided then table will be output to it.
-/// For example it could be stdout or stderr. If given in this way then
-/// fclose() is not called on the stream when the table is closed.
-		} else if (tableconfig->stream) {
-			stream = tableconfig->stream;
 		}
 	}
 /// If no TABLECONFIG, then see if we have a filename in PMX then make
@@ -191,7 +161,7 @@ done_file_open:
 		.imodel = 0,
 		.predictvars = 0,
 		.record = 0,
-		.err = 0,
+		.simerr = 0,
 	};
 
 /// The table fields are indicated by a string which will be tokenized
@@ -278,10 +248,10 @@ static int table_row(TABLE* const table)
 	table->predictvars = (const PREDICTVARS*)((char*)individ->predictvars + table->individ_i * idata->predictvars_size);
 	table->record = RECORD_INDEX(individ->record, record_size, table->individ_i);
 
-	table->err = table->zeroerr;
-	if (individ->isimerr) {
-		let v = &individ->isimerr[table->individ_i * idata->nsigma];
-		table->err = v;
+	table->simerr = table->zeroerr;
+	if (individ->simerr) {
+		let v = &individ->simerr[table->individ_i * idata->nsigma];
+		table->simerr = v;
 	}
 
 	return 1;
@@ -313,7 +283,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 		return DATA_FIELD(table->predictvars, predictvarsoffset);
 
 /// The follwing fields are accesible: YHAT, YHATVAR, PRED, OBJ, INEVAL,
-/// EVID, MDV, EVID, AMT, RATE, and CMT.
+/// EVID, MDV, EVID, AMT, RATE, and CMT. Also IWRES, CWRES.
 	/* Table entries for each RECORD */
 	if (strcmp(name, "YHAT") == 0)
 		return individ->yhat[table->individ_i];
@@ -321,6 +291,21 @@ static double table_value(const TABLE* const table, const char* const name, cons
 		return individ->yhatvar[table->individ_i];
 	if (strcmp(name, "PRED") == 0)
 		return individ->pred[table->individ_i];
+	if (strcmp(name, "IWRES") == 0) {
+		if (!individ->iwres)
+			return NAN;
+		return individ->iwres[table->individ_i];
+	}
+	if (strcmp(name, "CWRES") == 0) {
+		if (!individ->cwres)
+			return NAN;
+		return individ->cwres[table->individ_i];
+	}
+	if (strcmp(name, "NPDE") == 0) {
+		if (!individ->npde)
+			return NAN;
+		return individ->npde[table->individ_i];
+	}
 	if (strcmp(name, "OBJ") == 0)
 		return individ->iobjfn;
 	if (strcmp(name, "INEVAL") == 0)
@@ -368,7 +353,7 @@ static double table_value(const TABLE* const table, const char* const name, cons
 	if (sscanf(name, "ERR(%i)", &i) == 1) {
 		i -= off;
 		if (i >= 0 && i < idata->nsigma)
-			return table->err[i];
+			return table->simerr[i];
 		if (table->individ == 0 && table->individ_i == 0)
 			warning(0, "access \"%s\" outside nsigma (%i)\n", name, idata->nsigma + off);
 		return NAN;
@@ -389,7 +374,7 @@ void pmx_table(OPENPMX* pmx,
 	if (errctx.len)
 		fatal(0, "%s: %s", __func__, errctx.errmsg);
 
-	TABLE table = table_open(&pmx->state->idata,
+	var table = table_open(&pmx->state->idata,
 							 pmx->state->advanfuncs,
 							 &popmodel,
 							 pmx->filename,
@@ -400,7 +385,7 @@ void pmx_table(OPENPMX* pmx,
 	if (errctx.len)
 		fatal(0, "%s: %s", __func__, errctx.errmsg);
 
-	FILE* f = table.stream;
+	var f = table.stream;
 	assert(f);
 
 	/* write out fields */

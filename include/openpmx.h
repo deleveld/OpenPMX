@@ -37,7 +37,7 @@ extern "C" {
 
 #define OPENPMX_VERSION_MAJOR			0
 #define OPENPMX_VERSION_MINOR			1
-#define OPENPMX_VERSION_RELEASE			7
+#define OPENPMX_VERSION_RELEASE			8
 
 #define OPENPMX_THETA_MAX				64
 #define OPENPMX_OMEGABLOCKSIZE_MAX		64
@@ -261,6 +261,7 @@ void pmx_predict_pred(OPENPMX* openpmx);
 /*---------------------------------------------------------------------*/
 typedef struct {
 	unsigned long seed;
+	int nsim;
 } SIMCONFIG;
 
 void pmx_resample(OPENPMX* pmx, const SIMCONFIG* const simconfig);
@@ -302,8 +303,6 @@ void pmx_estimate(OPENPMX* pmx, ESTIMCONFIG* const estimconfig);
 /* tables */
 /*---------------------------------------------------------------------*/
 typedef struct {
-	FILE* stream;
-	const char* filename;
 	const char* name;
 	bool firstonly;
 } TABLECONFIG;
@@ -368,7 +367,7 @@ typedef struct {
 	double step_size;
 	bool details;
 	STAGE1CONFIG stage1;
-	
+
 	/* output of limits */
 	PARAM* limit;
 	int nlimit;			/* input: number limit entries; output: written limit entries */
@@ -382,9 +381,7 @@ void pmx_covariance(OPENPMX* const pmx, COVARIANCECONFIG* const args);
 #define OPENPMX_VPC_PROB_MAX 8
 
 typedef struct {
-	SIMCONFIG simulate;
 	const char* name;
-	int nsim;				/* default 500 */
 	int nbins;				/* equal-count bins per stratum, default 10 */
 	const char* xfield;		/* binning variable, default "TIME" */
 	const char* stratfield;	/* optional stratification field */
@@ -407,6 +404,11 @@ typedef struct {
 void pmx_vpc(OPENPMX* pmx, VPCCONFIG* const vpcconfig);
 
 void pmx_vpc_clean(const OPENPMX* const openpmx, const char* name);
+
+/*---------------------------------------------------------------------*/
+/* NPDE */
+/*---------------------------------------------------------------------*/
+void pmx_npde(OPENPMX* pmx);
 
 
 #ifdef __cplusplus

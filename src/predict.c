@@ -107,7 +107,7 @@ static void idata_predict_pred_thread(INDIVID* const individ,
 											 popmodel->nomega,
 											 popmodel->sigma,
 											 popmodel->nsigma,
-											 scatteroptions ? scatteroptions->logstream : 0);
+											 scatteroptions->logstream);
 	/* only write pred */
 	individual_evaluate(&ievaluate_args,
 						0,				/* dont write imodel */
@@ -170,8 +170,8 @@ void pmx_predict_pred(OPENPMX* pmx)
 		fatal(0, "%s", errctx.errmsg);
 
 	idata_predict_pred(&pstate->idata,
-						  pstate->advanfuncs,
-						  &popmodel,
-						  &options);
+					   pstate->advanfuncs,
+					   &popmodel,
+					   &options);
 }
 

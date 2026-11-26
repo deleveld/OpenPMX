@@ -24,7 +24,9 @@
  *   3. Select the usable observations (DVTY filter, finite values, ...).
  *   4. Split observations into strata and equal-count bins along x.
  *   5. Compute observed (optionally prediction-corrected) percentiles per bin.
- *   6. Simulate nsim replicates, computing the same percentiles per bin.
+ *   6. Take the nsim simulated DV replicates stored in the idata (making
+ *      them with pmx_simulate() if there are none) and compute the same
+ *      percentiles per bin.
  *   7. Write the summary and points files via temp files + rename, so a
  *      failure never leaves a half-written output behind.
  */
@@ -34,9 +36,8 @@
 #include "popmodel.h"
 #include "print.h"
 #include "options.h"
-#include "scatter.h"
-#include "simulate.h"
 #include "pmxstate.h"
+#include "predict.h"
 #include "defines.h"
 #include "advan/advan.h"
 #include "utils/c22.h"
@@ -52,7 +53,6 @@
 #include <strings.h>
 #include <math.h>
 #include <limits.h>
-#include <time.h>
 
 #include <gsl/gsl_statistics.h>
 
@@ -117,8 +117,6 @@ static int vpc_field_offset(const STRUCTINFO* info, const char* name)
  * false if filename could not be read. */
 static bool vpc_filter_to(FILE* fout, const char* filename, const char* name, bool* const any)
 {
-	/* read the whole file into a mutable buffer; failure (e.g. the file
-	 * does not exist yet) is reported to the caller, not fatal */
 	ERRCTX errctx = { 0 };
 	var text = filecontent_alloc(filename, &errctx);
 	if (errctx.len)
@@ -127,22 +125,24 @@ static bool vpc_filter_to(FILE* fout, const char* filename, const char* name, bo
 	const size_t n = strlen(name);
 	int lineno = 0;
 	var ptr = text.mutptr;
-	/* walk the buffer line by line, terminating each line in place */
+
 	while (*ptr != '\0') {
 		var next_line = strchr(ptr, '\n');
-		if (next_line)
+		if (next_line) {
 			*next_line = '\0';
+			/* strip a trailing CR so CRLF files stay clean */
+			if (next_line > ptr && next_line[-1] == '\r')
+				next_line[-1] = '\0';
+		}
 
-		/* skip leading whitespace, then compare the first column with name.
-		 * The column must end at whitespace/end of line so "A" does not
-		 * match "AB". Line 0 is the header and is never removed. */
 		const char* p = ptr;
 		while (isspace((unsigned char)*p))
 			p++;
+
 		let match = lineno > 0 && n > 0 &&
 					strncmp(p, name, n) == 0 &&
 					(p[n] == '\0' || isspace((unsigned char)p[n]));
-		/* keep non-matching, non-blank lines */
+
 		if (!match && *p != '\0') {
 			fprintf(fout, "%s\n", ptr);
 			*any = true;
@@ -153,6 +153,7 @@ static bool vpc_filter_to(FILE* fout, const char* filename, const char* name, bo
 			break;
 		ptr = next_line + 1;
 	}
+
 	filecontent_free(&text);
 	return true;
 }
@@ -213,7 +214,7 @@ static inline double vpc_correct(const VPCCONFIG* const c,
 	if (c->correction == VPC_NOCORRECTION)
 		return y;
 	let lb = c->lbound;
-	return lb + (y - lb) * (predbin - lb) / (pred - lb);
+	return lb + (y - lb) * (predbin - lb) / fmax(pred - lb, 1e-6);
 }
 
 /* percentiles (R type 7) of finite values within each bin.
@@ -253,62 +254,67 @@ static void vpc_percentiles(const double* const val,
 	}
 }
 
-/* run one simulation pass over all individuals using the ETAs and
- * residual errors currently stored in idata. Stage 1 ordering is off since
- * no estimation is done. Results end up in idata->individ[0].yhat / pred. */
-static void vpc_simulate_pass(IDATA* const idata,
-							  const ADVANFUNCS* const advanfuncs,
-							  const POPMODEL* const popmodel,
-							  const OPTIONS* const options)
-{
-	SCATTEROPTIONS scatteroptions = { 
-		.stage1_order = false
-	};
-	scatter_threads(idata, advanfuncs, popmodel, 0, options, &scatteroptions, simulate_with_error_thread);
-}
-
-/// Prediction-corrected VPC. The dataset DV is not modified. Like
-/// pmx_simulate(), the individual ETAs in the state are overwritten.
+/// Prediction-corrected VPC. The dataset DV is not modified. The
+/// simulated DV values are taken from the idata of the source (as made by
+/// pmx_simulate() with nsim > 0). If there are none, nsim of them are made
+/// first with pmx_simulate() and stay in the idata of the source.
 /// The results are appended to the VPC output and points files. The
 /// first column is the VPC name and any previous VPC with the same name
 /// is replaced. The new files are written to temporary files and renamed
 /// over the old ones only after the VPC succeeded and was written fully.
 void pmx_vpc(OPENPMX* source, VPCCONFIG* const cfg)
 {
-	info(0, "VPC begin\n");
+	info(0, "vpc begin\n");
 
 	if (!cfg)
-		fatal(0, "VPC config required\n");
+		fatal(0, "vpc config required\n");
 	if (!source->filename || !*source->filename)
-		fatal(0, "VPC needs a filename\n");
+		fatal(0, "vpc needs a filename\n");
 
-	/* ---- apply defaults / validate config ----
-	 * nsim:  replicates (1000),
+	/* ---- defaults / validate config ----
 	 * nbins: bins per stratum (10),
 	 * ci:    width of the simulated confidence interval (0.95),
 	 * prob:  percentiles to report (5%, 50%, 95%) */
-	let nsim = cfg->nsim > 0 ? cfg->nsim : 1000;
 	let nbins = cfg->nbins > 0 ? cfg->nbins : 10;
 	let ci = (cfg->ci > 0. && cfg->ci < 1.) ? cfg->ci : 0.95;
 	double prob[OPENPMX_VPC_PROB_MAX] = { 0.05, 0.5, 0.95 };
 	int nprob = 3;
 	if (cfg->nprob > 0) {
 		if (cfg->nprob > OPENPMX_VPC_PROB_MAX)
-			fatal(0, "VPC nprob exceeds OPENPMX_VPC_PROB_MAX\n");
+			fatal(0, "vpc nprob exceeds OPENPMX_VPC_PROB_MAX\n");
 		nprob = cfg->nprob;
 		memcpyvar(prob, cfg->prob, nprob);
 		forcount(k, nprob)
 			if (!(prob[k] >= 0. && prob[k] <= 1.))
-				fatal(0, "VPC prob must be in [0,1]\n");
+				fatal(0, "vpc prob must be in [0,1]\n");
 	}
 
-	/* ---- private model copy and state ----
-	 * Work on a copy so the caller's state is not touched (its ETAs are
-	 * not overwritten), then build the population model, options and RNG */
+	/* ------------------------------------------------------------------ */
+	/* private working copy – keeps the source ETAs / state untouched   */
+	/* ------------------------------------------------------------------ */
 	var pmx = pmx_copy(source);
-	pmx.filename = source->filename;
 	pmx_ensure_state(&pmx);
-	var pstate = pmx.state;
+
+	/* ------------------------------------------------------------------ */
+	/* simulations executed in working copy so that source ETA isnt modified
+	 * Then the simulations are moved to source so they can be reused later */
+	/* ------------------------------------------------------------------ */
+	pmx_ensure_state(source);
+	if (!source->state->idata.sim.dv) {
+		SIMCONFIG simconfig = {
+			.nsim = 1000
+		};
+		pmx_simulate(&pmx, &simconfig);
+
+		/* move simulations to source, we dont need to free because we 
+		 * already know there are none */ 
+		source->state->idata.sim = pmx.state->idata.sim;
+		memset(&pmx.state->idata.sim, 0, sizeof(pmx.state->idata.sim));
+	} else
+		info(0, "vpc using previous %i simulations\n", source->state->idata.sim.nsim);
+	 
+	let nsim = source->state->idata.sim.nsim;
+	let simdv = source->state->idata.sim.dv;
 
 	ERRCTX errctx = { 0 };
 	var popmodel = popmodel_init(pmx.theta, pmx.omega, pmx.sigma, &errctx);
@@ -316,17 +322,14 @@ void pmx_vpc(OPENPMX* source, VPCCONFIG* const cfg)
 		fatal(0, "%s", errctx.errmsg);
 
 	var options = options_init(&pmx);
-	options.simulate = simconfig_default(&cfg->simulate);
-	pmx_ensure_state_rng(&pmx, &options);
 
 	/* ---- shortcuts into the data/state ---- */
+	var pstate = pmx.state;
 	var idata = &pstate->idata;
 	let advanfuncs = pstate->advanfuncs;
 	let recordinfo = &advanfuncs->recordinfo;
 	let dataconfig = recordinfo->dataconfig;
 	let ndata = recordinfo->ndata;
-	let nomega = idata->nomega;
-	let nsigma = popmodel.nsigma;
 	let recordsize = dataconfig->recordfields.size;
 	/* record offsets of the x variable (default TIME) and the optional
 	 * stratification variable (-1 = no stratification) */
@@ -356,7 +359,7 @@ void pmx_vpc(OPENPMX* source, VPCCONFIG* const cfg)
 	/* whitespace would break the space-separated output format */
 	for (var c = vpcname; *c; c++)
 		if (isspace((unsigned char)*c))
-			fatal(0, "VPC name '%s' cannot contain whitespace\n", vpcname);
+			fatal(0, "vpc name '%s' cannot contain whitespace\n", vpcname);
 
 	char dvtystr[32];	/* DVTY column value, NA if no DVTY filter */
 	if (offd >= 0)
@@ -364,13 +367,11 @@ void pmx_vpc(OPENPMX* source, VPCCONFIG* const cfg)
 	else
 		snprintf(dvtystr, sizeof(dvtystr), "NA");
 
-	/* PRED: population prediction, ETA=0 and no residual error */
-	forcount(i, idata->nindivid)
-		memset(idata->individ[i].eta, 0, nomega * sizeof(double));
-	memset(idata_alloc_simerr(idata), 0, ndata * nsigma * sizeof(double));
-	vpc_simulate_pass(idata, advanfuncs, &popmodel, &options);
-	var pred0 = mallocvar(double, ndata);
-	memcpyvar(pred0, idata->individ[0].yhat, ndata);
+	/* PRED: population prediction. Always recomputed on the private copy
+	 * because pmx_simulate() zeroes PRED. The copy is not simulated
+	 * afterwards so the PRED array stays valid until the state is released. */
+	idata_predict_pred(idata, advanfuncs, &popmodel, &options);
+	let pred0 = idata->individ[0].pred;
 
 	/* ---- observations used in the VPC ----
 	 * Per-observation arrays (indexed 0..nobs-1):
@@ -409,7 +410,7 @@ void pmx_vpc(OPENPMX* source, VPCCONFIG* const cfg)
 		nobs++;
 	}
 	if (nobs == 0)
-		fatal(0, "VPC has no usable observations\n");
+		fatal(0, "vpc no usable observations\n");
 
 	/* strata: sort a copy of the stratum values and compact it in place
 	 * to the unique values (ustrat[0..nstrat-1], ascending) */
@@ -533,33 +534,18 @@ void pmx_vpc(OPENPMX* source, VPCCONFIG* const cfg)
 	var obspct = mallocvar(double, (size_t)nbin * nprob);
 	vpc_percentiles(obsval, order, start, nbin, prob, nprob, buf, obspct);
 
-	struct timespec begin, now;
-	clock_gettime(CLOCK_MONOTONIC, &begin);
-	var stime = 0.;
-
-	/* simulated percentiles for each replicate.
+	/* simulated percentiles for each replicate, from the stored simulated
+	 * DV values (observation with noise).
 	 * simpct layout: [replicate][bin][prob] */
 	var simpct = mallocvar(double, (size_t)nsim * nbin * nprob);
 	forcount(s, nsim) {
-		clock_gettime(CLOCK_MONOTONIC, &now);
-		let t = timespec_time_difference(&begin, &now) / 1000.;
-		if (t > stime + 1) {
-			stime += 1.;
-			info(0, "VPC sim %i\n", s + 1);
-		} 
-		/* draw new individual ETAs and residual errors, then simulate */
-		idata_resample_eta(idata, &popmodel, pstate->rng);
-		idata_resample_err(idata, &popmodel, pstate->rng);
-		vpc_simulate_pass(idata, advanfuncs, &popmodel, &options);
-
 		/* correct the simulated values exactly like the observed ones and
 		 * take the per-bin percentiles of this replicate */
-		let pred = idata->individ[0].pred;	/* observation with noise */
+		let dv = &simdv[(size_t)s * ndata];
 		forcount(o, nobs)
-			val[o] = vpc_correct(cfg, pred[oidx[o]], opred[o], predbin[binof[o]]);
+			val[o] = vpc_correct(cfg, dv[oidx[o]], opred[o], predbin[binof[o]]);
 		vpc_percentiles(val, order, start, nbin, prob, nprob, buf, &simpct[(size_t)s * nbin * nprob]);
 	}
-	info(0, "VPC sim %i\n", nsim);
 
 	/* everything succeeded. Build the new files next to the old ones
 	 * (old rows of this name removed, new rows appended) and only
@@ -568,8 +554,8 @@ void pmx_vpc(OPENPMX* source, VPCCONFIG* const cfg)
 	char tmpout[PATH_MAX + 8], tmppts[PATH_MAX + 8];
 	bool out_empty, pts_empty;
 	
-	snprintf(fout_name, sizeof(fout_name), "%s" OPENPMX_VPC_OUT, pmx.filename);
-	snprintf(fpts_name, sizeof(fpts_name), "%s" OPENPMX_VPC_POINTS, pmx.filename);
+	snprintf(fout_name, sizeof(fout_name), "%s" OPENPMX_VPC_OUT, source->filename);
+	snprintf(fpts_name, sizeof(fpts_name), "%s" OPENPMX_VPC_POINTS, source->filename);
 	var out = vpc_open_tmp(fout_name, vpcname, tmpout, sizeof(tmpout), &out_empty);
 	var pts = vpc_open_tmp(fpts_name, vpcname, tmppts, sizeof(tmppts), &pts_empty);
 
@@ -636,23 +622,23 @@ void pmx_vpc(OPENPMX* source, VPCCONFIG* const cfg)
 	if (!ok_out || !ok_pts) {
 		remove(tmpout);
 		remove(tmppts);
-		fatal(0, "error writing VPC output\n");
+		fatal(0, "vpc error writing output\n");
 	}
 	if (VPC_RENAME(tmpout, fout_name) != 0 || VPC_RENAME(tmppts, fpts_name) != 0) {
 		remove(tmpout);
 		remove(tmppts);
-		fatal(0, "cannot replace VPC output files\n");
+		fatal(0, "vpc cannot replace output files\n");
 	}
 
-	/* ---- cleanup ---- */
+	/* cleanup */
 	pmx_release_state(&pmx);
-	free(pred0); free(oidx); free(ox); free(os); free(odv); free(opred);
+	free(oidx); free(ox); free(os); free(odv); free(opred);
 	free(ustrat); free(binof); free(bstrat); free(bnum); free(bedlo); free(bedhi); free(xo);
 	free(start); free(fill); free(order); free(buf);
 	free(xmed); free(predbin);
 	free(val); free(obsval); free(obspct); free(simpct);
 
-	info(0, "VPC end\n");
+	info(0, "vpc end\n");
 }
 
 /* remove all rows with first column == name, the header line is kept.

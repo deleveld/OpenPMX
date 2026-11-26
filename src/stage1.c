@@ -196,11 +196,11 @@ static void write_icov_from_reduced(double* icov,
 /// eta values, so it properly handles eta-sigma interaction.
 
 /* calculate individual variance covariance matrix */
-static double stage1_jacobian(const int nreta,
-								const double reta[static nreta],
-								const STAGE1_PARAMS* const params,
-								double* icov,
-								const int nobs)
+static gsl_matrix* jacobian_alloc(const int nreta,
+								  const double reta[static nreta],
+								  const STAGE1_PARAMS* const params,
+								  double* icov,
+								  const int nobs)
 {
 	double* testeta = params->testeta;
 	let nonzero = params->nonzero;
@@ -221,7 +221,6 @@ static double stage1_jacobian(const int nreta,
 	let nomega = popparam->nomega;
 	assert(gradient_step != 0.);
 	var J = gsl_matrix_alloc(nobs, nreta);
-	var reducedicov = gsl_matrix_alloc(nreta, nreta);
 
 	let advanfuncs = ievaluate_args->advanfuncs;
 	let record = ievaluate_args->record;
@@ -293,7 +292,7 @@ static double stage1_jacobian(const int nreta,
 				} else {
 					let upper = logp_plus_h[k];
 					let lower = logp_minus_h[k];
-					deriv = (upper - lower) / (above - below);
+					deriv = 0.5 * (upper - lower) / (above - below);
 				}
 				gsl_matrix_set(J, iobs, j, deriv);
 				++iobs;
@@ -309,12 +308,28 @@ static double stage1_jacobian(const int nreta,
 	free(logp_plus_h);
 	free(logp_minus_h);
 
+	return J;
+}
+
+static double stage1_focei_icov(const int nreta,
+								const double reta[static nreta],
+								const STAGE1_PARAMS* const params,
+								double* icov,
+								const int nobs)
+{
+	let ievaluate_args = &params->ievaluate_args;
+	let popparam = &ievaluate_args->popparam;
+	let nomega = popparam->nomega;
+	let nonzero = params->nonzero;
+
 	/* for now accumulate the inverse in reducedicov */
+	var reducedicov = gsl_matrix_alloc(nreta, nreta);
 	let omegainverse = gsl_matrix_const_view_array(nonzero->inversedata, nreta, nreta);
 	gsl_matrix_memcpy(reducedicov, &omegainverse.matrix);
 
 	/* we made J such that tJ*J is tGi*invVi*Gi in Term 5 from Bae and Yim */
 	/* multiply and accumulate omega inverse, all in one command */
+	let J = jacobian_alloc(nreta, reta, params, icov, nobs);
 	gsl_blas_dgemm(CblasTrans, CblasNoTrans, 1., J, J, 1., reducedicov);
 	gsl_matrix_free(J);
 
@@ -322,7 +337,6 @@ static double stage1_jacobian(const int nreta,
 	   the contribution from each individual to get the individual covariance,
 	   well, the inverse of it. Now we have to invert to get the actual
 	   individual covariance matrix */
-	let oldhandler = gsl_set_error_handler_off();
 	var saved_reducedicov = gsl_matrix_alloc(nreta, nreta);
 	gsl_matrix_memcpy(saved_reducedicov, reducedicov);
 	if (gsl_linalg_cholesky_decomp1(reducedicov) != GSL_SUCCESS) {
@@ -334,7 +348,6 @@ static double stage1_jacobian(const int nreta,
 		gsl_linalg_cholesky_decomp1(reducedicov);
 	}
 	gsl_matrix_free(saved_reducedicov);
-	gsl_set_error_handler(oldhandler);
 	let lndet = matrix_lndet_from_cholesky(reducedicov);
 	gsl_linalg_cholesky_invert(reducedicov);
 
@@ -344,9 +357,6 @@ static double stage1_jacobian(const int nreta,
 
 	return lndet;
 }
-
-#include <gsl/gsl_eigen.h>
-#include <gsl/gsl_blas.h>
 
 /* Replace symmetric R (n x n) by the inverse of its nearest-PD version:
  * eigenvalues below eps * lambda_max are clamped up to that floor.
@@ -392,7 +402,7 @@ static double matrix_eigen_clamp_invert(gsl_matrix* const R,
 }
 
 /* calculate individual variance covariance matrix */
-static double stage1_laplace(const int nreta,
+static double stage1_laplace_icov(const int nreta,
 								const double reta[static nreta],
 								const STAGE1_PARAMS* const params,
 								double* icov,
@@ -569,10 +579,8 @@ static double stage1_laplace(const int nreta,
 	   the contribution from each individual to get the individual covariance,
 	   well, the inverse of it. Now we have to invert to get the actual
 	   individual covariance matrix */
-	let oldhandler = gsl_set_error_handler_off();
 	int nclamp;
 	let lndet = matrix_eigen_clamp_invert(R, 1e-8, &nclamp);
-	gsl_set_error_handler(oldhandler);
 
 	write_icov_from_reduced(icov, nonzero, R, nomega);
 	gsl_matrix_free(R);
@@ -580,6 +588,8 @@ static double stage1_laplace(const int nreta,
 }
 
 /* NOTE: this function must be thread safe on the level of an individual */
+/* idata_iwres_free() and idata_cwres_free() should be called before 
+ * scatter_threads() on this function */
 void stage1_thread(INDIVID* const individ,
 				   const ADVANFUNCS* const advanfuncs,
 				   const POPMODEL* const popmodel,
@@ -604,6 +614,7 @@ void stage1_thread(INDIVID* const individ,
 	individ->eta_min2ll = 0.;
 	individ->icov_lndet = 0.;
 	individ->iobjfn = DBL_MAX;
+	individ->obs_logp = 0.;
 
 	/* do the evaluation in a test eta and copy back at the end */
 	/* this has to be done because we may unreduce the eta and there we
@@ -627,7 +638,7 @@ void stage1_thread(INDIVID* const individ,
 											  popmodel->nomega,
 											  popmodel->sigma,
 											  popmodel->nsigma,
-											  scatteroptions ? scatteroptions->logstream : 0),
+											  scatteroptions->logstream),
 		.nobs = individ->nobs,
 		.eval_msec = &individ->eval_msec,
 	};
@@ -693,7 +704,7 @@ void stage1_thread(INDIVID* const individ,
 	 * did in the evaluate above */
 	
 	/* on first run, do it more than once to stabilize step sizes */
-	let niter = all_eta_zero ? 4 : 1;
+	let niter = (all_eta_zero || scatteroptions->stage1_evaluate) ? 4 : 1;
 	forcount(i, niter) {
 
 		/* regular icov calcualtion via first derivatives. This adds the
@@ -706,26 +717,167 @@ void stage1_thread(INDIVID* const individ,
 					 individ->obs_min2ll +
 					 individ->obs_logp +
 					 individ->eta_min2ll;
-			individ->icov_lndet = stage1_laplace(nreta,
-												 reta,
-												 &stage1_params,
-												 icov,
-												 f0);
+			individ->icov_lndet = stage1_laplace_icov(nreta,
+													  reta,
+													  &stage1_params,
+													  icov,
+													  f0);
 		/* regular FOCEI with Jacobian outer-product */
 		} else {
-			individ->icov_lndet = stage1_jacobian(nreta,
-												  reta,
-												  &stage1_params,
-												  icov,
-												  individ->nobs);
+			individ->icov_lndet = stage1_focei_icov(nreta,
+													reta,
+													&stage1_params,
+													icov,
+													individ->nobs);
 		} 
 
 		/* if icov does not change, we can stop now */
-		if (fabs(last_icov_lndet - individ->icov_lndet) < 0.01)
+		if (i > 0 && fabs(last_icov_lndet - individ->icov_lndet) < 0.01)
 			break;
 	}
 
 	individ->ineval += stage1_ineval;
 	timespec_duration(&t1, &individ->stage1_msec);
 }
+
+/* call after stage1_thread, uses individ->eta, DV, yhat and yhatvar */
+/* idata_cwres_alloc() must be called before scatter_threads() to this function */
+void stage1_cwres_thread(INDIVID* const individ,
+						 const ADVANFUNCS* const advanfuncs,
+						 const POPMODEL* const popmodel,
+						 const NONZERO* const nonzero,
+						 const OPTIONS* const options,
+						 const SCATTEROPTIONS* const scatteroptions)
+{
+	let nomega = popmodel->nomega;
+	let nreta = nonzero->n;
+	let nrecord = individ->nrecord;
+	let recordinfo = &advanfuncs->recordinfo;
+	let h = options->estimate.stage1.gradient_step;
+	double* cwres = individ->cwres;
+	assert(cwres);
+
+	forcount(k, nrecord)
+		cwres[k] = NAN;
+	if (nreta == 0 || individ->nobs == 0)
+		return;
+
+	double testeta[OPENPMX_OMEGA_MAX];
+	forcount(i, OPENPMX_OMEGA_MAX)
+		testeta[i] = NAN;
+	memcpy(testeta, individ->eta, nomega * sizeof(double));
+	let args = ievaluate_args_init(individ->record,
+								   individ->nrecord,
+								   advanfuncs,
+								   popmodel->theta,
+								   popmodel->ntheta,
+								   testeta,
+								   popmodel->nomega,
+								   popmodel->sigma,
+								   popmodel->nsigma,
+								   scatteroptions ? scatteroptions->logstream : 0);
+	double reta[OPENPMX_OMEGA_MAX] = { };
+	reduce_eta(reta, testeta, nonzero);
+
+	/* continuous observations: evid 0 and yhatvar > 0 */
+	var idx = mallocvar(int, nrecord);
+	var dv = mallocvar(double, nrecord);
+	int m = 0;
+	const RECORD* ptr = individ->record;
+	forcount(k, nrecord) {
+		if (RECORDINFO_EVID(recordinfo, ptr) == 0 && individ->yhatvar[k] > 0.) {
+			dv[m] = RECORDINFO_DV(recordinfo, ptr);
+			idx[m++] = k;
+		}
+		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
+	}
+	if (m == 0) {
+		free(idx);
+		free(dv);
+		return;
+	}
+
+	/* G = df/deta at eta-hat */
+	var G = gsl_matrix_alloc(m, nreta);
+	var fp = mallocvar(double, nrecord);
+	var fm = mallocvar(double, nrecord);
+	double xx[OPENPMX_OMEGA_MAX] = { };
+	forcount(j, nreta) {
+		memcpy(xx, reta, nreta * sizeof(double));
+		xx[j] = reta[j] + h;
+		unreduce_eta(testeta, xx, nonzero);
+		individual_evaluate(&args, 0, 0, 0, fp, 0, 0, 0, 0, 0);
+		xx[j] = reta[j] - h;
+		unreduce_eta(testeta, xx, nonzero);
+		individual_evaluate(&args, 0, 0, 0, fm, 0, 0, 0, 0, 0);
+		forcount(r, m)
+			gsl_matrix_set(G, r, j, (fp[idx[r]] - fm[idx[r]]) / (2. * h));
+	}
+
+	/* reduced omega, row-major nomega x nomega (see note below) */
+	var Om = gsl_matrix_alloc(nreta, nreta);
+	forcount(a, nreta) {
+		forcount(b, nreta) {
+			let r = nonzero->rowcol[a];
+			let c = nonzero->rowcol[b];
+			gsl_matrix_set(Om, a, b, popmodel->omega[r][c]);
+		}
+	}
+	/* C = G Om G' + diag(yhatvar), z = y - (f - G eta) */
+	var GO = gsl_matrix_alloc(m, nreta);
+	var C = gsl_matrix_alloc(m, m);
+	gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1., G, Om, 0., GO);
+	gsl_blas_dgemm(CblasNoTrans, CblasTrans, 1., GO, G, 0., C);
+	var z = gsl_vector_alloc(m);
+	forcount(r, m) {
+		let k = idx[r];
+		gsl_matrix_set(C, r, r, gsl_matrix_get(C, r, r) + individ->yhatvar[k]);
+		var Geta = 0.;
+		forcount(j, nreta)
+			Geta += gsl_matrix_get(G, r, j) * reta[j];
+		gsl_vector_set(z, r, dv[r] - (individ->yhat[k] - Geta));
+	}
+
+	/* whiten with the Cholesky factor */
+	if (gsl_linalg_cholesky_decomp1(C) == GSL_SUCCESS) {
+		gsl_blas_dtrsv(CblasLower, CblasNoTrans, CblasNonUnit, C, z);
+		forcount(r, m)
+			cwres[idx[r]] = gsl_vector_get(z, r);
+	}
+
+	gsl_vector_free(z);
+	gsl_matrix_free(C);
+	gsl_matrix_free(GO);
+	gsl_matrix_free(Om);
+	gsl_matrix_free(G);
+	free(fp);
+	free(fm);
+	free(dv);
+	free(idx);
+}
+
+/* call after stage1_thread, uses DV, yhat and yhatvar */
+/* idata_iwres_alloc() must be called before this function */
+void stage1_iwres(INDIVID* const individ,
+				  const ADVANFUNCS* const advanfuncs)
+{
+	let nrecord = individ->nrecord;
+	let recordinfo = &advanfuncs->recordinfo;
+	var iwres = individ->iwres;
+
+	forcount(k, nrecord)
+		iwres[k] = NAN;
+	if (individ->nobs == 0)
+		return;
+
+	var ptr = individ->record;
+	forcount(k, nrecord) {
+		if (RECORDINFO_EVID(recordinfo, ptr) == 0 && individ->yhatvar[k] > 0.) {
+			let dv = RECORDINFO_DV(recordinfo, ptr);
+			iwres[k] = (dv - individ->yhat[k]) / sqrt(individ->yhatvar[k]);
+		}
+		ptr = RECORDINFO_INDEX(recordinfo, ptr, 1);
+	}
+}
+
 

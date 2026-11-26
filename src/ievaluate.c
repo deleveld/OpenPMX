@@ -1,4 +1,4 @@
-/* 
+	/* 
  * This file is part of OpenPMX (https://github.com/deleveld/openpmx).
  * Copyright (c) 2024 Douglas Eleveld.
  *
@@ -239,9 +239,6 @@ void individual_evaluate(const IEVALUATE_ARGS* const ievaluate_args,
 	forcount(i, nrecord) {
 		let predictstate = advan_advance(advan, imodel, ptr, popparam);
 
-		if (predictvars_saved)
-			memset(predictvars, 0, predictvars_size);
-			
 		let evid = RECORDINFO_EVID(recordinfo, ptr);
 		let yhat = (evid == 0 || predictall) ? 
 					evaluate_yhat(imodel, &predictstate, predict, advanmem.errarray, predictvars) : 
@@ -444,7 +441,7 @@ void individual_checkout(const IEVALUATE_ARGS* const ievaluate_args)
 
 		/* other event type */
 		} else {
-			if (!gsl_finite(dv) && dv != 0.)
+			if (gsl_finite(dv) && dv != 0.)
 				warning(logstream, "non-zero DV (%f) for non-observation: ID %f time %f record %i\n", dv, id, time, i + record_offset);
 		}
 
@@ -554,7 +551,12 @@ void individual_simulate(const IEVALUATE_ARGS* const ievaluate_args,
 		/* do prediction with the random error, put into pred */
 		/* pred contains the prediction (*with* noise) */
 		/* point to residual error with non-zero err values */
-		let errarray = &isimerr[i * nsigma];
+		let errarray1 = &isimerr[i * nsigma];
+		double errarray[OPENPMX_SIGMA_MAX];
+		forcount(j, OPENPMX_SIGMA_MAX)
+			errarray[j] = NAN;
+		forcount(j, nsigma)
+			errarray[j] = errarray1[j];
 		let pred = (RECORDINFO_EVID(recordinfo, ptr) == 0) ?
 					evaluate_yhat(imodel, &advanstate, predict, errarray, predictvars) :
 					(PREDRES){ 0 };

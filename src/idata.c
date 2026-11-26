@@ -45,10 +45,10 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 	let nindivid = recordinfo->nindivid;
 	let nobs = recordinfo->nobs;
 
-	assert(ntheta <= OPENPMX_THETA_MAX);
-	assert(nomega <= OPENPMX_OMEGA_MAX);
-	assert(nsigma <= OPENPMX_SIGMA_MAX);
-	assert(nstate <= OPENPMX_STATE_MAX);
+	assert(ntheta < OPENPMX_THETA_MAX);
+	assert(nomega < OPENPMX_OMEGA_MAX);
+	assert(nsigma < OPENPMX_SIGMA_MAX);
+	assert(nstate < OPENPMX_STATE_MAX);
 
 	var imodel = (IMODEL*)calloc(ndata, imodel_size);
 	var state = callocvar(double, ndata * nstate);
@@ -68,9 +68,8 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 		var nrecordi = 0;
 		let thisid = RECORDINFO_ID(recordinfo, RECORDINFO_INDEX(recordinfo, data, i));
 		while (i+nrecordi < ndata && RECORDINFO_ID(recordinfo, RECORDINFO_INDEX(recordinfo, data, i+nrecordi)) == thisid) {
-			let dv = RECORDINFO_DV(recordinfo, RECORDINFO_INDEX(recordinfo, data, i+nrecordi)); 
 			let evid = RECORDINFO_EVID(recordinfo, RECORDINFO_INDEX(recordinfo, data, i+nrecordi)); 
-			if (!isnan(dv) && evid == 0)
+			if (evid == 0)
 				++nobsi;
 			++nrecordi;
 		}
@@ -94,7 +93,9 @@ IDATA idata_construct(const RECORDINFO* const recordinfo,
 			.yhatvar = &yhatvar[i],
 			.pred = &pred[i],
 			.predictvars = (PREDICTVARS*)((char*)predictvars + i * predictvars_size),
-			.isimerr = 0,
+			.simerr = 0,
+			.cwres = 0,
+			.iwres = 0,
 
 			.obs_min2ll = 0.,
 			.obs_lndet = 0.,
@@ -146,39 +147,111 @@ void idata_destruct(IDATA* const idata)
 	free(firstindivid->pred);
 	free(firstindivid->predictvars);
 
-	/* these pointers are only non-zero if idata_alloc_... functions were called */
-	free(firstindivid->isimerr);
+	/* these pointers are only non-zero if idata_*_alloc... functions were called */
+	free(firstindivid->simerr);
+	free(firstindivid->cwres);
+	free(firstindivid->iwres);
+	free(firstindivid->npde);
+	free(idata->sim.dv);
 
 	/* now we can safely delete the individ array itself */
 	free(idata->individ);
 }
 
-double* idata_alloc_simerr(const IDATA* const idata)
+static double *idata_alloc_per_record(const IDATA *const idata,
+                                      double **slot0,
+                                      int stride)
 {
-	let individ = idata->individ;
-	if (individ[0].isimerr == 0) {
-		let ndata = idata->ndata;
-		let nsigma = idata->nsigma;
-		var simerr = mallocvar(double, ndata * nsigma);
+	if (*slot0)
+		return *slot0;
 
-		let nindivid = idata->nindivid;
-		var ioffset = 0;
-		forcount(i, nindivid) {
-			individ[i].isimerr = &simerr[ioffset * nsigma];
-			ioffset += individ[i].nrecord;
-		}
+	double *buf = callocvar(double, idata->ndata * stride);
+	int ioffset = 0;
+
+	forcount(i, idata->nindivid) {
+		/* each INDIVID is contiguous, so the corresponding field
+		 * is exactly sizeof(INDIVID) bytes further on */
+		double **field = (double **)((char *)slot0 + i * sizeof(INDIVID));
+		*field = &buf[ioffset * stride];
+		ioffset += idata->individ[i].nrecord;
 	}
-	return individ[0].isimerr;
+
+	return *slot0;
 }
 
-void idata_free_simerr(const IDATA* const idata)
+double *idata_simerr_alloc(const IDATA *const idata)
 {
-	let individ = idata->individ;
-	let nindivid = idata->nindivid;
-	var simerr = individ[0].isimerr;
-	forcount(i, nindivid)
-		individ[i].isimerr = 0;
+	return idata_alloc_per_record(idata, &idata->individ[0].simerr, idata->nsigma);
+}
+
+double *idata_cwres_alloc(const IDATA *const idata)
+{
+	return idata_alloc_per_record(idata, &idata->individ[0].cwres, 1);
+}
+
+double *idata_iwres_alloc(const IDATA *const idata)
+{
+	return idata_alloc_per_record(idata, &idata->individ[0].iwres, 1);
+}
+
+double *idata_npde_alloc(const IDATA *const idata)
+{
+	return idata_alloc_per_record(idata, &idata->individ[0].npde, 1);
+}
+
+void idata_simerr_free(const IDATA* const idata)
+{
+	var simerr = idata->individ[0].simerr;
+	forcount(i, idata->nindivid)
+		idata->individ[i].simerr = 0;
 	free(simerr);
+}
+
+void idata_cwres_free(const IDATA* const idata)
+{
+	var cwres = idata->individ[0].cwres;
+	forcount(i, idata->nindivid)
+		idata->individ[i].cwres = 0;
+	free(cwres);
+}
+
+void idata_iwres_free(const IDATA* const idata)
+{
+	var iwres = idata->individ[0].iwres;
+	forcount(i, idata->nindivid)
+		idata->individ[i].iwres = 0;
+	free(iwres);
+}
+
+void idata_npde_free(const IDATA* const idata)
+{
+	var npde = idata->individ[0].npde;
+	forcount(i, idata->nindivid)
+		idata->individ[i].npde = 0;
+	free(npde);
+}
+
+double* idata_sim_alloc(IDATA* const idata, const int nsim)
+{
+	/* check if already allocated */
+	if (idata->sim.dv && idata->sim.nsim == nsim)
+		return idata->sim.dv;
+	
+	free(idata->sim.dv);
+
+	let ndata = idata->ndata;
+	var dv = callocvar(double, ndata * nsim);
+	idata->sim.dv = dv;
+	idata->sim.nsim = nsim;
+
+	return dv;
+}
+
+void idata_sim_free(IDATA* const idata)
+{
+	free(idata->sim.dv);
+	idata->sim.dv = 0;
+	idata->sim.nsim = 0;
 }
 
 int idata_ineval(const IDATA* const idata, const bool reset)
@@ -326,6 +399,7 @@ void table_yhat_idata(const char* filename,
 	fprintf(f, OPENPMX_HEADER_FORMAT, "YHAT");
 	fprintf(f, OPENPMX_HEADER_FORMAT, "YHATVAR");
 	fprintf(f, OPENPMX_HEADER_FORMAT, "PRED");
+	fprintf(f, OPENPMX_HEADER_FORMAT, "CWRES");
 
 	let indexoffset = _offset1 ? 1 : 0;
 	let nstate = idata->nstate;
@@ -345,6 +419,7 @@ void table_yhat_idata(const char* filename,
 			fprintf(f, OPENPMX_TABLE_FORMAT, individ->yhat[j]);
 			fprintf(f, OPENPMX_TABLE_FORMAT, individ->yhatvar[j]);
 			fprintf(f, OPENPMX_TABLE_FORMAT, individ->pred[j]);
+			fprintf(f, OPENPMX_TABLE_FORMAT, individ->cwres ? individ->cwres[j] : NAN);
 
 			let istate = individ->istate;
 			forcount(i, nstate) 

@@ -28,7 +28,6 @@ This repository contains the work-in-progress (WIP) development version and coul
 A free-to-use install of a stable release is available at [OpenPMX online free](https://openpmx.com).
 
 ### Features
-
 - First-order conditional estimation with interation (FOCEI) results similar to industry standard [NONMEM](https://www.iconplc.com/solutions/technologies/nonmem)
 - Code and simulate/estimate models using text files and C allows scripting and integration with other tools
 - System advancers for:
@@ -37,14 +36,24 @@ A free-to-use install of a stable release is available at [OpenPMX online free](
 	- Eigensystem solver for linear models of any topology
 - Utilize multi-core CPUs via [OpenMP](https://www.openmp.org/) or [pthreads](https://man7.org/linux/man-pages/man7/pthreads.7.html)
 - Estimation speed comparable with NONMEM
+- VPC, NPDE, CWRES, and IWRES calculation and graphics
 - Limited project scope and complexity, focused on simulation and estimation
-- Few dependencies: [gcc](https://gcc.gnu.org/), [GSL](https://www.gnu.org/software/gsl/)
+- Few dependencies: [gcc](https://gcc.gnu.org/), [GSL](https://www.gnu.org/software/gsl/), graphics uses [R](https://www.r-project.org/)
+ 
+### New features 0.1.8
+- Script `openpmx` replaced with an executable file
+- NPDE calculation via `npde();` and plotting added to graphics.R
+- VPC calculation via `vpc();` and plotting added to graphics.R
+- NPDE and VPC share previous simulation results
+- Simulation with multiple repeats shows progress
+- Calculation of CWRES and IWRES
+- If a likelihood profile is missing the upper and lower bounds then they are inferred from parameter limits
 
 ### New features 0.1.7
 - Added an initial LAPLACE method the stage1.c, still testing to see if any performance is gained. Based on code submitted by Erik Olofsen (e.olofsen@weggetjes.nl).
 - Documentation of the FOCEI method derived from code and documentation submitted by Erik Olofsen (e.olofsen@weggetjes.nl)
 - Speed optimized advance functions for two- and three-compartment models and eigensystem solver.
-- Covariance matrix of estimation via `covariance()` to determine parameter limits.
+- Covariance matrix of estimation via `covariance()` to determine parameter limits
 	- For a given change in objective function value, the upper and lower bounds of the estimated `THETA()`, `SIGMA()`, and `OMEGA()` diagonal values are calculated
 	- The default uses the Sandwitch matrix (R<sup>-1</sup>*S*R<sup>-1</sup>)
 	- The near-null space of S and R are examined to determine non-idenifiable parameters
